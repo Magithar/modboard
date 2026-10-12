@@ -141,10 +141,17 @@ const list = (setting: unknown, fallback: string) =>
     .map(item => item.trim())
     .filter(Boolean)
 
-// The entry after `current` in `cycle`, wrapping; the first when `current`
-// matches none (a model named in full matches its short name).
+// The entry after `current` in `cycle`, wrapping from the last to the first;
+// the first when `current` matches none. An exact match wins, so "xhigh" is
+// never taken for "high"; otherwise the longest name inside it, so a model
+// named in full ("claude-opus-5-5") matches its short name ("opus").
 function after(cycle: string[], current: string) {
-  const at = cycle.findIndex(item => current.toLowerCase().includes(item.toLowerCase()))
+  const now = current.toLowerCase()
+  let at = cycle.findIndex(item => item.toLowerCase() === now)
+  if (at < 0) {
+    const inside = cycle.filter(item => now.includes(item.toLowerCase())).sort((a, b) => b.length - a.length)[0]
+    at = inside === undefined ? -1 : cycle.indexOf(inside)
+  }
   return cycle[(at + 1) % cycle.length]!
 }
 

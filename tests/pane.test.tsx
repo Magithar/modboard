@@ -281,3 +281,17 @@ test('the models and efforts settings choose what the blocks step through', { op
   expect(calls).toContainEqual(['/model', 'fable'])
   expect(calls).toContainEqual(['/effort', 'low'])
 })
+
+test('effort steps through every level in order and wraps from the highest to the lowest', async ($, on) => {
+  const calls = host(on, [task('T-001', 'todo')], { effort: 'medium' })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  const seen: string[] = []
+  for (let i = 0; i < 5; i++) {
+    await band.press({ key: 'effort' })
+    seen.push(String((await band.find({ key: 'effort' }))?.props.label))
+  }
+  // "xhigh" contains "high": it must still step on to "max", not back to itself.
+  expect(seen).toEqual(['effort high', 'effort xhigh', 'effort max', 'effort low', 'effort medium'])
+  expect(calls.filter(c => c[0] === '/effort').map(c => c[1])).toEqual(['high', 'xhigh', 'max', 'low', 'medium'])
+})
