@@ -151,7 +151,18 @@ The display shows only what needs you. Everything else waits until you ask.
 **One line above the prompt**, always visible while there's work on the board:
 
 ```
-2 tasks waiting · 1 in progress   T-005 needs someone to continue it   5-hour limit ▓▓▓▓▓▓░░░░ 64%   [ Sonnet 5.5 ]  [ effort medium ]
+2 tasks waiting · 1 in progress   T-005 needs someone to continue it   5-hour limit ▓▓▓▓▓▓░░░░ 64%   model Sonnet 5.5   effort medium
+```
+
+The line never wraps. In a narrow window its parts shorten first, then the
+last ones drop off. The first block (the summary) keeps its full form longest,
+and the alert outlasts the counts:
+
+```
+120 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
+ 60 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
+ 34 cols   2 tasks waiting   5h ▓▓▓░░  64%
+ 16 cols   2 tasks waiting
 ```
 
 The alert names the one thing that needs you: a task someone left with notes
@@ -185,16 +196,18 @@ as comma-separated lists, in order:
 | `summary` | ✓ | | what's waiting and in progress, and the one thing that needs you |
 | `tasks` | | ✓ | in progress, then waiting, then a count of done |
 | `usage` | ✓ | ✓ | plan usage per window: in the band past 50%, in the pane with resets |
-| `model` | ✓ | ✓ | the session's model; press it (or `m`) to switch to the next one |
-| `effort` | ✓ | ✓ | the effort level; press it (or `e`) to step to the next one |
+| `model` | ✓ | ✓ | the session's model; click it to switch to the next one |
+| `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest |
 | `clock` | ✓ | ✓ | the time |
 | `context` | ✓ | ✓ | context fill and the session's cost |
 | `agents` | | ✓ | who is live on the board |
 
 The defaults are `band: summary,usage,model,effort` and `pane: tasks,usage`.
 
-Pressing `model` or `effort` runs Claude Code's own `/model` or `/effort`, so
-the switch is the same as typing the command. The `models` setting lists what
+Click `model` or `effort` to switch: each click runs Claude Code's own
+`/model` or `/effort`, the same as typing the command. (In the `/board` pane
+they also answer to `m` and `e`.) Note that `/effort` saves the level as your
+default for new sessions, except `max`, which lasts for this session only. The `models` setting lists what
 the model block steps through (default `opus,sonnet,haiku`), and `efforts`
 lists the effort levels (default `low,medium,high,xhigh,max`). A model or
 effort changed by hand shows on the next request. Each block is

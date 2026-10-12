@@ -254,10 +254,10 @@ test('the model block shows the model and switches to the next one when pressed'
   const calls = host(on, [task('T-001', 'todo')])
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
-  expect((await band.find({ key: 'model' }))?.props.label).toBe('Sonnet 5.5')
+  expect((await band.find({ key: 'model' }))?.props.label).toBe('model Sonnet 5.5')
   await band.press({ key: 'model' })
   expect(calls).toContainEqual(['/model', 'haiku'])
-  expect((await band.find({ key: 'model' }))?.props.label).toBe('Haiku 5.5')
+  expect((await band.find({ key: 'model' }))?.props.label).toBe('model Haiku 5.5')
   await band.press({ key: 'model' })
   expect(calls).toContainEqual(['/model', 'opus'])
 })
@@ -294,4 +294,63 @@ test('effort steps through every level in order and wraps from the highest to th
   // "xhigh" contains "high": it must still step on to "max", not back to itself.
   expect(seen).toEqual(['effort high', 'effort xhigh', 'effort max', 'effort low', 'effort medium'])
   expect(calls.filter(c => c[0] === '/effort').map(c => c[1])).toEqual(['high', 'xhigh', 'max', 'low', 'medium'])
+})
+
+// The band at a given width: what it shows, and how wide that is.
+async function bandAt($: any, columns: number) {
+  const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND, props: { ...BAND.props, bodyColumns: columns } } as any)
+  const shown: string[] = (await ui.findAll({ type: 'Text' })).map((t: any) => t.text)
+  await ui.unmount()
+  return shown
+}
+
+test('the band never wraps: it narrows its parts, then leaves the last ones out', async ($, on) => {
+  host(on, [task('T-001', 'todo'), task('T-002', 'todo')], { effort: 'low' })
+  on('session.measure', (_$, e: any) => ({ changed: e.changed }))
+  await $.session.start(START)
+  await $.session.measure(measure(64) as any)
+
+  const wide = await bandAt($, 120)
+  expect(wide).toEqual(expect.arrayContaining(['2 tasks waiting', '5-hour limit', 'model ', 'Sonnet 5.5', 'effort ', 'low']))
+
+  const medium = await bandAt($, 60)
+  expect(medium).toEqual(expect.arrayContaining(['2 tasks waiting', 'Sonnet 5.5', 'low']))
+  expect(medium).not.toContain('model ')
+  expect(medium).not.toContain('effort ')
+
+  const narrow = await bandAt($, 34)
+  expect(narrow).toContain('2 tasks waiting')
+  expect(narrow).toContain('5h')
+  expect(narrow).not.toContain('Sonnet 5.5')
+
+  const tiny = await bandAt($, 16)
+  expect(tiny).toEqual(['2 tasks waiting'])
+})
+
+test('when the line is short, the alert outlasts the counts', async ($, on) => {
+  host(on, [handedOff('T-005', 'frontend'), task('T-002', 'todo')])
+  await $.session.start(START)
+  expect(await bandAt($, 30)).toEqual(['2 waiting', 'T-005 needs you'])
+  expect(await bandAt($, 16)).toEqual(['T-005 needs you'])
+})
+
+test('at every width, what the band draws fits the line', async ($, on) => {
+  host(on, [handedOff('T-005', 'frontend'), task('T-001', 'claimed', 'codex')], { effort: 'xhigh' })
+  on('session.measure', (_$, e: any) => ({ changed: e.changed }))
+  on('ui.render', { component: 'AbovePrompt' } as any, ($: any, e: any) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>{''}</Text>
+  })
+  await $.session.start(START)
+  await $.session.measure(measure(93) as any)
+  for (const columns of [140, 100, 80, 60, 40, 30, 20, 12]) {
+    const shown = await bandAt($, columns)
+    // Texts inside one part sit together; parts are 3 apart.
+    const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND, props: { ...BAND.props, bodyColumns: columns } } as any)
+    const tree: any = await ui.drawn()
+    await ui.unmount()
+    const parts = (tree.children ?? []).length
+    const width = shown.join('').length + (parts > 1 ? 3 * (parts - 1) : 0)
+    expect(width <= columns).toBe(true)
+  }
 })

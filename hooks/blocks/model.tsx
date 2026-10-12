@@ -11,12 +11,26 @@ export const modelName = (id: string) => {
 // setting, through Claude Code's own /model, as if you had typed it.
 export const model: Block = {
   name: 'model',
-  band: ({ ui: { Button }, model: id, act }) => (
-    <Button key="model" hotkey="m" label={modelName(id)} onPress={act.nextModel} />
-  ),
+  band: ({ ui: { Button, Text }, model: id, act }) => {
+    const name = modelName(id)
+    const press = (label: string, children: any) => ({
+      tree: (
+        <Button key="model" plain onPress={act.nextModel}>
+          {children}
+        </Button>
+      ),
+      width: label.length,
+    })
+    return [
+      press(`model ${name}`, [<Text dimColor>model </Text>, <Text bold>{name}</Text>]),
+      press(name, <Text bold>{name}</Text>),
+    ]
+  },
   pane: ({ ui: { Box, Button, Text }, model: id, act }) => (
-    <Box gap={1}>
-      <Text dimColor>model </Text>
+    <Box>
+      <Box width={8}>
+        <Text dimColor>model</Text>
+      </Box>
       <Button key="model" hotkey="m" label={modelName(id)} onPress={act.nextModel} />
     </Box>
   ),

@@ -4,12 +4,26 @@ import type { Block } from './types'
 // `efforts` setting, through Claude Code's own /effort.
 export const effort: Block = {
   name: 'effort',
-  band: ({ ui: { Button }, effort: level, act }) => (
-    <Button key="effort" hotkey="e" label={`effort ${level || '–'}`} onPress={act.nextEffort} />
-  ),
+  band: ({ ui: { Button, Text }, effort: level, act }) => {
+    const shown = level || '–'
+    const press = (label: string, children: any) => ({
+      tree: (
+        <Button key="effort" plain onPress={act.nextEffort}>
+          {children}
+        </Button>
+      ),
+      width: label.length,
+    })
+    return [
+      press(`effort ${shown}`, [<Text dimColor>effort </Text>, <Text bold>{shown}</Text>]),
+      press(shown, <Text bold>{shown}</Text>),
+    ]
+  },
   pane: ({ ui: { Box, Button, Text }, effort: level, act }) => (
-    <Box gap={1}>
-      <Text dimColor>effort</Text>
+    <Box>
+      <Box width={8}>
+        <Text dimColor>effort</Text>
+      </Box>
       <Button key="effort" hotkey="e" label={level || '–'} onPress={act.nextEffort} />
     </Box>
   ),

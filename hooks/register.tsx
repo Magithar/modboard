@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Agent, Task } from '../types'
-import { BLOCKS, type Ctx } from './blocks'
+import { BLOCKS, type BandForm, type Ctx } from './blocks'
 
 // The mod is an adapter: every board read and write goes through bin/board.mjs,
 // the same CLI Codex or a human runs, so it works whatever storage block holds
@@ -134,6 +134,23 @@ const pick = (setting: unknown, fallback: string) =>
     .split(',')
     .map(name => BLOCKS.find(b => b.name === name.trim()))
     .filter(b => b !== undefined)
+
+const GAP = 3
+
+// The band never wraps. The `band` setting's order is the order of importance,
+// so the first block (the board's summary, by default) holds its full form
+// longest: first the others narrow, last first; then the others go, last
+// first; only then does the first block narrow.
+function fit(offered: BandForm[][], columns: number): BandForm[] {
+  const chosen = offered.map(() => 0)
+  let kept = offered.length
+  const width = () => offered.slice(0, kept).reduce((sum, forms, i) => sum + forms[chosen[i]!]!.width, 0) + GAP * Math.max(0, kept - 1)
+  for (let i = kept - 1; i >= 1 && width() > columns; i--) while (chosen[i]! < offered[i]!.length - 1 && width() > columns) chosen[i]!++
+  while (kept > 1 && width() > columns) kept--
+  while (kept === 1 && chosen[0]! < offered[0]!.length - 1 && width() > columns) chosen[0]!++
+  if (width() > columns) kept = 0
+  return offered.slice(0, kept).map((forms, i) => forms[chosen[i]!]!)
+}
 
 const list = (setting: unknown, fallback: string) =>
   String(setting ?? fallback)
@@ -283,10 +300,15 @@ export const register: Register = (on, options) => {
     if (e.props.hasSurvey || !band.length) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     const c = await context($, e.props.bodyColumns, { Box, Text, Button }, actions($, cycles))
-    const parts = band.map(b => b.band!(c)).filter(part => part !== null)
+    const offered = band.map(b => b.band!(c)).filter((forms): forms is BandForm[] => forms !== null && forms.length > 0)
+    const parts = fit(offered, e.props.bodyColumns)
     if (!parts.length) return next(e)
     return (
-      <Box gap={3}>{parts}</Box>
+      <Box gap={GAP} flexWrap="nowrap">
+        {parts.map(part => (
+          <Box flexShrink={0}>{part.tree}</Box>
+        ))}
+      </Box>
     )
   })
 

@@ -14,4 +14,4 @@ import type { Block } from './types'
 
 export const BLOCKS: Block[] = [summary, tasks, usage, model, effort, clock, context, agents]
 
-export type { Block, Ctx } from './types'
+export type { BandForm, Block, Ctx } from './types'
