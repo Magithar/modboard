@@ -20,6 +20,8 @@ const tasks = atom({ plugin: 'agent-board', key: 'tasks' } as const, [])
 const agents = atom({ plugin: 'agent-board', key: 'agents' } as const, [])
 const me = atom({ plugin: 'agent-board', key: 'me' } as const, '')
 const usage = atom({ plugin: 'agent-board', key: 'usage' } as const, { limits: [] })
+const model = atom({ plugin: 'agent-board', key: 'model' } as const, '')
+const effort = atom({ plugin: 'agent-board', key: 'effort' } as const, '')
 
 let session = ''
 let lastBeat = 0
@@ -133,7 +135,38 @@ const pick = (setting: unknown, fallback: string) =>
     .map(name => BLOCKS.find(b => b.name === name.trim()))
     .filter(b => b !== undefined)
 
-async function context($: EngineInterface, width: number, ui: Ctx['ui']): Promise<Ctx> {
+const list = (setting: unknown, fallback: string) =>
+  String(setting ?? fallback)
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+
+// The entry after `current` in `cycle`, wrapping; the first when `current`
+// matches none (a model named in full matches its short name).
+function after(cycle: string[], current: string) {
+  const at = cycle.findIndex(item => current.toLowerCase().includes(item.toLowerCase()))
+  return cycle[(at + 1) % cycle.length]!
+}
+
+// Switch the way the person would, through Claude Code's own commands, so
+// everything else in the session sees the change.
+function actions($: EngineInterface, cycles: { models: string[]; efforts: string[] }): Ctx['act'] {
+  return {
+    nextModel: async () => {
+      const to = after(cycles.models, await read($, model))
+      await $.command.run({ command: 'model', args: to }).catch(() => $.ui.toast(`board: could not switch the model to ${to}`))
+      const now = await $.session.model()
+      await update($, model, () => now || to)
+    },
+    nextEffort: async () => {
+      const to = after(cycles.efforts, await read($, effort))
+      await $.command.run({ command: 'effort', args: to }).catch(() => $.ui.toast(`board: could not set effort to ${to}`))
+      await update($, effort, () => to)
+    },
+  }
+}
+
+async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
   return {
     ui,
     width,
@@ -142,14 +175,24 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui']): Promis
     tasks: await read($, tasks),
     agents: await read($, agents),
     usage: await read($, usage),
+    model: await read($, model),
+    effort: await read($, effort),
+    act,
   }
 }
 
 export const register: Register = (on, options) => {
-  const band = pick(options.band, 'summary,usage').filter(b => b.band)
+  const band = pick(options.band, 'summary,usage,model,effort').filter(b => b.band)
   const pane = pick(options.pane, 'tasks,usage').filter(b => b.pane)
+  const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
 
   on('session.start', async ($, e, next) => {
+    // Clears a status line an earlier version of this mod left behind.
+    $.ui.status(undefined)
+    const startModel = await $.session.model()
+    const startEffort = (await $.env.get('CLAUDE_EFFORT')) ?? ''
+    await update($, model, () => startModel)
+    await update($, effort, () => startEffort)
     session = await $.session.id()
     const name = await takeName($, await $.env.get('BOARD_AGENT'))
     await update($, me, () => name)
@@ -192,6 +235,18 @@ export const register: Register = (on, options) => {
     return ran
   })
 
+  // Each main-session request names the model and effort it runs with: the
+  // truth when the person switched with /model or /effort themselves.
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined) {
+      try {
+        await update($, model, () => e.model)
+        if (e.effort !== undefined) await update($, effort, () => String(e.effort))
+      } catch {}
+    }
+    return yield* next(e)
+  })
+
   on('session.measure', async ($, e, next) => {
     await update($, usage, () => ({
       limits: e.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt })),
@@ -219,8 +274,8 @@ export const register: Register = (on, options) => {
   // The band: one line above the prompt, quiet when no block has anything to say.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || !band.length) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
-    const c = await context($, e.props.bodyColumns, { Box, Text })
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const c = await context($, e.props.bodyColumns, { Box, Text, Button }, actions($, cycles))
     const parts = band.map(b => b.band!(c)).filter(part => part !== null)
     if (!parts.length) return next(e)
     return (
@@ -229,8 +284,8 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
-    const c = await context($, e.props.bodyColumns ?? 40, { Box, Text })
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const c = await context($, e.props.bodyColumns ?? 40, { Box, Text, Button }, actions($, cycles))
     const parts = pane.map(b => b.pane!(c)).filter(part => part !== null)
     return (
       <Box flexDirection="column" gap={1} paddingX={1}>

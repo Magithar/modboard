@@ -19,14 +19,26 @@
     "band": {
       "type": "string",
       "title": "Band blocks",
-      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, usage, clock, context.",
-      "default": "summary,usage"
+      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, usage, model, effort, clock, context.",
+      "default": "summary,usage,model,effort"
     },
     "pane": {
       "type": "string",
       "title": "Pane blocks",
-      "description": "Blocks in the /board pane, in order, comma-separated: tasks, usage, clock, context, agents.",
+      "description": "Blocks in the /board pane, in order, comma-separated: tasks, usage, model, effort, clock, context, agents.",
       "default": "tasks,usage"
+    },
+    "models": {
+      "type": "string",
+      "title": "Models to switch between",
+      "description": "The models the model block steps through, in order, as /model takes them.",
+      "default": "opus,sonnet,haiku"
+    },
+    "efforts": {
+      "type": "string",
+      "title": "Effort levels to switch between",
+      "description": "The levels the effort block steps through, in order, as /effort takes them.",
+      "default": "low,medium,high,xhigh,max"
     }
   }
 }

@@ -151,7 +151,7 @@ The display shows only what needs you. Everything else waits until you ask.
 **One line above the prompt**, always visible while there's work on the board:
 
 ```
-2 tasks waiting · 1 in progress   T-005 needs someone to continue it   5-hour limit ▓▓▓▓▓▓░░░░ 64%
+2 tasks waiting · 1 in progress   T-005 needs someone to continue it   5-hour limit ▓▓▓▓▓▓░░░░ 64%   [ Sonnet 5.5 ]  [ effort medium ]
 ```
 
 The alert names the one thing that needs you: a task someone left with notes
@@ -185,11 +185,19 @@ as comma-separated lists, in order:
 | `summary` | ✓ | | what's waiting and in progress, and the one thing that needs you |
 | `tasks` | | ✓ | in progress, then waiting, then a count of done |
 | `usage` | ✓ | ✓ | plan usage per window: in the band past 50%, in the pane with resets |
+| `model` | ✓ | ✓ | the session's model; press it (or `m`) to switch to the next one |
+| `effort` | ✓ | ✓ | the effort level; press it (or `e`) to step to the next one |
 | `clock` | ✓ | ✓ | the time |
 | `context` | ✓ | ✓ | context fill and the session's cost |
 | `agents` | | ✓ | who is live on the board |
 
-The defaults are `band: summary,usage` and `pane: tasks,usage`. Each block is
+The defaults are `band: summary,usage,model,effort` and `pane: tasks,usage`.
+
+Pressing `model` or `effort` runs Claude Code's own `/model` or `/effort`, so
+the switch is the same as typing the command. The `models` setting lists what
+the model block steps through (default `opus,sonnet,haiku`), and `efforts`
+lists the effort levels (default `low,medium,high,xhigh,max`). A model or
+effort changed by hand shows on the next request. Each block is
 its own file in [`hooks/blocks/`](hooks/blocks/). To add one, write a file of
 the same shape (see `types.ts`), then list it in `index.ts`. Claude Code mods
 can't load code at runtime, so a new block takes that one line in the index.

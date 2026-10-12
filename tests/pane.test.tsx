@@ -16,14 +16,31 @@ const NOW = Date.parse('2026-10-12T09:41:00')
 
 // The test stands for the host: the clock, the session, the environment and the
 // board CLI, which answers from `tasks` and refuses the names in `taken`.
-function host(on: On, tasks: Task[], { agent, taken = [] }: { agent?: string; taken?: string[] } = {}) {
+function host(
+  on: On,
+  tasks: Task[],
+  { agent, taken = [], effort }: { agent?: string; taken?: string[]; effort?: string } = {},
+) {
   const calls: string[][] = []
+  // Claude Code's own /model and /effort, which the model and effort blocks run.
+  let model = 'claude-sonnet-5-5'
+  on('session.model', () => ({ value: model }))
+  on('ui.status', () => ({ value: undefined }))
+  on('command.run', { command: 'model' } as any, (_$, e: any) => {
+    calls.push(['/model', e.args])
+    model = `claude-${e.args}-5-5`
+    return { text: `Set model to ${e.args}` }
+  })
+  on('command.run', { command: 'effort' } as any, (_$, e: any) => {
+    calls.push(['/effort', e.args])
+    return { text: `Set effort to ${e.args}` }
+  })
   on('session.start', (_$, e: any) => ({ cwd: e.cwd }))
   on('tool.register', (_$, e: any) => ({ value: { tool: `mcp__agent-board__${e.name}` } }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('clock.now', () => ({ value: NOW }))
   on('session.id', () => ({ value: 'aaaa1111-2222-3333-4444-555566667777' }))
-  on('env.get', (_$, e: any) => ({ value: e.name === 'BOARD_AGENT' ? agent : undefined }))
+  on('env.get', (_$, e: any) => ({ value: e.name === 'BOARD_AGENT' ? agent : e.name === 'CLAUDE_EFFORT' ? effort : undefined }))
   on('process.run', (_$, e: any) => {
     const argv: string[] = [...e.argv]
     calls.push(argv)
@@ -47,6 +64,8 @@ const PANE = { component: 'Pane', requestId: 'agent-board', props: { title: 'Age
 const texts = async (ui: any) => (await ui.findAll({ type: 'Text' })).map((t: any) => t.text)
 
 const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 100 } } as const
+// The band without the model and effort switches, for tests about the rest of it.
+const QUIET = { options: { band: 'summary,usage' } } as any
 const inMinutes = (m: number) => new Date(NOW + m * 60_000).toISOString()
 const handedOff = (id: string, by: string): Task => ({ ...task(id, 'todo'), notes: [{ at: '', by, text: 'HANDOFF: part 1 done' }] })
 
@@ -87,21 +106,21 @@ test('the pane flags a handoff nobody picked up and a claim going quiet', async 
   expect(shown).toContain('stopped responding')
 })
 
-test('the band says in plain words what is waiting, and the one thing that needs you', async ($, on) => {
+test('the band says in plain words what is waiting, and the one thing that needs you', QUIET, async ($, on) => {
   host(on, [handedOff('T-005', 'frontend'), task('T-001', 'claimed', 'codex'), task('T-002', 'todo')])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
   expect(await texts(ui)).toEqual(['2 tasks waiting · 1 in progress', 'T-005 needs someone to continue it'])
 })
 
-test('the band names a claim going quiet when no handoff waits', async ($, on) => {
+test('the band names a claim going quiet when no handoff waits', QUIET, async ($, on) => {
   host(on, [{ ...task('T-006', 'claimed', 'codex'), claim: { owner: 'codex', since: '', expiresAt: inMinutes(2) } }])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
   expect(await texts(ui)).toContain('T-006: codex stopped responding')
 })
 
-test('the band stays out of the way when nothing is waiting or in progress', async ($, on) => {
+test('the band stays out of the way when nothing is waiting or in progress', QUIET, async ($, on) => {
   host(on, [task('T-001', 'done')])
   // Stands for Claude Code's own band beneath the mod.
   on('ui.render', { component: 'AbovePrompt' } as any, ($: any, e: any) => {
@@ -165,7 +184,7 @@ const measure = (percentUsed: number) => ({
   changed: ['context', 'rateLimits', 'cost'],
 })
 
-test('usage shows in the pane with resets, and in the band only past half', async ($, on) => {
+test('usage shows in the pane with resets, and in the band only past half', QUIET, async ($, on) => {
   host(on, [task('T-001', 'todo')])
   on('session.measure', (_$, e: any) => ({ changed: e.changed }))
   await $.session.start(START)
@@ -189,7 +208,7 @@ test('usage shows in the pane with resets, and in the band only past half', asyn
   expect(await texts(band)).toEqual(expect.arrayContaining(['5-hour limit', '▓▓▓▓▓▓▓', '░░░', '  72%']))
 })
 
-test('usage is green with room, yellow from 70%, red from 90%', async ($, on) => {
+test('usage is green with room, yellow from 70%, red from 90%', QUIET, async ($, on) => {
   host(on, [task('T-001', 'todo')])
   on('session.measure', (_$, e: any) => ({ changed: e.changed }))
   await $.session.start(START)
@@ -224,9 +243,41 @@ test('an empty board says how to add a task', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /No tasks yet/ })).toBeDefined()
 })
 
-test('one task reads as one task', async ($, on) => {
+test('one task reads as one task', QUIET, async ($, on) => {
   host(on, [task('T-001', 'todo')])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
   expect(await texts(ui)).toEqual(['1 task waiting'])
+})
+
+test('the model block shows the model and switches to the next one when pressed', async ($, on) => {
+  const calls = host(on, [task('T-001', 'todo')])
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  expect((await band.find({ key: 'model' }))?.props.label).toBe('Sonnet 5.5')
+  await band.press({ key: 'model' })
+  expect(calls).toContainEqual(['/model', 'haiku'])
+  expect((await band.find({ key: 'model' }))?.props.label).toBe('Haiku 5.5')
+  await band.press({ key: 'model' })
+  expect(calls).toContainEqual(['/model', 'opus'])
+})
+
+test('the effort block shows the level and steps to the next when pressed', async ($, on) => {
+  const calls = host(on, [task('T-001', 'todo')], { effort: 'medium' })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort medium')
+  await band.press({ key: 'effort' })
+  expect(calls).toContainEqual(['/effort', 'high'])
+  expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort high')
+})
+
+test('the models and efforts settings choose what the blocks step through', { options: { models: 'sonnet,fable', efforts: 'low,max' } } as any, async ($, on) => {
+  const calls = host(on, [task('T-001', 'todo')], { effort: 'max' })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'model' })
+  await band.press({ key: 'effort' })
+  expect(calls).toContainEqual(['/model', 'fable'])
+  expect(calls).toContainEqual(['/effort', 'low'])
 })

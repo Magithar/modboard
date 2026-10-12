@@ -18,6 +18,6 @@ export type Usage = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'agent-board': { tasks: Task[]; agents: Agent[]; me: string; usage: Usage }
+    'agent-board': { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string }
   }
 }

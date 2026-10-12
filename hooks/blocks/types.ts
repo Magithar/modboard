@@ -2,13 +2,18 @@ import type { Agent, Task, Usage } from '../../types'
 
 // What every block draws from. `ui` is the surface's own element table.
 export type Ctx = {
-  ui: { Box: any; Text: any }
+  ui: { Box: any; Text: any; Button: any }
   width: number
   now: number
   who: string
   tasks: Task[]
   agents: Agent[]
   usage: Usage
+  model: string
+  effort: string
+  // What a pressed block can do: each switches the session the way the
+  // matching slash command would.
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void> }
 }
 
 // A block is one part of the board's display. It may draw in the band above
