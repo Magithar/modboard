@@ -1,0 +1,69 @@
+  WHO WORKS ON THE BOARD
+
+  ┌─────────────────────────────────────────┐      ┌─────────────────────────────────────────┐
+  │ Claude Code session  (the mod)          │      │ Codex · OpenCode · a shell · a person   │
+  │                                         │      │                                         │
+  │ tools   board_list  board_show          │      │ board claim T-001 --as codex            │
+  │         board_add   board_claim         │      │ board note · release · done             │
+  │         board_note  board_release       │      │                                         │
+  │         board_done                      │      │                                         │
+  │ name    BOARD_AGENT, else claude:<id>   │      │ name    BOARD_AGENT, or --as            │
+  │ alive   heartbeat on tool calls,        │      │ alive   board heartbeat, or a note      │
+  │         presence ping every 60 s        │      │                                         │
+  │ ends    releases all, with a handoff    │      │                                         │
+  └────────────────────┬────────────────────┘      └────────────────────┬────────────────────┘
+                       │                                                │
+                       └───────────────────────┬────────────────────────┘
+                                               │  both run the same CLI
+                                               ▼
+                                 ┌───────────────────────────┐
+                                 │ bin/board.mjs             │   the one CLI: plain lines, or --json
+                                 └─────────────┬─────────────┘
+                                               │
+                                 ┌─────────────┴─────────────┐
+                                 │ lib/engine.mjs            │   the rules, written once: claim · lease 15 min
+                                 │                           │   silent 3 min · handoff · done needs a note · ledger
+                                 └─────────────┬─────────────┘
+                                               │
+                                 ┌─────────────┴─────────────┐
+                                 │ lib/load-store.mjs        │   reads .agent-board/config.json
+                                 └─────────────┬─────────────┘
+                                               │
+                                 ┌─────────────┴─────────────┐
+                                 │ Store contract            │   now · snapshot · commit · events · verify
+                                 └─────────────┬─────────────┘
+                 ┌─────────────────────────────┼─────────────────────────────┐
+                 ▼                             ▼                             ▼
+        "file"  (built in)          "./my-block.mjs"              "my-store"  (a package)
+        board.json + ledger.jsonl   a block file beside           found in the project's
+        mkdir lock, atomic rename   the board                     node_modules
+                                                                  e.g. Supabase: not built
+
+
+  WHAT YOU SEE  (inside each Claude session)
+
+        every 3 s    board view --json      ──▶  tasks and live agents
+        every 30 s   your command blocks    ──▶  first line of each command's output
+                                     │
+                 ┌───────────────────┴────────────────────┐
+                 ▼                                        ▼
+        band above the prompt                    /board pane
+        summary · usage · model                  tasks · usage · agents
+        effort · clock · context                 model · effort · clock · context
+        + your own blocks                        + your own blocks
+
+
+  A TASK'S LIFE
+
+        board add
+          │
+          ▼
+        ○ Not started ──── claim ────▶ ◐ In progress ──── done --note ────▶ ● Done
+          ▲                             │   │   ▲
+          │                             │   │   └─ note or heartbeat renews the lease
+          │ lease runs out (15 min),    │   │
+          │ or session silent 3 min     │   │  release --handoff,
+          └─────────────────────────────┘   │  or its session ends
+                                            ▼
+                                          ○ Needs picking up ──── claim ────▶ ◐ In progress
+                                                                              (the next agent reads the handoff first)

@@ -4,21 +4,10 @@ A task board several coding agents share at once. Two Claude Code sessions, a
 Codex session and a person can all claim tasks from it, see who holds what,
 and hand unfinished work to each other without losing context.
 
-```
- Codex / OpenCode / a shell          Claude Code (this repo's mod)
-          │                                  │
-          │ board claim T-001 --as codex     │ board_claim tool, its own identity,
-          │                                  │ automatic lease renewal, live pane
-          └────────────────┬─────────────────┘
-                           ▼
-                 bin/board.mjs  →  lib/engine.mjs     the rules, written once
-                                         │
-                                   Store interface    the socket
-                                         │
-                ┌────────────────────────┼─────────────────────┐
-           local files               (Supabase)           (board serve)
-        board.json + ledger.jsonl    not built yet        not built yet
-```
+![How agent-board fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
+
+The diagram's source is plain text, [`docs/system.txt`](docs/system.txt).
+After editing it, `node docs/render.mjs` rebuilds the page and the image.
 
 One zero-dependency Node CLI owns all state. The Claude Code mod is an
 adapter over that CLI. It adds what only Claude Code's host can provide: the
