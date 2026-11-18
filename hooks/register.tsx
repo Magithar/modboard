@@ -2,7 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Agent, Task } from '../types'
-import { BLOCKS, type BandForm, type Ctx } from './blocks'
+import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
+import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 
 // The mod is an adapter: every board read and write goes through bin/board.mjs,
 // the same CLI Codex or a human runs, so it works whatever storage block holds
@@ -14,6 +15,7 @@ const PANE = 'agent-board'
 const HEARTBEAT_MS = 60_000
 const PRESENCE_MS = 60_000
 const POLL_MS = 3_000
+const COMMAND_MS = 30_000
 const NAME_TRIES = 9
 
 const tasks = atom({ plugin: 'agent-board', key: 'tasks' } as const, [])
@@ -22,6 +24,7 @@ const me = atom({ plugin: 'agent-board', key: 'me' } as const, '')
 const usage = atom({ plugin: 'agent-board', key: 'usage' } as const, { limits: [] })
 const model = atom({ plugin: 'agent-board', key: 'model' } as const, '')
 const effort = atom({ plugin: 'agent-board', key: 'effort' } as const, '')
+const custom = atom({ plugin: 'agent-board', key: 'custom' } as const, {} as Record<string, string>)
 
 let session = ''
 let lastBeat = 0
@@ -129,13 +132,25 @@ const TOOLS = [
 
 const SYMBOL = { todo: '○', claimed: '◐', done: '●' } as const
 
-const pick = (setting: unknown, fallback: string) =>
+const pick = (all: Block[], setting: unknown, fallback: string) =>
   String(setting ?? fallback)
     .split(',')
-    .map(name => BLOCKS.find(b => b.name === name.trim()))
+    .map(name => all.find(b => b.name === name.trim()))
     .filter(b => b !== undefined)
 
+// Each command block's first line of output; a failing command shows nothing.
+async function runCommands($: EngineInterface, commands: Record<string, string>) {
+  const out: Record<string, string> = {}
+  for (const [name, command] of Object.entries(commands)) {
+    const run = await $.process.run(['sh', '-c', command]).catch(() => undefined)
+    if (run && run.exitCode === 0) out[name] = firstLine(run.stdout)
+  }
+  await update($, custom, () => out)
+}
+
 const GAP = 3
+// Claude Code draws its own collapse control ([-]) at the line's right end.
+const CONTROL = 4
 
 // The band never wraps. The `band` setting's order is the order of importance,
 // so the first block (the board's summary, by default) holds its full form
@@ -201,20 +216,31 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     usage: await read($, usage),
     model: await read($, model),
     effort: await read($, effort),
+    custom: await read($, custom),
     act,
   }
 }
 
 export const register: Register = (on, options) => {
-  const band = pick(options.band, 'summary,usage,model,effort').filter(b => b.band)
-  const pane = pick(options.pane, 'tasks,usage').filter(b => b.pane)
+  const { commands, problems } = parseCommandBlocks(options.blocks, BLOCKS.map(b => b.name))
+  const all = [...BLOCKS, ...Object.keys(commands).map(commandBlock)]
+  const band = pick(all, options.band, 'summary,usage,model,effort').filter(b => b.band)
+  const pane = pick(all, options.pane, 'tasks,usage').filter(b => b.pane)
   const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
 
   on('session.start', async ($, e, next) => {
     // Clears a status line an earlier version of this mod left behind.
     $.ui.status(undefined)
     const startModel = await $.session.model()
-    const startEffort = (await $.env.get('CLAUDE_EFFORT')) ?? ''
+    // Before the first request, the level the session will start on: the env
+    // override, else the model's own effortLevel (modelSettings), else the
+    // general one (what /effort saves). The first request's effort
+    // (turn.step below) then replaces it with the truth.
+    const level = (v: unknown) => (typeof v === 'string' && !['auto', 'unset', ''].includes(v) ? v : undefined)
+    const settings: any = await $.settings.read().catch(() => ({}))
+    const perModel = Object.entries(settings?.modelSettings ?? {}).find(([key]) => key === startModel || startModel.includes(key))?.[1] as any
+    const startEffort =
+      level(await $.env.get('CLAUDE_CODE_EFFORT_LEVEL')) ?? level(perModel?.effortLevel) ?? level(settings?.effortLevel) ?? ''
     await update($, model, () => startModel)
     await update($, effort, () => startEffort)
     session = await $.session.id()
@@ -232,6 +258,11 @@ export const register: Register = (on, options) => {
 
     await refresh($)
     $.clock.every(POLL_MS, () => refresh($).catch(() => {}))
+    for (const problem of problems) $.ui.toast(`board: ${problem}`)
+    if (Object.keys(commands).length) {
+      await runCommands($, commands)
+      $.clock.every(COMMAND_MS, () => runCommands($, commands).catch(() => {}))
+    }
     // Presence: keeps this session's name while it is open, so no other
     // session can take it; leases stay tied to work (see tool.call below).
     $.clock.every(PRESENCE_MS, () => cli($, ['register', name, '--session', session]).catch(() => {}))
@@ -301,7 +332,7 @@ export const register: Register = (on, options) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const c = await context($, e.props.bodyColumns, { Box, Text, Button }, actions($, cycles))
     const offered = band.map(b => b.band!(c)).filter((forms): forms is BandForm[] => forms !== null && forms.length > 0)
-    const parts = fit(offered, e.props.bodyColumns)
+    const parts = fit(offered, e.props.bodyColumns - CONTROL)
     if (!parts.length) return next(e)
     return (
       <Box gap={GAP} flexWrap="nowrap">

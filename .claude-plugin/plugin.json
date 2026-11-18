@@ -1,6 +1,6 @@
 {
   "name": "agent-board",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A task board several agents share: Claude tools, a live pane and lease heartbeats over an agent-neutral CLI",
   "author": {
     "name": "Magithar",
@@ -19,14 +19,20 @@
     "band": {
       "type": "string",
       "title": "Band blocks",
-      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, usage, model, effort, clock, context.",
+      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, usage, model, effort, clock, context, or your own from Your own blocks.",
       "default": "summary,usage,model,effort"
     },
     "pane": {
       "type": "string",
       "title": "Pane blocks",
-      "description": "Blocks in the /board pane, in order, comma-separated: tasks, usage, model, effort, clock, context, agents.",
+      "description": "Blocks in the /board pane, in order, comma-separated: tasks, usage, model, effort, clock, context, agents, or your own from Your own blocks.",
       "default": "tasks,usage"
+    },
+    "blocks": {
+      "type": "string",
+      "title": "Your own blocks",
+      "description": "Blocks that show a shell command's first line of output, refreshed every 30 seconds, as JSON: {\"ci\": \"gh run list -L1 --json conclusion -q '.[0].conclusion'\"}. Then name them in Band blocks or Pane blocks.",
+      "default": ""
     },
     "models": {
       "type": "string",

@@ -19,7 +19,7 @@ const NOW = Date.parse('2026-10-12T09:41:00')
 function host(
   on: On,
   tasks: Task[],
-  { agent, taken = [], effort }: { agent?: string; taken?: string[]; effort?: string } = {},
+  { agent, taken = [], effort, envEffort, modelEffort }: { agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -40,11 +40,19 @@ function host(
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('clock.now', () => ({ value: NOW }))
   on('session.id', () => ({ value: 'aaaa1111-2222-3333-4444-555566667777' }))
-  on('env.get', (_$, e: any) => ({ value: e.name === 'BOARD_AGENT' ? agent : e.name === 'CLAUDE_EFFORT' ? effort : undefined }))
+  on('env.get', (_$, e: any) => ({ value: e.name === 'BOARD_AGENT' ? agent : e.name === 'CLAUDE_CODE_EFFORT_LEVEL' ? envEffort : undefined }))
+  // The effortLevel setting, which /effort saves: where a session starts.
+  on('settings.read', () => ({ value: { ...(effort === undefined ? {} : { effortLevel: effort }), ...(modelEffort ? { modelSettings: { 'claude-sonnet-5-5': { effortLevel: modelEffort } } } : {}) } }))
   on('process.run', (_$, e: any) => {
     const argv: string[] = [...e.argv]
     calls.push(argv)
     const refused = argv[2] === 'register' && taken.includes(argv[3]!)
+    // A command block's shell: `echo x` prints x, `false` fails.
+    if (argv[0] === 'sh') {
+      const cmd = argv[2]!
+      const failed = cmd === 'false'
+      return { value: { exitCode: failed ? 1 : 0, stdout: failed ? '' : `\n${cmd.replace(/^echo /, '')}\nsecond line`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    }
     const stdout = argv[2] === 'view' ? JSON.stringify({ tasks, agents: [{ name: 'codex', lastSeen: '' }] }) : 'ok'
     return {
       value: {
@@ -69,7 +77,7 @@ const QUIET = { options: { band: 'summary,usage' } } as any
 const inMinutes = (m: number) => new Date(NOW + m * 60_000).toISOString()
 const handedOff = (id: string, by: string): Task => ({ ...task(id, 'todo'), notes: [{ at: '', by, text: 'HANDOFF: part 1 done' }] })
 
-test('the pane groups in progress above waiting, and counts done', async ($, on) => {
+test('the pane groups in progress, then not started, and counts done', async ($, on) => {
   host(on, [
     task('T-002', 'todo'),
     { ...task('T-001', 'claimed', 'claude:aaaa1111'), claim: { owner: 'claude:aaaa1111', since: '', expiresAt: inMinutes(11) } },
@@ -82,12 +90,14 @@ test('the pane groups in progress above waiting, and counts done', async ($, on)
     const ui = await $.ui.mount({ plugin: 'agent-board', surface, ...PANE, props: { ...PANE.props, bodyColumns: 80 } } as any)
     const shown = await texts(ui)
     expect(shown.indexOf('In progress')).toBeLessThan(shown.indexOf('title of T-001'))
-    expect(shown.indexOf('title of T-003')).toBeLessThan(shown.indexOf('Waiting'))
-    expect(shown.indexOf('Waiting')).toBeLessThan(shown.indexOf('title of T-002'))
-    expect(shown).toContain('you')
-    expect(shown).toContain('codex')
+    expect(shown.indexOf('title of T-003')).toBeLessThan(shown.indexOf('Not started'))
+    expect(shown.indexOf('Not started')).toBeLessThan(shown.indexOf('title of T-002'))
+    // Who has a task is said as a sentence, never a bare name.
+    expect(shown).toContain("you're on it")
+    expect(shown).toContain('codex is on it')
+    expect(shown).not.toContain('Needs picking up')
     // A lease with time to spare says nothing; only one that needs you does.
-    expect(shown.some((t: string) => /left|responding/.test(t))).toBe(false)
+    expect(shown.some((t: string) => /partway|responding/.test(t))).toBe(false)
     expect(shown).toContain('1 done')
     expect(shown).not.toContain('title of T-004')
     await ui.unmount()
@@ -100,17 +110,23 @@ test('the pane flags a handoff nobody picked up and a claim going quiet', async 
     { ...task('T-006', 'claimed', 'codex'), claim: { owner: 'codex', since: '', expiresAt: inMinutes(3) } },
   ])
   await $.session.start(START)
+  const wide = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 80 } } as any)
+  expect(await texts(wide)).toContain('frontend stopped partway · see its note')
+  await wide.unmount()
+  // Narrow, it still says who stopped.
   const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...PANE } as any)
   const shown = await texts(ui)
-  expect(shown).toContain('left by frontend, with notes')
-  expect(shown).toContain('stopped responding')
+  expect(shown).toContain('Needs picking up')
+  expect(shown).toContain('frontend stopped partway')
+  expect(shown).toContain('codex stopped responding')
+  expect(shown).not.toContain('Not started')
 })
 
 test('the band says in plain words what is waiting, and the one thing that needs you', QUIET, async ($, on) => {
   host(on, [handedOff('T-005', 'frontend'), task('T-001', 'claimed', 'codex'), task('T-002', 'todo')])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
-  expect(await texts(ui)).toEqual(['2 tasks waiting · 1 in progress', 'T-005 needs someone to continue it'])
+  expect(await texts(ui)).toEqual(['2 tasks waiting · 1 in progress', 'T-005 was stopped partway, pick it up'])
 })
 
 test('the band names a claim going quiet when no handoff waits', QUIET, async ($, on) => {
@@ -272,6 +288,27 @@ test('the effort block shows the level and steps to the next when pressed', asyn
   expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort high')
 })
 
+test('effort shows the saved level before the session has sent anything', async ($, on) => {
+  host(on, [task('T-001', 'todo')], { effort: 'low' })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort low')
+})
+
+test("the model's own saved effort wins over the general one", async ($, on) => {
+  host(on, [task('T-001', 'todo')], { effort: 'medium', modelEffort: 'low' })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort low')
+})
+
+test('CLAUDE_CODE_EFFORT_LEVEL overrides the saved level', async ($, on) => {
+  host(on, [task('T-001', 'todo')], { effort: 'low', envEffort: 'high' })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort high')
+})
+
 test('the models and efforts settings choose what the blocks step through', { options: { models: 'sonnet,fable', efforts: 'low,max' } } as any, async ($, on) => {
   const calls = host(on, [task('T-001', 'todo')], { effort: 'max' })
   await $.session.start(START)
@@ -310,28 +347,28 @@ test('the band never wraps: it narrows its parts, then leaves the last ones out'
   await $.session.start(START)
   await $.session.measure(measure(64) as any)
 
-  const wide = await bandAt($, 120)
+  const wide = await bandAt($, 124)
   expect(wide).toEqual(expect.arrayContaining(['2 tasks waiting', '5-hour limit', 'model ', 'Sonnet 5.5', 'effort ', 'low']))
 
-  const medium = await bandAt($, 60)
+  const medium = await bandAt($, 64)
   expect(medium).toEqual(expect.arrayContaining(['2 tasks waiting', 'Sonnet 5.5', 'low']))
   expect(medium).not.toContain('model ')
   expect(medium).not.toContain('effort ')
 
-  const narrow = await bandAt($, 34)
+  const narrow = await bandAt($, 38)
   expect(narrow).toContain('2 tasks waiting')
   expect(narrow).toContain('5h')
   expect(narrow).not.toContain('Sonnet 5.5')
 
-  const tiny = await bandAt($, 16)
+  const tiny = await bandAt($, 20)
   expect(tiny).toEqual(['2 tasks waiting'])
 })
 
 test('when the line is short, the alert outlasts the counts', async ($, on) => {
   host(on, [handedOff('T-005', 'frontend'), task('T-002', 'todo')])
   await $.session.start(START)
-  expect(await bandAt($, 30)).toEqual(['2 waiting', 'T-005 needs you'])
-  expect(await bandAt($, 16)).toEqual(['T-005 needs you'])
+  expect(await bandAt($, 34)).toEqual(['2 waiting', 'T-005 needs you'])
+  expect(await bandAt($, 20)).toEqual(['T-005 needs you'])
 })
 
 test('at every width, what the band draws fits the line', async ($, on) => {
@@ -344,13 +381,47 @@ test('at every width, what the band draws fits the line', async ($, on) => {
   await $.session.start(START)
   await $.session.measure(measure(93) as any)
   for (const columns of [140, 100, 80, 60, 40, 30, 20, 12]) {
-    const shown = await bandAt($, columns)
-    // Texts inside one part sit together; parts are 3 apart.
     const ui = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND, props: { ...BAND.props, bodyColumns: columns } } as any)
     const tree: any = await ui.drawn()
     await ui.unmount()
-    const parts = (tree.children ?? []).length
-    const width = shown.join('').length + (parts > 1 ? 3 * (parts - 1) : 0)
-    expect(width <= columns).toBe(true)
+    // The host stacks each plugin's band; measure agent-board's alone. Its
+    // parts sit 3 apart, and the texts inside one part sit together.
+    const row = (tree.children ?? []).find((c: any) => c.part?.plugin === 'agent-board')
+    const parts = row?.children ?? []
+    const textOf = (n: any): string => (typeof n === 'string' ? n : (n?.children ?? []).map(textOf).join(''))
+    const width = parts.map(textOf).join('').length + (parts.length > 1 ? 3 * (parts.length - 1) : 0)
+    // Clear of Claude Code's own [-] control at the right end.
+    expect({ columns, width: width <= columns - 4 }).toEqual({ columns, width: true })
   }
+})
+
+test('a command block shows its first line in the band and the pane; a failing one shows nothing', {
+  options: { blocks: '{"ci": "echo passing", "broken": "false"}', band: 'summary,ci,broken', pane: 'tasks,ci,broken' },
+} as any, async ($, on) => {
+  const calls = host(on, [task('T-001', 'todo')])
+  await $.session.start(START)
+  expect(calls).toContainEqual(['sh', '-c', 'echo passing'])
+  const band = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...BAND } as any)
+  expect(await texts(band)).toEqual(['1 task waiting', 'ci passing'])
+  await band.unmount()
+  const pane = await $.ui.mount({ plugin: 'agent-board', surface: 'terminal', ...PANE } as any)
+  const shown = await texts(pane)
+  expect(shown).toEqual(expect.arrayContaining(['ci', 'passing']))
+  expect(shown).not.toContain('broken')
+})
+
+test('the blocks setting refuses what it cannot use, by name, and never runs it', {
+  options: { blocks: '{"tasks": "echo hijack", "Bad Name": "echo x", "ok": "echo fine"}', band: 'summary,ok' },
+} as any, async ($, on) => {
+  const toasts: string[] = []
+  on('ui.toast', (_$, e: any) => {
+    toasts.push(String(e.message ?? e.text ?? e))
+    return { value: undefined }
+  })
+  const calls = host(on, [task('T-001', 'todo')])
+  await $.session.start(START)
+  expect(toasts.some(t => t.includes('"tasks" is a built-in block'))).toBe(true)
+  expect(toasts.some(t => t.includes('"Bad Name"'))).toBe(true)
+  expect(calls).not.toContainEqual(['sh', '-c', 'echo hijack'])
+  expect(calls).toContainEqual(['sh', '-c', 'echo fine'])
 })

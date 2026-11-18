@@ -1,11 +1,24 @@
 {
   "name": "agent-board",
-  "version": "0.4.0",
-  "private": true,
+  "version": "0.5.0",
   "description": "A task board several coding agents share, through one CLI",
   "type": "module",
   "bin": { "board": "bin/board.mjs" },
-  "scripts": { "test": "node --test test/*.test.mjs" },
+  "exports": {
+    "./lib/contract.mjs": "./lib/contract.mjs",
+    "./lib/engine.mjs": "./lib/engine.mjs",
+    "./lib/store-file.mjs": "./lib/store-file.mjs",
+    "./examples/store-memory.mjs": "./examples/store-memory.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": ["bin/", "lib/", "examples/", "hooks/", "types/", ".claude-plugin/plugin.json", "tsconfig.json", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:mod": "claude plugin test .",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": ["multi-agent", "task-board", "coordination", "claude-code", "codex"],
+  "repository": { "type": "git", "url": "git+https://github.com/Magithar/agent-board.git" },
   "engines": { "node": ">=18" },
   "license": "MIT"
 }

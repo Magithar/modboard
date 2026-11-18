@@ -61,6 +61,26 @@ function describe(t) {
 
 const DIR = boardDir()
 
+// Local clock time, for people: "19:45".
+const hhmm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+const ids = list => (list.length ? list.join(', ') : 'nothing')
+
+// What each command says to a person. --json prints the data instead, and
+// view and events (for programs) always do.
+const SAY = {
+  add: t => `added ${line(t)}`,
+  claim: t => `claimed ${t.id}  ${t.title}\nit's yours until ${hhmm(t.claim.expiresAt)}; a note or heartbeat renews it`,
+  heartbeat: r => `renewed ${ids(r.renewed)}`,
+  note: t => `noted on ${t.id}; yours until ${hhmm(t.claim.expiresAt)}`,
+  release: t => `released ${t.id}${t.notes.at(-1)?.text.startsWith('HANDOFF:') ? ' with a handoff' : ''}; it's back to todo`,
+  done: t => `done ${line(t)}\n${t.notes.at(-1).text}`,
+  'release-all': r => `released ${ids(r.released)}`,
+  register: r => `you are ${r.name}`,
+  agents: list => (list.length ? list.map(a => `${a.name}  last seen ${hhmm(a.lastSeen)}`).join('\n') : '(no live agents)'),
+  doctor: r =>
+    [`storage block: ${r.block}`, ...(r.tasks !== undefined ? [`${r.tasks} ${r.tasks === 1 ? 'task' : 'tasks'}, ${r.events ?? '?'} events`] : []), r.ok ? 'ok: the ledger and the state agree' : 'problems:', ...r.problems.map(p => `- ${p}`)].join('\n'),
+}
+
 const commands = {
   async list(board, _, flags) {
     const tasks = await board.list({ all: !!flags.all })
@@ -111,9 +131,13 @@ async function main() {
   }
   try {
     const { store, name } = await loadStore(DIR)
-    const board = createEngine(store, { leaseMs: Number(process.env.BOARD_LEASE_MS ?? 15 * 60 * 1000) })
+    const board = createEngine(store, {
+      leaseMs: Number(process.env.BOARD_LEASE_MS ?? 15 * 60 * 1000),
+      presenceMs: Number(process.env.BOARD_PRESENCE_MS ?? 3 * 60 * 1000),
+    })
     const out = await run(board, pos, flags, name)
-    console.log(flags.json || typeof out !== 'string' ? JSON.stringify(out, null, 2) : out)
+    const say = !flags.json && SAY[cmd]
+    console.log(say ? say(out) : flags.json || typeof out !== 'string' ? JSON.stringify(out, null, 2) : out)
   } catch (err) {
     if (!(err instanceof BoardError)) throw err
     if (flags.json) console.log(JSON.stringify({ error: err.message, code: err.code }))

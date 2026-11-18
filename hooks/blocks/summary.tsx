@@ -16,7 +16,7 @@ export const summary: Block = {
     const counts = [open && `${tasksWord(open)} waiting`, working && `${working} in progress`].filter(Boolean).join(' · ')
     const short = [open && `${open} waiting`, working && `${working} active`].filter(Boolean).join(' · ')
     const alert = waiting.length
-      ? `${waiting[0]!.id} needs someone to continue it${waiting.length > 1 ? ` (+${waiting.length - 1} more)` : ''}`
+      ? `${waiting[0]!.id} was stopped partway, pick it up${waiting.length > 1 ? ` (+${waiting.length - 1} more)` : ''}`
       : quiet.length
         ? `${quiet[0]!.id}: ${quiet[0]!.claim!.owner} stopped responding`
         : ''
@@ -25,16 +25,16 @@ export const summary: Block = {
     const form = (left: string, right: string) => ({
       tree: (
         <Box gap={3}>
-          {left && (
+          {left ? (
             <Text dimColor wrap="truncate">
               {left}
             </Text>
-          )}
-          {right && (
+          ) : null}
+          {right ? (
             <Text color="warning" wrap="truncate">
               {right}
             </Text>
-          )}
+          ) : null}
         </Box>
       ),
       width: left.length + right.length + (left && right ? 3 : 0),

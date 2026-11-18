@@ -43,7 +43,11 @@ other agent uses the same CLI directly.
   owner can note, release or finish a task.
 - **Leases:** a claim lasts 15 minutes (`BOARD_LEASE_MS`). `heartbeat` or
   `note` renews it. An expired claim goes back to todo, and the ledger records
-  it, so an agent that crashed doesn't hold a task forever.
+  it, so an agent that crashed doesn't hold a task forever. A Claude session
+  pings the board every minute while it is open, so if one is killed outright
+  its claims go back after 3 minutes of silence (`BOARD_PRESENCE_MS`), not 15.
+  An agent that never ran `board register` (a plain shell) keeps the lease
+  alone.
 - **Names:** start a session with `BOARD_AGENT=frontend` to name it. If
   another live session already holds the name, the new one becomes
   `frontend-2` and gets a toast explaining why. Without a name, a session is
@@ -72,6 +76,9 @@ else in that file is the block's own settings:
 { "store": "agent-board-supabase" }                     a block published as a package
 ```
 
+A package block is found the way Node finds any package: in the
+`node_modules` of the project that holds the board, or a folder above it.
+
 A block is one module that exports `createStore(config, { dir })` and returns
 five methods: `now`, `snapshot`, `commit`, `events` and `verify`. The hard one
 is `commit`: it must apply all of its writes or none, and only where every
@@ -98,6 +105,10 @@ in the error.
 git clone https://github.com/Magithar/agent-board.git
 cd agent-board && npm link        # puts `board` on your PATH
 ```
+
+Or, inside a project: `npm install --save-dev github:Magithar/agent-board`,
+then `npx board ...`. A storage block's own package can depend on it and
+import `agent-board/lib/contract.mjs` for its tests.
 
 **The Claude Code mod:**
 
@@ -127,7 +138,9 @@ board view                                # every task and live agent, as JSON
 board doctor                              # ledger vs state
 ```
 
-Every command takes `--json`. Exit codes: 2 usage, 3 board busy, 4 no such
+Each command answers in a line or two for a person (`claimed T-001 … it's
+yours until 14:05`); `--json` prints the data instead, for scripts. `view`
+and `events` are for programs and always print JSON. Exit codes: 2 usage, 3 board busy, 4 no such
 task, 5 not yours, 6 held by another agent, 7 name in use.
 
 For agents other than Claude, put this protocol in their instructions
@@ -151,21 +164,22 @@ The display shows only what needs you. Everything else waits until you ask.
 **One line above the prompt**, always visible while there's work on the board:
 
 ```
-2 tasks waiting · 1 in progress   T-005 needs someone to continue it   5-hour limit ▓▓▓▓▓▓░░░░ 64%   model Sonnet 5.5   effort medium
+2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░ 64%   model Sonnet 5.5   effort medium
 ```
 
-The line never wraps. In a narrow window its parts shorten first, then the
+The line never wraps, and stays clear of Claude Code's own `[-]` control at
+its right end. In a narrow window its parts shorten first, then the
 last ones drop off. The first block (the summary) keeps its full form longest,
 and the alert outlasts the counts:
 
 ```
-120 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
- 60 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
- 34 cols   2 tasks waiting   5h ▓▓▓░░  64%
- 16 cols   2 tasks waiting
+124 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
+ 64 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
+ 38 cols   2 tasks waiting   5h ▓▓▓░░  64%
+ 20 cols   2 tasks waiting
 ```
 
-The alert names the one thing that needs you: a task someone left with notes
+The alert names the one thing that needs you: a task someone stopped partway
 that nobody has picked up, or an agent that stopped responding (its claim is
 about to run out). Usage appears only once a limit passes 50%. It's green
 with room left, yellow from 70% and red from 90%. With nothing waiting or in
@@ -175,11 +189,15 @@ progress, the line disappears.
 
 ```
  In progress
- ◐  T-004  Add a test script           frontend
- ◐  T-006  Add a LICENSE file          codex          stopped responding
+ ◐  T-004  Add a test script           you're on it
+ ◐  T-007  Write the README            backend is on it
+ ◐  T-006  Add a LICENSE file          codex stopped responding
 
- Waiting
- ○  T-005  Ghost task                  left by frontend, with notes
+ Needs picking up
+ ○  T-005  Ghost task                  frontend stopped partway · see its note
+
+ Not started
+ ○  T-008  Add dark mode
 
  3 done
 
@@ -194,7 +212,7 @@ as comma-separated lists, in order:
 | Block | Band | Pane | Shows |
 |---|---|---|---|
 | `summary` | ✓ | | what's waiting and in progress, and the one thing that needs you |
-| `tasks` | | ✓ | in progress, then waiting, then a count of done |
+| `tasks` | | ✓ | in progress, then work stopped partway, then not started, then a count of done |
 | `usage` | ✓ | ✓ | plan usage per window: in the band past 50%, in the pane with resets |
 | `model` | ✓ | ✓ | the session's model; click it to switch to the next one |
 | `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest |
@@ -204,16 +222,37 @@ as comma-separated lists, in order:
 
 The defaults are `band: summary,usage,model,effort` and `pane: tasks,usage`.
 
+Each row says who has a task as a sentence (`backend is on it`, `frontend
+stopped partway`) rather than a bare name, which could mean whoever made,
+holds or dropped it.
+
 Click `model` or `effort` to switch: each click runs Claude Code's own
 `/model` or `/effort`, the same as typing the command. (In the `/board` pane
 they also answer to `m` and `e`.) Note that `/effort` saves the level as your
 default for new sessions, except `max`, which lasts for this session only. The `models` setting lists what
 the model block steps through (default `opus,sonnet,haiku`), and `efforts`
 lists the effort levels (default `low,medium,high,xhigh,max`). A model or
-effort changed by hand shows on the next request. Each block is
-its own file in [`hooks/blocks/`](hooks/blocks/). To add one, write a file of
-the same shape (see `types.ts`), then list it in `index.ts`. Claude Code mods
-can't load code at runtime, so a new block takes that one line in the index.
+effort changed by hand shows on the next request. Until the session's first
+request, the effort block shows the level it will start on:
+`CLAUDE_CODE_EFFORT_LEVEL` if set, else the model's own `effortLevel` under
+`modelSettings`, else the general `effortLevel` setting.
+
+**Your own blocks, no code.** The `blocks` setting adds blocks that show a
+shell command's first line of output, refreshed every 30 seconds:
+
+```json
+{"ci": "gh run list -L1 --json conclusion -q '.[0].conclusion'", "branch": "git branch --show-current"}
+```
+
+Then name them in `band` or `pane` like a built-in one
+(`band: summary,ci,usage`). A command that fails shows nothing. The setting is
+yours (it lives in your user config, not in the project), so opening someone
+else's repo can never make your session run its commands.
+
+**Blocks in code.** Each built-in block is its own file in
+[`hooks/blocks/`](hooks/blocks/). To add one, write a file of the same shape
+(see `types.tsx`), then list it in `index.ts`. Claude Code mods can't load
+code at runtime, so a code block takes that one line in the index.
 
 ## What has been tested
 
@@ -247,8 +286,9 @@ blocks).
 - **Usage is per session.** The usage block shows the session's own plan
   usage, which Claude Code reports, not the other agents'.
 - **A crash skips the release on session end.** If a Claude process is killed
-  outright, its claims are freed only when their leases expire (at most 15
-  minutes).
+  outright, its claims are freed once its session has been silent for
+  3 minutes. A plain CLI agent that never registered waits out its lease
+  (15 minutes).
 - **A verification note is the agent's own claim.** The board requires one
   but doesn't run the check itself.
 

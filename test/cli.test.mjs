@@ -69,6 +69,27 @@ test('an expired lease frees the task for every reader and is recorded', async (
   assert.equal(b.run(['claim', 'T-001', '--as', 'bob']).code, 0)
 })
 
+test('a registered session that goes silent loses its claims before the lease runs out', async () => {
+  const b = fresh()
+  const quick = { BOARD_PRESENCE_MS: '300' }
+  for (const title of ['crashed', 'alive', 'plain']) b.run(['add', title])
+  b.run(['register', 'ghost', '--session', 's1'], quick)
+  b.run(['register', 'alive', '--session', 's2'], quick)
+  b.run(['claim', 'T-001', '--as', 'ghost'], quick)
+  b.run(['claim', 'T-002', '--as', 'alive'], quick)
+  // A plain CLI agent that never registered keeps its lease alone.
+  b.run(['claim', 'T-003', '--as', 'codex'], quick)
+  await new Promise(resolve => setTimeout(resolve, 200))
+  b.run(['register', 'alive', '--session', 's2'], quick)
+  await new Promise(resolve => setTimeout(resolve, 200))
+  const tasks = b.json(['list'], quick)
+  const by = id => tasks.find(t => t.id === id)
+  assert.equal(by('T-001').status, 'todo')
+  assert.match(by('T-001').notes.at(-1).text, /ghost stopped responding/)
+  assert.equal(by('T-002').claim.owner, 'alive')
+  assert.equal(by('T-003').claim.owner, 'codex')
+})
+
 test('a heartbeat keeps a lease alive', async () => {
   const b = fresh()
   b.run(['add', 'long'])

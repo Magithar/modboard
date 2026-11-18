@@ -11,6 +11,8 @@ export type Ctx = {
   usage: Usage
   model: string
   effort: string
+  // The last line each command block printed, by block name.
+  custom: Record<string, string>
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
   act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void> }

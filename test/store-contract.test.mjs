@@ -38,7 +38,7 @@ test('config.json can name a block file, which the CLI loads', () => {
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './my-block.mjs', folder: 'elsewhere' }))
   assert.equal(board(dir, ['add', 'hello']).code, 0)
   assert.ok(fs.existsSync(path.join(dir, 'elsewhere', 'board.json')))
-  assert.equal(JSON.parse(board(dir, ['doctor']).out).block, './my-block.mjs')
+  assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, './my-block.mjs')
 })
 
 test('config.json can name a block package installed in the project, not beside agent-board', () => {
@@ -60,7 +60,7 @@ test('config.json can name a block package installed in the project, not beside 
     fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: name, folder: name.replace('/', '_') }))
     assert.equal(board(dir, ['add', 'hello']).code, 0, name)
     assert.ok(fs.existsSync(path.join(dir, name.replace('/', '_'), 'board.json')), name)
-    assert.equal(JSON.parse(board(dir, ['doctor']).out).block, name)
+    assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, name)
   }
 })
 

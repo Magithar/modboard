@@ -2,12 +2,23 @@ import type { Task } from '../../types'
 import type { Block, Ctx } from './types'
 import { goingQuiet, handedOffBy, handoffWaiting } from './attention'
 
-function Row({ ui: { Box, Text }, width, now, who }: Ctx, t: Task) {
-  const isMine = t.claim?.owner === who
-  const owner = t.claim ? (isMine ? 'you' : t.claim.owner) : ''
-  // Said only when it needs you: an agent that stopped, or work left with notes.
-  const right = goingQuiet(t, now) ? 'stopped responding' : handoffWaiting(t) ? `left by ${handedOffBy(t)}, with notes` : ''
-  const wide = width >= 64
+// What a row says about who has the task, as a sentence: a bare name could mean
+// whoever made it, holds it or dropped it. Warnings are what needs you.
+function status(t: Task, { now, who, width }: Ctx): { text: string; warn: boolean } {
+  if (t.claim) {
+    const name = t.claim.owner === who ? 'you' : t.claim.owner
+    if (goingQuiet(t, now)) return { text: `${name} stopped responding`, warn: true }
+    if (width < 64) return { text: name, warn: false }
+    return { text: name === 'you' ? "you're on it" : `${name} is on it`, warn: false }
+  }
+  if (handoffWaiting(t)) return { text: `${handedOffBy(t)} stopped partway${width < 64 ? '' : ' · see its note'}`, warn: true }
+  return { text: '', warn: false }
+}
+
+function Row(c: Ctx, t: Task) {
+  const { Box, Text } = c.ui
+  const isMine = t.claim?.owner === c.who
+  const { text, warn } = status(t, c)
   return (
     <Box>
       <Box width={3}>
@@ -23,45 +34,42 @@ function Row({ ui: { Box, Text }, width, now, who }: Ctx, t: Task) {
           {t.title}
         </Text>
       </Box>
-      {wide && owner && (
-        <Box width={14} marginLeft={2}>
-          <Text dimColor wrap="truncate">
-            {owner}
+      {text && (
+        <Box marginLeft={2} flexShrink={0}>
+          <Text color={warn ? 'warning' : undefined} dimColor={!warn}>
+            {text}
           </Text>
-        </Box>
-      )}
-      {right && (
-        <Box marginLeft={2}>
-          <Text color="warning">{right}</Text>
         </Box>
       )}
     </Box>
   )
 }
 
-// In progress first, then waiting, with room between them; done tasks become a count.
+function Group(c: Ctx, title: string, list: Task[]) {
+  const { Box, Text } = c.ui
+  if (!list.length) return null
+  return (
+    <Box flexDirection="column">
+      <Text bold>{title}</Text>
+      {list.map(t => Row(c, t))}
+    </Box>
+  )
+}
+
+// In progress first; then work someone stopped partway, which needs picking
+// up; then what nobody has started. Done tasks become a count.
 export const tasks: Block = {
   name: 'tasks',
   pane: c => {
     const { Box, Text } = c.ui
-    const working = c.tasks.filter(t => t.status === 'claimed')
-    const open = c.tasks.filter(t => t.status === 'todo')
-    const done = c.tasks.filter(t => t.status === 'done').length
     if (!c.tasks.length) return <Text dimColor>No tasks yet. Ask Claude to add some, or run `board add`.</Text>
+    const todo = c.tasks.filter(t => t.status === 'todo')
+    const done = c.tasks.filter(t => t.status === 'done').length
     return (
       <Box flexDirection="column" gap={1}>
-        {working.length > 0 && (
-          <Box flexDirection="column">
-            <Text bold>In progress</Text>
-            {working.map(t => Row(c, t))}
-          </Box>
-        )}
-        {open.length > 0 && (
-          <Box flexDirection="column">
-            <Text bold>Waiting</Text>
-            {open.map(t => Row(c, t))}
-          </Box>
-        )}
+        {Group(c, 'In progress', c.tasks.filter(t => t.status === 'claimed'))}
+        {Group(c, 'Needs picking up', todo.filter(handoffWaiting))}
+        {Group(c, 'Not started', todo.filter(t => !handoffWaiting(t)))}
         {done > 0 && <Text dimColor>{`${done} done`}</Text>}
       </Box>
     )
