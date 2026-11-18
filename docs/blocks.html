@@ -1,0 +1,99 @@
+<!doctype html><html><head><meta charset="utf-8"><title>agent-board blocks</title>
+  <style>
+  body{margin:0;background:#141414}
+  .wrap{padding:28px 30px;display:inline-block}
+  .t{font:600 15px -apple-system,sans-serif;color:#e8e8e8;margin:0 0 4px}
+  .s{font:13px -apple-system,sans-serif;color:#8a8a8a;margin:0 0 16px}
+  pre{margin:0;background:#0c0c0c;border:1px solid #2a2a2a;border-radius:10px;padding:22px 24px;
+  font:13px/1.17 Menlo,"SF Mono",monospace;color:#dcdcdc}
+  .d{color:#5e5e5e} .h{color:#d97757;font-weight:700} .c{color:#d97757} .g{color:#4ec27a} .m{color:#9a9a9a}
+  </style></head><body><div class="wrap">
+  <p class="t">agent-board · how blocks work</p>
+  <p class="s">v0.5.0 · storage blocks hold the board; display blocks draw it in each Claude session</p>
+  <pre><span class="h">  TWO KINDS OF BLOCK</span><span class="d"></span>
+
+        storage block     where the board is kept        one per board     .agent-board/config.json
+        display block     what a Claude session shows    many, in order    the plugin's settings
+
+
+<span class="h">  STORAGE BLOCKS</span><span class="d">:  HOW ONE IS FOUND</span>
+
+                           .agent-board/config.json   { "store": "...", ...its own settings }
+                                         <span class="d">│</span>
+                 <span class="d">┌</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┼</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┐</span>
+                 <span class="d">▼</span>                       <span class="d">▼</span>                       <span class="d">▼</span>
+            "file"                  "./my-block.mjs"        "my-store"
+            built in                starts with . or /      anything else: a package
+            lib/store-file.mjs      a file, relative to     looked up in node_modules
+                                    .agent-board/           from the board's folder up,
+                 <span class="d">│</span>                       <span class="d">│</span>                  then beside agent-board
+                 <span class="d">│</span>                       <span class="d">│</span>                       <span class="d">│</span>
+                 <span class="d">└</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┼</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┘</span>
+                                         <span class="d">▼</span>
+                           createStore(config, { dir })
+                                         <span class="d">│</span>
+                                         <span class="d">▼</span>
+                           must return five methods     missing one: refused, by name (exit 2)
+
+
+<span class="h">  STORAGE BLOCKS</span><span class="d">:  WHAT THE ENGINE ASKS OF ONE</span>
+
+        now()                 the store's clock          leases are timed by it, so every machine agrees
+        snapshot()            every task and agent       each with the version it was read at
+        commit(writes)        all of them, or none       only if every version still matches
+        events(since)         the ledger after a seq     what happened, in order
+        verify()              does it add up?            what board doctor reports
+
+        every change runs the same loop:
+
+            snapshot() <span class="d">─</span><span class="d">─</span><span class="d">▶</span> decide (the rules) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> commit(writes)
+                <span class="d">▲</span>                                       <span class="d">│</span>
+                <span class="d">│</span>                                       <span class="d">├</span><span class="d">─</span><span class="d">─</span> ok <span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">▶</span> done
+                <span class="d">└</span><span class="d">─</span><span class="d">─</span><span class="d">─</span> a version moved: retry (max 50) <span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┘</span>
+
+        check a block:   storeContract('my block', () =&gt; createStore(config, { dir }))
+                         from agent-board/lib/contract.mjs
+
+
+<span class="h">  DISPLAY BLOCKS</span><span class="d">:  WHERE THEY COME FROM</span>
+
+            built in                                 your own, no code
+            hooks/blocks/*.tsx                       the blocks setting, as JSON:
+            listed in hooks/blocks/index.ts          {"ci": "gh run list -L1 ..."}
+            summary · tasks · usage · model                       <span class="d">│</span>
+            effort · clock · context · agents        every 30 s: sh -c the command,
+                 <span class="d">│</span>                                   show its first line (60 chars)
+                 <span class="d">│</span>                                                <span class="d">│</span>
+                 <span class="d">└</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┬</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┘</span>
+                                         <span class="d">▼</span>
+                           band  setting   summary,usage,model,effort     the order is the importance
+                           pane  setting   tasks,usage
+
+
+<span class="h">  DISPLAY BLOCKS</span><span class="d">:  WHAT ONE IS</span>
+
+        { name,                                   each draws from one context:
+          band?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> its forms, widest first      tasks · agents · who you are
+                         [ { tree, width }, ... ]     usage · model · effort · the time
+                         or null: nothing to say      your command blocks' output
+          pane?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> one part of the pane         the width · act.nextModel/nextEffort
+                         or null }
+
+
+<span class="h">  DISPLAY BLOCKS</span><span class="d">:  HOW THE BAND FITS ONE LINE</span>
+
+        room = the line's width, less 4 for Claude Code's own [-] control
+
+        1  every block offers its widest form
+        2  too long?  narrow the others, last block first
+        3  still too long?  drop blocks from the end
+        4  still too long?  narrow the first block (the summary); its alert outlasts its counts
+        5  never wraps; with nothing to say, the line disappears
+
+        124 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
+         64 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
+         38 cols   2 tasks waiting   5h ▓▓▓░░  64%
+         20 cols   2 tasks waiting
+
+        the pane has room to spare: each block's part, stacked in the pane setting's order
+</pre></div></body></html>

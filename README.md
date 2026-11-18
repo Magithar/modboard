@@ -7,7 +7,7 @@ and hand unfinished work to each other without losing context.
 ![How agent-board fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
 
 The diagram's source is plain text, [`docs/system.txt`](docs/system.txt).
-After editing it, `node docs/render.mjs` rebuilds the page and the image.
+After editing it, `node docs/render.mjs` rebuilds every diagram's page and image.
 
 One zero-dependency Node CLI owns all state. The Claude Code mod is an
 adapter over that CLI. It adds what only Claude Code's host can provide: the
@@ -23,7 +23,7 @@ other agent uses the same CLI directly.
 - **Storage is a block.** The engine never touches files. It reads a snapshot
   from a Store and commits conditional writes ("only if this task is still at
   the version I read"). Any backend that can do that atomically can hold a
-  board. See [Storage blocks](#storage-blocks).
+  board. See [Make your own block](#a-storage-block-an-adapter).
 - **Where the board lives:** `.agent-board/` next to the git *common* dir, so
   every worktree of a repo shares one board. Set `BOARD_DIR` to override it.
   Add `.agent-board/` to `.gitignore`, because it is runtime state.
@@ -53,38 +53,6 @@ other agent uses the same CLI directly.
 - **Ledger:** every change is appended to `ledger.jsonl`, including lost
   claims (`claim-rejected`, with the holder). `board doctor` checks that the
   ledger and the state agree.
-
-## Storage blocks
-
-`.agent-board/config.json` names the block that holds the board. Everything
-else in that file is the block's own settings:
-
-```json
-{ "store": "file" }                                     the built-in default
-{ "store": "./stores/supabase.mjs", "url": "..." }      a block file, relative to .agent-board/
-{ "store": "agent-board-supabase" }                     a block published as a package
-```
-
-A package block is found the way Node finds any package: in the
-`node_modules` of the project that holds the board, or a folder above it.
-
-A block is one module that exports `createStore(config, { dir })` and returns
-five methods: `now`, `snapshot`, `commit`, `events` and `verify`. The hard one
-is `commit`: it must apply all of its writes or none, and only where every
-version still matches what was read. The contract is written out in
-[`lib/store-file.mjs`](lib/store-file.mjs).
-[`examples/store-memory.mjs`](examples/store-memory.mjs) is a complete block
-in about 20 lines to copy from.
-
-Check a block against the rules the engine relies on:
-
-```js
-import { storeContract } from 'agent-board/lib/contract.mjs'
-storeContract('my block', () => createStore(config, { dir }))
-```
-
-The CLI refuses a block that won't load or is missing a method, and names it
-in the error.
 
 ## Install
 
@@ -226,22 +194,168 @@ request, the effort block shows the level it will start on:
 `CLAUDE_CODE_EFFORT_LEVEL` if set, else the model's own `effortLevel` under
 `modelSettings`, else the general `effortLevel` setting.
 
-**Your own blocks, no code.** The `blocks` setting adds blocks that show a
-shell command's first line of output, refreshed every 30 seconds:
+**Your own blocks.** Show a command's output with no code, or write a block
+of your own: see [Make your own block](#make-your-own-block).
+
+## Make your own block
+
+agent-board is built from blocks, and you can add your own. There are two
+kinds:
+
+| Kind | What it does | How many | Where you choose it |
+|---|---|---|---|
+| **Storage block** (an adapter) | holds the board: a folder, a database, a server | one per board | `.agent-board/config.json` |
+| **Display block** | draws part of the board inside a Claude session | many, in order | the plugin's `band` and `pane` settings |
+
+![How blocks work: how a storage block is found, what the engine asks of it, where display blocks come from and how the band fits them on one line](docs/blocks.png)
+
+The diagram's source is plain text, [`docs/blocks.txt`](docs/blocks.txt).
+
+### A storage block (an adapter)
+
+Write one when the board should live somewhere other than a local folder,
+for example so agents on different machines can share it. The engine keeps
+every rule (claims, leases, handoffs). A block only stores records and
+refuses writes that are out of date, so it never needs to know what a task
+is.
+
+**1. Write the module.** One file that exports `createStore(config, { dir })`.
+`config` is everything in `.agent-board/config.json`, so your block's own
+settings (a URL, a table name) go there too. `dir` is the `.agent-board/`
+folder. It returns five methods, all of which may be async:
+
+```js
+// my-block.mjs
+export function createStore(config, { dir }) {
+  return {
+    // The store's clock, in ms. Leases are timed by it, so every machine
+    // agrees. A database should answer with its own time.
+    now: () => Date.now(),
+
+    // Every record, each with the version it stands at:
+    //   { tasks: { 'T-001': { ...task, version: 3 } },
+    //     agents: { frontend: { ...agent, version: 1 } } }
+    snapshot: async () => { /* read everything */ },
+
+    // writes: [{ kind: 'task' | 'agent', key, value, expect }]
+    // events: ledger entries to append
+    // Apply every write and append every event, or nothing at all, and only
+    // if each record still stands at `expect` (0 means it must not exist).
+    // An applied record's version becomes expect + 1. A null value deletes.
+    // Answer { ok: true }, or { ok: false, conflict: key } to have the
+    // engine read again and retry.
+    commit: async ({ writes, events }) => { /* one transaction */ },
+
+    // Ledger events with seq > since, in order. Give each appended event the
+    // next seq and an `at` time.
+    events: async (since = 0) => { /* ... */ },
+
+    // Does the ledger agree with the state? This is what `board doctor` reports.
+    verify: async () => ({ ok: true, problems: [] }),
+  }
+}
+```
+
+`commit` is the only hard part: it must be all-or-none, and checking the
+versions and writing must happen as one step (a database transaction, a
+conditional write, a lock). [`examples/store-memory.mjs`](examples/store-memory.mjs)
+is a complete, working block in about 20 lines to copy from, and
+[`lib/store-file.mjs`](lib/store-file.mjs) is the built-in one.
+
+**2. Test it against the contract.** The engine relies on a few rules and
+nothing else: one winner when many agents claim one task, distinct ids when
+they add at once, stale writes refused, one live session per name. They ship
+as a test suite:
+
+```js
+// my-block.test.mjs, run with: node --test
+import { storeContract } from 'agent-board/lib/contract.mjs'
+import { createStore } from './my-block.mjs'
+
+storeContract('my block', () => createStore({ /* test settings */ }, { dir: '/tmp/board-test' }))
+```
+
+Each run should start from an empty board, so give each `createStore` call a
+fresh table or folder.
+
+**3. Point a board at it.** In `.agent-board/config.json`, name it in one of
+three ways. Everything besides `store` is passed to your block:
+
+```json
+{ "store": "file" }                                     the built-in default
+{ "store": "./stores/my-block.mjs", "url": "..." }      a block file, relative to .agent-board/
+{ "store": "agent-board-my-block", "url": "..." }       a block published as a package
+```
+
+Then check it: `board add "first task"`, `board view`, and `board doctor`.
+The CLI refuses a block that won't load or is missing a method, and says
+which (exit 2).
+
+**4. Share it (optional).** Publish it as a package whose entry exports
+`createStore` (through `exports` or `main`), with `agent-board` as a
+dev dependency for the contract tests. Anyone can then
+`npm install agent-board-my-block` in their project and name it in
+`config.json`. A package is found the way Node finds any package: in the
+`node_modules` of the project that holds the board, or a folder above it.
+
+### A display block from a command (no code)
+
+The quickest way to show something of your own. The `blocks` setting (in
+`/config`) maps a block name to a shell command. Every 30 seconds the command
+runs, and the block shows the first line it prints, cut to 60 characters:
 
 ```json
 {"ci": "gh run list -L1 --json conclusion -q '.[0].conclusion'", "branch": "git branch --show-current"}
 ```
 
-Then name them in `band` or `pane` like a built-in one
-(`band: summary,ci,usage`). A command that fails shows nothing. The setting is
-yours (it lives in your user config, not in the project), so opening someone
-else's repo can never make your session run its commands.
+Then name them in `band` or `pane` like a built-in block
+(`band: summary,ci,usage`). In the band a command block shows as
+`ci success`, or just `success` when the line is short.
 
-**Blocks in code.** Each built-in block is its own file in
-[`hooks/blocks/`](hooks/blocks/). To add one, write a file of the same shape
-(see `types.tsx`), then list it in `index.ts`. Claude Code mods can't load
-code at runtime, so a code block takes that one line in the index.
+- Names are lowercase letters, digits and dashes, up to 16 characters, and
+  can't reuse a built-in block's name. A bad entry is skipped, with a toast
+  saying why.
+- A command that fails (non-zero exit) or prints nothing shows nothing.
+- The setting lives in your user config, not in the project, so opening
+  someone else's repo can never make your session run its commands.
+
+### A display block in code
+
+For a block that reads the board itself, or reacts to a click. Each built-in
+block is its own file in [`hooks/blocks/`](hooks/blocks/), and yours is a file
+of the same shape:
+
+```tsx
+// hooks/blocks/mine.tsx: how many tasks are mine
+import { words, type Block } from './types'
+
+export const mine: Block = {
+  name: 'mine',
+  // The band: forms widest first. The band takes the widest that fits,
+  // and leaves the block out when even the last one doesn't.
+  band: ({ ui: { Text }, tasks, who }) => {
+    const n = tasks.filter(t => t.claim?.owner === who).length
+    if (!n) return null // nothing to say: the block takes no room
+    return [words(Text, `${n} mine`), words(Text, `${n}`)]
+  },
+  // The pane: one part of /board, or null.
+  pane: ({ ui: { Text }, tasks, who }) => (
+    <Text>{tasks.filter(t => t.claim?.owner === who).length} tasks are mine</Text>
+  ),
+}
+```
+
+Every block gets the same context (see [`types.tsx`](hooks/blocks/types.tsx)):
+the tasks, the live agents, who this session is, plan usage, the model and
+effort, the time, the width, your command blocks' output, and `act` for
+switching the model or effort when the block is clicked. A block may draw in
+the band, the pane or both.
+
+Then list it in [`index.ts`](hooks/blocks/index.ts) (an import, and its name
+in `BLOCKS`), name it in the `band` or `pane` setting, and run
+`claude plugin test .`. Claude Code mods can't load code at runtime, so a
+code block lives in your copy of the mod: fork this repo, or send it as a
+pull request if others would want it.
 
 ## What has been tested
 

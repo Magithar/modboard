@@ -1,0 +1,86 @@
+  TWO KINDS OF BLOCK
+
+        storage block     where the board is kept        one per board     .agent-board/config.json
+        display block     what a Claude session shows    many, in order    the plugin's settings
+
+
+  STORAGE BLOCKS:  HOW ONE IS FOUND
+
+                           .agent-board/config.json   { "store": "...", ...its own settings }
+                                         │
+                 ┌───────────────────────┼───────────────────────┐
+                 ▼                       ▼                       ▼
+            "file"                  "./my-block.mjs"        "my-store"
+            built in                starts with . or /      anything else: a package
+            lib/store-file.mjs      a file, relative to     looked up in node_modules
+                                    .agent-board/           from the board's folder up,
+                 │                       │                  then beside agent-board
+                 │                       │                       │
+                 └───────────────────────┼───────────────────────┘
+                                         ▼
+                           createStore(config, { dir })
+                                         │
+                                         ▼
+                           must return five methods     missing one: refused, by name (exit 2)
+
+
+  STORAGE BLOCKS:  WHAT THE ENGINE ASKS OF ONE
+
+        now()                 the store's clock          leases are timed by it, so every machine agrees
+        snapshot()            every task and agent       each with the version it was read at
+        commit(writes)        all of them, or none       only if every version still matches
+        events(since)         the ledger after a seq     what happened, in order
+        verify()              does it add up?            what board doctor reports
+
+        every change runs the same loop:
+
+            snapshot() ──▶ decide (the rules) ──▶ commit(writes)
+                ▲                                       │
+                │                                       ├── ok ─────────▶ done
+                └─── a version moved: retry (max 50) ───┘
+
+        check a block:   storeContract('my block', () => createStore(config, { dir }))
+                         from agent-board/lib/contract.mjs
+
+
+  DISPLAY BLOCKS:  WHERE THEY COME FROM
+
+            built in                                 your own, no code
+            hooks/blocks/*.tsx                       the blocks setting, as JSON:
+            listed in hooks/blocks/index.ts          {"ci": "gh run list -L1 ..."}
+            summary · tasks · usage · model                       │
+            effort · clock · context · agents        every 30 s: sh -c the command,
+                 │                                   show its first line (60 chars)
+                 │                                                │
+                 └───────────────────────┬────────────────────────┘
+                                         ▼
+                           band  setting   summary,usage,model,effort     the order is the importance
+                           pane  setting   tasks,usage
+
+
+  DISPLAY BLOCKS:  WHAT ONE IS
+
+        { name,                                   each draws from one context:
+          band?(ctx) ──▶ its forms, widest first      tasks · agents · who you are
+                         [ { tree, width }, ... ]     usage · model · effort · the time
+                         or null: nothing to say      your command blocks' output
+          pane?(ctx) ──▶ one part of the pane         the width · act.nextModel/nextEffort
+                         or null }
+
+
+  DISPLAY BLOCKS:  HOW THE BAND FITS ONE LINE
+
+        room = the line's width, less 4 for Claude Code's own [-] control
+
+        1  every block offers its widest form
+        2  too long?  narrow the others, last block first
+        3  still too long?  drop blocks from the end
+        4  still too long?  narrow the first block (the summary); its alert outlasts its counts
+        5  never wraps; with nothing to say, the line disappears
+
+        124 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
+         64 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
+         38 cols   2 tasks waiting   5h ▓▓▓░░  64%
+         20 cols   2 tasks waiting
+
+        the pane has room to spare: each block's part, stacked in the pane setting's order
