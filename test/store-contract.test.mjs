@@ -41,6 +41,29 @@ test('config.json can name a block file, which the CLI loads', () => {
   assert.equal(JSON.parse(board(dir, ['doctor']).out).block, './my-block.mjs')
 })
 
+test('config.json can name a block package installed in the project, not beside agent-board', () => {
+  const project = tmp()
+  const dir = path.join(project, '.agent-board')
+  fs.mkdirSync(dir, { recursive: true })
+  const block = `import { fileStore } from ${JSON.stringify(path.join(ROOT, 'lib/store-file.mjs'))}\n` +
+    `export const createStore = (config, { dir }) => fileStore(dir + '/' + config.folder)\n`
+  // Two common shapes: conditional exports (scoped name), and a plain main.
+  const shapes = {
+    '@acme/board-store': { exports: { '.': { import: './dist/index.mjs', require: './dist/index.cjs' } }, file: 'dist/index.mjs' },
+    'plain-store': { main: 'lib/store.mjs', file: 'lib/store.mjs' },
+  }
+  for (const [name, { file, ...pkg }] of Object.entries(shapes)) {
+    const pkgDir = path.join(project, 'node_modules', name)
+    fs.mkdirSync(path.dirname(path.join(pkgDir, file)), { recursive: true })
+    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name, type: 'module', ...pkg }))
+    fs.writeFileSync(path.join(pkgDir, file), block)
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: name, folder: name.replace('/', '_') }))
+    assert.equal(board(dir, ['add', 'hello']).code, 0, name)
+    assert.ok(fs.existsSync(path.join(dir, name.replace('/', '_'), 'board.json')), name)
+    assert.equal(JSON.parse(board(dir, ['doctor']).out).block, name)
+  }
+})
+
 test('a block that cannot load, or breaks the contract shape, is refused by name', () => {
   const dir = path.join(tmp(), '.agent-board')
   fs.mkdirSync(dir, { recursive: true })
