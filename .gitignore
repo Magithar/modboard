@@ -4,3 +4,6 @@ node_modules/
 .modboard/
 .agent-board/
 .DS_Store
+
+# build intermediates of docs/render.mjs and docs/band.mjs
+docs/*.html
