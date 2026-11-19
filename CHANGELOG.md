@@ -3,105 +3,83 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
-## Unreleased
+## 0.6.0 — 2026-11-20
 
-The board can now show a project's own task file, with its priorities, and a
-compact button. The display is quieter: colour, marks and words appear only
-where they tell you something.
+Sessions name themselves, the board shows your project's own task file with
+its priorities, and the display is quieter and clickable: colour, marks and
+words appear only where they tell you something.
 
 ### Added
 
 - **Sessions are named for you**, by what they run and when they joined:
   `claude 1`, `claude 2`, `codex 1`. Nothing to set: a Claude session joins
   when it starts, and a Codex thread when it first runs `board` (Codex marks
-  its shells with `CODEX_THREAD_ID`). A session keeps its name while it is
+  its shells with `CODEX_THREAD_ID`). A session keeps its name while it's
   open; a new one takes the lowest free number. `BOARD_AGENT` still picks a
   name of your own. New `board join` and `board whoami` commands.
-- **A `taskfile` block** in the `/board` pane. When the checkout has a
-  `task.md`, `tasks.md` or `todo.md` (any case) at its root or in `docs/`,
-  one line, `To do · 9 open`, says how much of it is open. Click it to see
-  what's left, under a dim line naming the file (`from TASKS.md`): every open item, read again from the file on each click,
-  so what you just added shows. Checked-off
-  items stay in the file and out of the pane. Nothing in it is claimed or
-  written; to work an item through the board, `board add` it.
-- **Each task file item has a grey dot** before it, as a handoff's points do.
+- **Your task.md on the board.** When the project has a `task.md`,
+  `tasks.md` or `todo.md` (upper or lower case) at its root or in `docs/`,
+  the pane shows what's left in it under **To do**, read again on each
+  click. Checked-off items stay out. Nothing in it is claimed or written; to
+  work an item through the board, `board add` it.
 - **Task file priorities.** P0–P9 are read from headings (`## P0 — …`,
   `## Sync (P1)`), from items (`- [ ] P2 …`, which wins over its heading)
-  and from tables with a Priority column.
-- **A priority button**, bold like `compact`, beside the task file, which turns through the tiers
-  the file has the way the effort button turns through levels: `P0`,
-  `P1`, …, `all`, and round again. It starts on the most
-  urgent and shows one tier at a time. `all` lists every priority in order,
-  each row with its own priority, with unprioritised items last, marked
-  with a dash.
-- **A `compact` block**: the context window as a bar, like the 5-hour
-  limit's, and a button that compacts the conversation,
-  through Claude Code's own compaction, the call `/compact` makes. The bar
-  shows from the start: Claude Code's local estimate of the context until
-  the first reply, then each reply's measurement. It's always in the pane,
-  and in the band.
-- **Collapsible task groups.** In progress, Unfinished, Not started and
-  Done are each a heading you click to open or close,
-  with its count: `▾ In progress · 3`. What needs you starts open; Not
-  started starts closed, so the whole board fits without scrolling.
-- **`/board` asks for a taller pane**, room for the whole board. Where the
-  surface gives less, the pane's body scrolls with the mouse wheel.
-- **A tutorial**, [docs/TUTORIAL.md](docs/TUTORIAL.md): from install to two
-  agents sharing a board, reading the display, your task.md and its
-  priorities, other agents, settings, and what to do when something looks
-  wrong.
+  and from tables with a Priority column. A priority button beside To do
+  turns through the tiers the file has, `P0`, `P1`, …, `all`, the way the
+  effort button turns through levels. `all` lists every item with its
+  priority, unprioritised ones last, marked with a dash.
 - **`board taskfile`** prints the task file's items; `--json` gives them as
   data. It reads no board and writes nothing.
+- **A `compact` block**: the context window as a bar, like the 5-hour
+  limit's, and a button that compacts the conversation, the call `/compact`
+  makes. It shows from the start: Claude Code's own estimate until the first
+  reply, then each reply's measurement.
+- **A `modBOARD` button on the band**, bold in the logo's green, at the
+  line's right end. It opens the `/board` pane, and closes it when it's
+  open. On a short line, model and effort drop before it.
+- **Collapsible groups.** In progress, Unfinished, Not started and Done are
+  each a heading you click to open or close, with a count: `▾ In progress ·
+  3`. What needs you starts open; Not started and Done start closed.
+- **A Done group** lists what's finished, latest first, and who finished it.
+- **A Limits heading** over the context and 5-hour bars, which folds like
+  the groups. Folded, it keeps the figures: `▸ Limits · context 72% ·
+  5-hour 64%`, each yellow or red as its bar would be.
+- **A red line when the board stops answering**: `board not updating: …`
+  at the top of the pane, with the reason, until the `board` CLI answers
+  again.
+- **A taller `/board` pane**, room for the whole board. Where the surface
+  gives less, the pane scrolls with the mouse wheel.
+- **A tutorial**, [docs/TUTORIAL.md](docs/TUTORIAL.md): from install to two
+  agents sharing a board, reading the display, your task.md, other agents,
+  settings, and what to do when something looks wrong.
+- **A roadmap**, [ROADMAP.md](ROADMAP.md), starting with `/board colours`.
+- **A logo**, at the top of the README.
 
 ### Changed
 
-- **Defaults.** The band is now `summary,model,effort,board`: the 5-hour limit
-  and the context moved to the pane, which is `tasks,taskfile,compact,usage`.
-- **A shorter band.** It reads `2 waiting · 1 active   [T-005]`: `active`
-  in green, and each task left partway in a yellow box, with no "pick it
-  up".
-- **A red line when the board stops answering**: `board not updating: …`
-  at the top of the pane, with the reason, while the `board` CLI fails. What
-  is below it is the last board it read. It goes once the board answers.
+- **Default blocks.** The band is now `summary,model,effort,board`; the
+  5-hour limit and the context moved to the pane, which is
+  `tasks,taskfile,compact,usage`.
+- **A shorter band**: `2 waiting · 1 active   [T-005]   Sonnet 5.5   low`.
+  `active` is green, and the model and effort lose their labels.
 - **Each unfinished task is a yellow box on the band**: `[T-005] [T-008]`,
-  up to three, then `+N`. A box is a button: it opens `/board` at the
-  Unfinished group, and pressed again folds the group; the pane stays open
-  until `modBOARD` closes it. In the pane the id stays grey, like every other.
+  up to three, then `+N`. A box is a button: it opens `/board` at
+  Unfinished, and pressed again folds the group. It replaces "T-005 stopped
+  partway, pick it up".
 - **A claim gone idle leaves the band**, since its lease frees it on its
   own; in the pane its row reads `codex 1 · idle`, in yellow.
-- **The band's model and effort lose their labels**: `Sonnet 5.5   low`,
-  since each says what it is. The pane keeps them.
-- **A `modBOARD` button on the band**, bold in the logo's green, opens the
-  `/board` pane, and closes it when it's already open: a plain word, like
-  the model's, at the line's right end by Claude Code's `[-]`.
-  On a short line, model and effort drop before it.
-- **The 5-hour limit keeps its bar**, now plain with room left instead of
-  green.
+- **"Needs picking up" is now "Unfinished"**, and its handoff shows under
+  each task as points, one per part the agent separated with a semicolon.
+  It replaces "see its note". Handoffs are now asked for as "done X; left Y;
+  see Z".
+- **A quieter pane.** It opens with `modBOARD`, this session's name and the
+  counts. Rows lose their ◐/○ mark and name only who (`claude 2`, `you`),
+  since the heading says what. IDs are grey. A heading's name is a bold
+  button and its count grey beside it. Each open group has room around it,
+  and a grey rule parts the board, To do and the bars.
 - **Colour only when something needs you**: yellow from 70%, red from 90%.
   With room left, usage and context stay plain (usage used to be green).
-- **The weekly limit is left off the board.** The 5-hour limit stays;
-  `/usage` has the rest.
-- **A quieter pane.** Rows lose their ◐/○ mark, since the heading says the
-  state, and name only who ("backend", "you"), since the heading says what.
-  "Needs picking up" is now "Unfinished". A heading's name is a bold
-  button and its count is grey beside it, so only the name highlights. Opened, a group shows every
-  task in it.
-- **Work stopped partway shows its handoff** under the title, dim: what's
-  done and what's left, as the agent wrote it, one point a line where it
-  used semicolons. It replaces "see its note". Handoffs are now asked for as
-  "done X; left Y; see Z".
-- **Done is a group**, `▸ Done · 3`, closed like Not started. Opened, it
-  lists what's finished, the latest first, and who finished each.
-- **The pane opens with `modBOARD`**, bold in the logo's green (heading size
-  where the surface has sizes), this session's name, and, at the right,
-  what waits and what's active, as the band counts them.
-- **Room around each open group**: a blank line under its heading and after
-  its rows.
-- **A grey rule between the pane's sections**: the board, To do, and the
-  bars, which stay together as one.
-- **The bars sit under a Limits heading**, `▾ Limits`, which folds like the
-  task groups. It starts open. Folded, it keeps the figures, `▸ Limits ·
-  context 72% · 5-hour 64%`, each yellow or red as its bar would be.
+- **The weekly limit is left off the board**; `/usage` has it.
 - **The clock** in the pane is dimmed instead of bold.
 
 ### Reading task files
@@ -114,6 +92,15 @@ where they tell you something.
 - Markdown marks (`**`, backticks, link syntax) and status emoji are taken
   off item text and headings for display.
 - A broken link named `task.md` reads as no task file, not an error.
+
+### Docs
+
+- The README is reorganised: what it does, a demo, a three-step quick
+  start, everyday commands, what you see, settings, how it works, then
+  making your own blocks, with reference material folded away.
+- Screenshots of the `/board` pane and the task file, and a sharper live
+  demo, re-recorded at retina resolution with the automatic names.
+- The diagrams show the new names and groups, in the logo's green.
 
 ## 0.5.1 — 2026-11-19
 
