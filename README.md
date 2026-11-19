@@ -22,16 +22,16 @@
 
 ## See it in action
 
-![Three live Claude Code sessions share one board: frontend and backend race for T-001, frontend hands T-003 off partway, backend picks it up, and the viewer's /board pane follows along](docs/board-live.gif)
+![Three live Claude Code sessions share one board: claude 2 and claude 3 race for T-001, claude 2 hands T-003 off partway, claude 3 picks it up, and claude 1's /board pane follows along](docs/board-live.gif)
 
-Three real Claude Code sessions, recorded live at real speed. Only idle
-stretches are cut: the wait before the sessions start, and two short pauses
-while they wrote their final summaries.
-`frontend` and `backend` are each told to work the board, and `viewer` has
-`/board` open. Both go for T-001. `frontend` wins, and `backend` is refused
-and takes T-002. `frontend` writes part of T-003, then hands it off. The band
-above its prompt says "T-003 stopped partway". `backend` reads
-the handoff, finishes T-003, and the pane ends on "3 done".
+Three real Claude Code sessions, recorded live at real speed. Only the wait
+before the two workers start is cut. The board names each session as it
+joins: `claude 1` has `/board` open, and `claude 2` and `claude 3` are each
+told to work the board. Both go for T-001. `claude 2` wins, and `claude 3`
+is refused and takes T-002. `claude 2` writes part of T-003, then hands it
+off: every band shows `T-003` in a yellow box, and the pane lists it under
+Unfinished with the handoff as points. `claude 3` reads the handoff,
+finishes T-003, and the pane ends on `Done · 3`.
 
 What each part of the screen means: [what you see](#what-you-see).
 
