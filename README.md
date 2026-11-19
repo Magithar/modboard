@@ -66,7 +66,9 @@ before the two workers start is cut.
 4. `claude 3` reads the handoff, finishes T-003, and the pane ends on
    `Done · 3`.
 
-What each part of the screen means: [what you see](#what-you-see).
+What each part of the screen means: [what you see](#what-you-see). The pane
+also shows your project's task file under To do; the demo has none, so see
+the [screenshots of the pane](#the-board-pane).
 
 ---
 
@@ -287,46 +289,17 @@ and the context is a bar of its own; clicking it compacts the conversation, as
 
 ### The `/board` pane
 
-```
- modBOARD · claude 1               13 waiting · 3 active
-
- ▾ In progress · 3
-
-   T-004  Add a test script                          you
-   T-007  Write the README                      claude 2
-   T-006  Add a LICENSE file                codex 1 · idle
-
- ▾ Unfinished · 1
-
-   T-005  Ghost task                            claude 3
-          · layout done
-          · saving isn't wired yet
-
- ▸ Not started · 12
-
- ▸ Done · 3
-
- ───────────────────────────────────────────────────────
-
- ▸ To do · 4 open   P0
-
- ───────────────────────────────────────────────────────
-
- ▾ Limits
-
-   context       ▓▓▓▓▓▓▓░░░  72%   compact
-
-   5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
-```
+<p align="center">
+  <img src="docs/pane-board.png" width="640" alt="The /board pane as it opens: In progress with an idle codex 1 row in yellow, Unfinished with each handoff as points, Not started and Done folded, To do, and the Limits bars"/>
+  <br/><em>As it opens</em>
+</p>
 
 <table>
   <tr>
-    <td><img src="docs/pane-board.png" alt="The /board pane as it opens: In progress with an idle codex 1 row in yellow, Unfinished with each handoff as points, Not started and Done folded, To do, and the Limits bars"/></td>
-    <td><img src="docs/pane-done.png" alt="Done opened, listing who finished each task, and To do opened at P0, showing the task file's most urgent items"/></td>
-    <td><img src="docs/pane-all.png" alt="Not started opened, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
+    <td width="50%"><img src="docs/pane-done.png" alt="Done opened, listing who finished each task, and To do opened at P0, showing the task file's most urgent items"/></td>
+    <td width="50%"><img src="docs/pane-all.png" alt="Not started opened, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
   </tr>
   <tr>
-    <td align="center">As it opens</td>
     <td align="center">Done and To do opened</td>
     <td align="center">Not started, every priority, Limits folded</td>
   </tr>
