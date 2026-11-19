@@ -500,11 +500,12 @@ modboard/
 │   └── plugin.json          # the mod's manifest and settings
 ├── test/                    # CLI and store contract tests (npm test)
 ├── tests/                   # mod tests (claude plugin test .)
-└── docs/
-    ├── system.txt  .png     # how it fits together
-    ├── blocks.txt  .png     # how blocks work
-    ├── board-live.gif       # a live recording of three Claude sessions
-    └── render.mjs           # rebuilds every image from its .txt
+├── docs/
+│   ├── system.txt  .png     # how it fits together
+│   ├── blocks.txt  .png     # how blocks work
+│   ├── board-live.gif       # a live recording of three Claude sessions
+│   └── render.mjs           # rebuilds every image from its .txt
+└── CHANGELOG.md             # what changed in each version
 ```
 
 Each diagram's source is plain text. After editing a `.txt`,
