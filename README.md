@@ -668,7 +668,6 @@ leaves the two out of step, `verify()` says so and `board doctor` reports it.
 
 </details>
 
-
 ---
 
 ## What has been tested
