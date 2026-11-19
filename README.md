@@ -207,7 +207,7 @@ kinds:
 | **Storage block** (an adapter) | holds the board: a folder, a database, a server | one per board | `.agent-board/config.json` |
 | **Display block** | draws part of the board inside a Claude session | many, in order | the plugin's `band` and `pane` settings |
 
-![How blocks work: how a storage block is found, what the engine asks of it, where display blocks come from and how the band fits them on one line](docs/blocks.png)
+![How blocks work: the three ways to make your own, how a storage block (an adapter) is found, what the engine asks of it, where display blocks come from and how the band fits them on one line](docs/blocks.png)
 
 The diagram's source is plain text, [`docs/blocks.txt`](docs/blocks.txt).
 

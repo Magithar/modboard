@@ -1,7 +1,16 @@
   TWO KINDS OF BLOCK
 
         storage block     where the board is kept        one per board     .agent-board/config.json
+        (an adapter)
+
         display block     what a Claude session shows    many, in order    the plugin's settings
+
+
+  MAKE YOUR OWN                      the README's "Make your own block" walks through each
+
+        a storage block (an adapter)    a module: createStore → five methods          test: storeContract
+        a display block, no code        a shell command in the blocks setting         its first line, every 30 s
+        a display block in code         a file in hooks/blocks/, in index.ts          in your copy of the mod
 
 
   STORAGE BLOCKS:  HOW ONE IS FOUND
@@ -45,15 +54,15 @@
 
   DISPLAY BLOCKS:  WHERE THEY COME FROM
 
-            built in                                 your own, no code
-            hooks/blocks/*.tsx                       the blocks setting, as JSON:
-            listed in hooks/blocks/index.ts          {"ci": "gh run list -L1 ..."}
-            summary · tasks · usage · model                       │
-            effort · clock · context · agents        every 30 s: sh -c the command,
-                 │                                   show its first line (60 chars)
-                 │                                                │
-                 └───────────────────────┬────────────────────────┘
-                                         ▼
+        built in                        your own, no code                 your own, in code
+        hooks/blocks/*.tsx              the blocks setting, as JSON:      a file of the same shape
+        listed in index.ts              {"ci": "gh run list ..."}         in hooks/blocks/, listed
+        summary · tasks · usage         every 30 s: sh -c the command,    in index.ts, in your copy
+        model · effort · clock          show its first line (60 chars)    of the mod: a fork or a PR
+        context · agents
+            │                               │                                 │
+            └───────────────────────────────┼─────────────────────────────────┘
+                                            ▼
                            band  setting   summary,usage,model,effort     the order is the importance
                            pane  setting   tasks,usage
 
