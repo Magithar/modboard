@@ -26,7 +26,8 @@
   <a href="#install">Install</a> ·
   <a href="#usage">Usage</a> ·
   <a href="#how-it-fits-together">How it works</a> ·
-  <a href="#what-you-see">What you see</a>
+  <a href="#what-you-see">What you see</a> ·
+  <a href="#your-taskmd">Your task.md</a>
   <br/>
   <a href="#make-your-own-block">Make your own block</a> ·
   <a href="#what-has-been-tested">Tested</a> ·
@@ -46,6 +47,8 @@ without losing context.
   on its own.
 - **Done means verified.** Nothing is marked done without saying how it was
   checked.
+- **Your task.md, beside the board.** The pane lists what's left in your
+  project's own task file, by priority. [See it](#your-taskmd).
 
 ---
 
@@ -68,7 +71,7 @@ before the two workers start is cut.
 
 What each part of the screen means: [what you see](#what-you-see). The pane
 also shows your project's task file under To do; the demo has none, so see
-the [screenshots of the pane](#the-board-pane).
+[Your task.md](#your-taskmd).
 
 ---
 
@@ -364,7 +367,7 @@ also answer to `m` and `e`.
   start on: `CLAUDE_CODE_EFFORT_LEVEL` if set, else the model's own
   `effortLevel` under `modelSettings`, else the general `effortLevel` setting.
 
-### task.md
+### Your task.md
 
 If the checkout has a `task.md`, `tasks.md` or `todo.md` (in any case) at its
 root or in `docs/`, the pane shows one quiet line, `To do`, with how much of it
@@ -374,32 +377,19 @@ from.
 When the file has priorities, a second button turns through them, the way the
 effort button turns through levels. Each press steps to the next priority the
 file has, then to `all`, then round to the most urgent again, and shows that
-tier. It starts on the most urgent:
+tier. It starts on the most urgent, and `all` shows every open item, most
+urgent first, each row with its own priority:
 
-```
- ▾ To do · 6 open   P0
-
-   from TASKS.md
-
-   · Build local ledger
-   · Wire news discovery
-   · Fix silent capture
-```
-
-`all` shows every open item, most urgent first, each row with its own priority:
-
-```
- ▾ To do · 6 open   all
-
-   from TASKS.md
-
- P0  Build local ledger
- P0  Wire news discovery
- P0  Fix silent capture
- P1  Supabase sync
- P1  Agent integration
- –   Thumbnail-only mode
-```
+<table>
+  <tr>
+    <td valign="top"><img src="docs/taskfile-p0.png" alt="To do open at P0: 9 open, from TASKS.md, and the three P0 items, each after a grey dot" width="380"/></td>
+    <td valign="top"><img src="docs/taskfile-all.png" alt="To do turned to all: each open item with its priority, P0 first, then P1, P2, and items without one marked with a dash" width="380"/></td>
+  </tr>
+  <tr>
+    <td align="center"><code>P0</code>: the most urgent tier</td>
+    <td align="center"><code>all</code>: every item, by priority</td>
+  </tr>
+</table>
 
 Priority is read wherever your file keeps it:
 
@@ -739,6 +729,7 @@ modboard/
 │   ├── board-live.gif       # a live recording of three Claude sessions
 │   ├── logo.png             # the modBOARD logo
 │   ├── pane-*.png           # screenshots of the /board pane
+│   ├── taskfile-*.png       # the To do list, at P0 and at all
 │   └── render.mjs           # rebuilds every image from its .txt
 ├── CHANGELOG.md             # what changed in each version
 ├── ROADMAP.md               # what's planned next
