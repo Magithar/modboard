@@ -1,6 +1,6 @@
 {
   "name": "modboard",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A task board several agents share: Claude tools, a live pane and lease heartbeats over an agent-neutral CLI",
   "author": {
     "name": "Magithar",

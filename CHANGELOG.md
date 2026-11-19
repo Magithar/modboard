@@ -3,6 +3,17 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## 0.5.1 — 2026-11-19
+
+Docs and package details only. The code is the same as 0.5.0.
+
+- npm keywords now match the GitHub topics, so npm search finds modboard
+  under `claude-code-plugin`, `llm-agents`, `coding-agents` and more.
+- The package now includes `CHANGELOG.md`.
+- The README links to the changelog and to a new contributing guide, and its
+  badges show the license, release, npm downloads and Claude Code version.
+- The live recording in the README is re-recorded with the modboard name.
+
 ## 0.5.0 — 2026-11-19
 
 First release on npm: `npm install -g modboard`.
