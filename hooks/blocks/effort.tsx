@@ -5,18 +5,17 @@ import type { Block } from './types'
 export const effort: Block = {
   name: 'effort',
   band: ({ ui: { Button, Text }, effort: level, act }) => {
+    // Beside the model, the level says what it is ("low"), so the band gives it no label.
     const shown = level || '–'
-    const press = (label: string, children: any) => ({
-      tree: (
-        <Button key="effort" plain onPress={act.nextEffort}>
-          {children}
-        </Button>
-      ),
-      width: label.length,
-    })
     return [
-      press(`effort ${shown}`, [<Text dimColor>effort </Text>, <Text bold>{shown}</Text>]),
-      press(shown, <Text bold>{shown}</Text>),
+      {
+        tree: (
+          <Button key="effort" plain onPress={act.nextEffort}>
+            <Text bold>{shown}</Text>
+          </Button>
+        ),
+        width: shown.length,
+      },
     ]
   },
   pane: ({ ui: { Box, Button, Text }, effort: level, act }) => (

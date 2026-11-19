@@ -1,7 +1,8 @@
 import type { Block } from './types'
 
-// A word on the band that opens the /board pane, or closes it when it is
-// open: a button like the model's, no brackets, the click is the whole of it.
+// The mod's name on the band, bold in the logo's green, as the pane's title
+// is: a button that opens the /board pane, or closes it when it is open. No
+// brackets; the click is the whole of it.
 // It sits at the line's right end, by Claude Code's own [-]. The pane has no
 // part of it.
 export const board: Block = {
@@ -10,10 +11,12 @@ export const board: Block = {
     {
       tree: (
         <Button key="board" plain onPress={act.openBoard}>
-          <Text bold>full board</Text>
+          <Text bold color="success">
+            modBOARD
+          </Text>
         </Button>
       ),
-      width: 'full board'.length,
+      width: 'modBOARD'.length,
       end: true,
     },
   ],
