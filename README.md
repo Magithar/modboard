@@ -175,9 +175,7 @@ The display shows only what needs you. Everything else waits until you ask.
 
 **One line above the prompt**, always visible while there's work on the board:
 
-```
-2 waiting · 1 active   T-005 stopped partway   model Sonnet 5.5   effort low   full board
-```
+![The line above the prompt: 2 waiting · 1 active in green, T-005 stopped partway in yellow, model Sonnet 5.5, effort low, and full board at the right end beside Claude Code's [-]](docs/band.png)
 
 `1 active` is green: work is moving. `T-005 stopped partway` is yellow:
 something was left unfinished. The 5-hour limit and the context live in the
