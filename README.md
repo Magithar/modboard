@@ -219,6 +219,35 @@ every rule (claims, leases, handoffs). A block only stores records and
 refuses writes that are out of date, so it never needs to know what a task
 is.
 
+**How an adapter works.** Every record carries a version, and every write
+says which version it expects. Say agents A and B both claim T-001 at the
+same moment:
+
+1. Both read the board with `snapshot()`. T-001 is at version 3, and nobody
+   holds it.
+2. Both decide the claim is fine, and both send `commit`: "claim T-001, only
+   if it is still at version 3".
+3. A's commit lands first. The adapter sees version 3, writes the claim, and
+   T-001 moves to version 4.
+4. B's commit finds version 4, not 3, so the adapter writes nothing and
+   answers `{ ok: false, conflict: 'T-001' }`.
+5. The engine reads again for B, sees that A holds T-001, and refuses B:
+   "T-001 is already claimed by A" (exit 6). The ledger records B's attempt
+   as `claim-rejected`.
+
+Three things follow from this:
+
+- **The engine decides; the adapter keeps versions honest.** Claims, leases,
+  handoffs and names are all rules in the engine. An adapter for a new
+  backend never has to reimplement them.
+- **The check and the write must be one step.** A transaction, a conditional
+  write or a lock. If an adapter checks the version and then writes in two
+  separate steps, A and B can both pass the check, and two agents end up
+  holding one task. The contract tests below race ten claims to catch this.
+- **The ledger makes it checkable.** Each commit appends its events with the
+  writes. If a crash ever leaves the two out of step, `verify()` says so, and
+  `board doctor` reports it.
+
 **1. Write the module.** One file that exports `createStore(config, { dir })`.
 `config` is everything in `.agent-board/config.json`, so your block's own
 settings (a URL, a table name) go there too. `dir` is the `.agent-board/`

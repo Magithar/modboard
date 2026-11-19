@@ -52,6 +52,25 @@
                          from agent-board/lib/contract.mjs
 
 
+  STORAGE BLOCKS:  WHY THE VERSIONS   (agents A and B claim T-001 at the same moment)
+
+                 agent A                       the adapter                        agent B
+
+        1   snapshot(): T-001 at v3    ◀──     T-001   v3      ──▶    snapshot(): T-001 at v3
+        2   commit: claim T-001,       ──▶     v3 matches:
+            only if still v3                   write it, now v4
+        3                                      v4, not v3:     ◀──    commit: claim T-001,
+                                               conflict        ──▶    only if still v3
+        4                                                             the engine reads again:
+                                                                      A holds T-001
+        5                                                             refused: already claimed
+                                                                      (exit 6, in the ledger)
+
+        the engine makes every decision; the adapter only keeps the versions honest
+        checking the version and writing must be one step: a transaction, a conditional write, a lock
+        as two steps, both claims could pass the check, and two agents would hold one task
+
+
   DISPLAY BLOCKS:  WHERE THEY COME FROM
 
         built in                        your own, no code                 your own, in code
