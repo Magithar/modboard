@@ -29,6 +29,10 @@ where they tell you something.
 - **A `compact` block**: the context window as a ring that fills
   (○ ◔ ◑ ◕ ●), and clicking it (or pressing `c`) runs `/compact`. It's in the
   pane by default, and in the band once the context is half full.
+- **A tutorial**, [docs/TUTORIAL.md](docs/TUTORIAL.md): from install to two
+  agents sharing a board, reading the display, your task.md and its
+  priorities, other agents, settings, and what to do when something looks
+  wrong.
 - **`board taskfile`** prints the task file's items; `--json` gives them as
   data. It reads no board and writes nothing.
 

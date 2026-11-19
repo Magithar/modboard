@@ -15,7 +15,7 @@
 ---
 
 <p align="center">
-  <a href="#see-it-in-action">Demo</a> • <a href="#install">Install</a> • <a href="#usage">Usage</a> • <a href="#how-it-fits-together">How it fits together</a> • <a href="#what-you-see">What you see</a> • <a href="#make-your-own-block">Make your own block</a> • <a href="#what-has-been-tested">Tested</a> • <a href="#project-structure">Project structure</a> • <a href="#known-limitations">Limitations</a> • <a href="#contributing">Contributing</a>
+  <a href="docs/TUTORIAL.md">Tutorial</a> • <a href="#see-it-in-action">Demo</a> • <a href="#install">Install</a> • <a href="#usage">Usage</a> • <a href="#how-it-fits-together">How it fits together</a> • <a href="#what-you-see">What you see</a> • <a href="#make-your-own-block">Make your own block</a> • <a href="#what-has-been-tested">Tested</a> • <a href="#project-structure">Project structure</a> • <a href="#known-limitations">Limitations</a> • <a href="#contributing">Contributing</a>
 </p>
 
 ---
@@ -38,6 +38,10 @@ What each part of the screen means: [what you see](#what-you-see).
 ---
 
 ## Install
+
+New here? The [tutorial](docs/TUTORIAL.md) walks you from install to two
+agents sharing a board, your task.md on it, and every button, in about
+fifteen minutes.
 
 | Agent | How |
 |-------|-----|
@@ -576,6 +580,7 @@ modboard/
 ├── test/                    # CLI and store contract tests (npm test)
 ├── tests/                   # mod tests (claude plugin test .)
 ├── docs/
+│   ├── TUTORIAL.md          # a walk-through from install to two agents
 │   ├── system.txt  .png     # how it fits together
 │   ├── blocks.txt  .png     # how blocks work
 │   ├── board-live.gif       # a live recording of three Claude sessions
