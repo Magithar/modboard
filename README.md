@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <b>A task board several coding agents share at once.</b><br/>
+  <b>One task board every coding agent shares, built from blocks you can add to.</b><br/>
   Works with Claude Code, Codex, OpenCode and anything with a shell, a person included.
 </p>
 
@@ -29,9 +29,10 @@
 
 ## What it does
 
-Two Claude Code sessions, a Codex session and a person can all take tasks from
-one board, see who holds what, and hand unfinished work to each other without
-losing context.
+One universal board for every agent you run. Two Claude Code sessions, a
+Codex session and a person can all take tasks from it, see who holds what, and
+hand unfinished work to each other without losing context. It's built from
+blocks, so you can add your own and show whatever you need on it.
 
 | | |
 |---|---|
@@ -40,6 +41,7 @@ losing context.
 | **Handoffs keep context** | An agent that stops partway leaves a note; the next one reads it and carries on. |
 | **Done means verified** | Nothing is marked done without saying how it was checked. |
 | **Your task.md, beside the board** | The pane lists what's left in your project's own task file, by priority. |
+| **Add your own blocks** | Show anything on the board, like CI status, the git branch or any command's output, with no code. Or keep the board in a database. [How](#make-your-own-block) |
 
 ---
 
