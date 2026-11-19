@@ -488,10 +488,17 @@ export const mine: Block = {
 ```
 
 Every block gets the same context (see [`types.tsx`](hooks/blocks/types.tsx)):
-the tasks, the live agents, who this session is, plan usage, the model and
-effort, the time, the width, your command blocks' output, and `act` for
-switching the model or effort when the block is clicked. A block may draw in
-the band, the pane or both.
+the tasks, the live agents, who this session is, plan usage and context
+fill, the model and effort, the time, the width, your command blocks'
+output, the project's task file (and whether its list is open, and which
+priority it's turned to), and `act` for what a click can do: switch the
+model or effort, run `/compact`, open the task file or turn its priority. A
+block may draw in the band, the pane or both.
+
+Two rules keep the display calm, and a new block should follow them: colour
+only when something needs the person (theme `warning` and `error`), and no
+word or mark that the heading or the order already says. The `meter.tsx`
+ring is there for anything that fills up.
 
 Then list it in [`index.ts`](hooks/blocks/index.ts) (an import, and its name
 in `BLOCKS`), name it in the `band` or `pane` setting, and run
@@ -520,10 +527,16 @@ ownership, handoff, lease expiry, heartbeat, rejected-claim logging, verified
 done, release-all) and the store contract against the file block and an
 in-memory reference block (concurrent claims and adds, stale writes, names).
 It also checks that the CLI loads a block named in `config.json` and refuses
-a broken one. `claude plugin test .` runs the mod tests (the pane's sections
-and alerts, the band and when it stays quiet, names and their fallback, the
-tools, the verification note, release on session end, usage, and choosing
-blocks).
+a broken one, and that `board taskfile` reads each way a task file keeps
+items and priorities (headings, items, tables, `docs/`) without touching the
+board. `claude plugin test .` runs the mod tests (the pane's sections and
+alerts and the eight-row limit, the band and when it stays quiet, names and
+their fallback, the tools, the verification note, release on session end,
+usage and the context ring, the compact button, the task file's list and
+its priority button's whole turn, and choosing blocks).
+
+The task file, priority and compact features were added after the live
+tests above, and have so far run only under the automated tests.
 
 ---
 
@@ -548,14 +561,15 @@ modboard/
 │   ├── engine.mjs           # the rules: claims, leases, handoffs, names, the ledger
 │   ├── load-store.mjs       # finds the storage block that config.json names
 │   ├── store-file.mjs       # the built-in storage block: a folder
-│   ├── taskfile.mjs         # reads a project's task.md for display
+│   ├── taskfile.mjs         # reads a project's task file and its priorities, for display
 │   └── contract.mjs         # the tests every storage block must pass
 ├── examples/
 │   └── store-memory.mjs     # a complete storage block in about 20 lines
 ├── hooks/
 │   ├── hooks.json
 │   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
-│   └── blocks/              # one file per display block, listed in index.ts
+│   └── blocks/              # one file per display block, listed in index.ts;
+│                            # meter.tsx is the ring that usage and compact share
 ├── types/index.d.ts
 ├── .claude-plugin/
 │   └── plugin.json          # the mod's manifest and settings
@@ -588,6 +602,14 @@ Each diagram's source is plain text. After editing a `.txt`,
   (15 minutes).
 - **A verification note is the agent's own claim.** The board requires one
   but doesn't run the check itself.
+- **The task file is read-only.** The board shows it but never writes it,
+  and its items can't be claimed. Add one with `board add` to work it
+  through the board.
+- **The compact button asks Claude Code to run `/compact`.** Whether a mod's
+  request compacts exactly as typing it does is not yet checked in a live
+  session.
+- **The demo recording predates the quieter pane.** It still shows row
+  marks and "is on it".
 
 ---
 

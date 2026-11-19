@@ -71,9 +71,18 @@ through each kind.
 ## Style
 
 - **Plain words in anything a person reads**: the band, the pane, CLI output,
-  docs. "backend is on it", not "claimed by backend". The CLI flags and the
+  docs. "Stopped partway", not "released with handoff". The CLI flags and the
   tools keep the precise terms (claim, lease, handoff), because agents act on
   them.
+- **Say a thing once.** If the heading or the order already says it, the row
+  doesn't: under "In progress", a row names only who ("backend").
+- **Colour only when something needs the person**: theme `warning` from
+  70%, `error` from 90%, and alerts. Nothing is green for "fine".
+- **Show what's left, then a count.** Long lists stop at eight rows
+  (`SHOWN` in `hooks/blocks/types.tsx`) and end in "N more". Work that needs
+  the person is never cut.
+- **One look for one idea.** Anything that fills up uses the ring in
+  `hooks/blocks/meter.tsx`.
 - **No new dependencies** in the CLI or engine.
 - **Commit messages** say what changed and why, in a short first line and,
   where it helps, a few lines below it.

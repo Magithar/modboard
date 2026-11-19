@@ -76,24 +76,25 @@
         built in                        your own, no code                 your own, in code
         hooks/blocks/*.tsx              the blocks setting, as JSON:      a file of the same shape
         listed in index.ts              {"ci": "gh run list ..."}         in hooks/blocks/, listed
-        summary · tasks · usage         every 30 s: sh -c the command,    in index.ts, in your copy
-        model · effort · clock          show its first line (60 chars)    of the mod: a fork or a PR
-        context · agents
+        summary · tasks · taskfile      every 30 s: sh -c the command,    in index.ts, in your copy
+        usage · compact · model         show its first line (60 chars)    of the mod: a fork or a PR
+        effort · clock · context
+        agents
             │                               │                                 │
             └───────────────────────────────┼─────────────────────────────────┘
                                             ▼
-                           band  setting   summary,usage,model,effort     the order is the importance
-                           pane  setting   tasks,usage
+                           band  setting   summary,usage,compact          the order is the importance
+                           pane  setting   tasks,taskfile,compact,usage
 
 
   DISPLAY BLOCKS:  WHAT ONE IS
 
         { name,                                   each draws from one context:
           band?(ctx) ──▶ its forms, widest first      tasks · agents · who you are
-                         [ { tree, width }, ... ]     usage · model · effort · the time
-                         or null: nothing to say      your command blocks' output
-          pane?(ctx) ──▶ one part of the pane         the width · act.nextModel/nextEffort
-                         or null }
+                         [ { tree, width }, ... ]     usage · context · model · effort · the time
+                         or null: nothing to say      your command blocks' output · the task file
+          pane?(ctx) ──▶ one part of the pane         the width · act: nextModel · nextEffort
+                         or null }                    compact · toggleTaskfile · nextTier
 
 
   DISPLAY BLOCKS:  HOW THE BAND FITS ONE LINE
@@ -106,9 +107,11 @@
         4  still too long?  narrow the first block (the summary); its alert outlasts its counts
         5  never wraps; with nothing to say, the line disappears
 
-        124 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
-         64 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
-         38 cols   2 tasks waiting   5h ▓▓▓░░  64%
-         20 cols   2 tasks waiting
+        112 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64% 5-hour limit   ◕ 72% compact
+        100 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64%   ◕ 72%
+         80 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up
+         64 cols   2 waiting · 1 active   T-005 was stopped partway, pick it up
+         42 cols   2 waiting · 1 active   T-005 needs you
+         20 cols   T-005 needs you
 
         the pane has room to spare: each block's part, stacked in the pane setting's order

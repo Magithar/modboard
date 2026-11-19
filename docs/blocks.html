@@ -9,7 +9,7 @@
   .d{color:#5e5e5e} .h{color:#d97757;font-weight:700} .c{color:#d97757} .g{color:#4ec27a} .m{color:#9a9a9a} .p{color:#f0f0f0;font-weight:700}
   </style></head><body><div class="wrap">
   <p class="t">modboard · how blocks work</p>
-  <p class="s">v0.5.0 · storage blocks hold the board; display blocks draw it in each Claude session</p>
+  <p class="s">v0.5.1 · storage blocks hold the board; display blocks draw it in each Claude session</p>
   <pre><span class="h">  TWO KINDS OF BLOCK</span><span class="d"></span>
 
         storage block     where the board is kept        one per board     .modboard/config.json
@@ -88,24 +88,25 @@
         built in                        your own, no code                 your own, in code
         hooks/blocks/*.tsx              the blocks setting, as JSON:      a file of the same shape
         listed in index.ts              {"ci": "gh run list ..."}         in hooks/blocks/, listed
-        summary · tasks · usage         every 30 s: sh -c the command,    in index.ts, in your copy
-        model · effort · clock          show its first line (60 chars)    of the mod: a fork or a PR
-        context · agents
+        summary · tasks · taskfile      every 30 s: sh -c the command,    in index.ts, in your copy
+        usage · compact · model         show its first line (60 chars)    of the mod: a fork or a PR
+        effort · clock · context
+        agents
             <span class="d">│</span>                               <span class="d">│</span>                                 <span class="d">│</span>
             <span class="d">└</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┼</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┘</span>
                                             <span class="d">▼</span>
-                           band  setting   summary,usage,model,effort     the order is the importance
-                           pane  setting   tasks,usage
+                           band  setting   summary,usage,compact          the order is the importance
+                           pane  setting   tasks,taskfile,compact,usage
 
 
 <span class="h">  DISPLAY BLOCKS</span><span class="d">:  WHAT ONE IS</span>
 
         { name,                                   each draws from one context:
           band?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> its forms, widest first      tasks · agents · who you are
-                         [ { tree, width }, ... ]     usage · model · effort · the time
-                         or null: nothing to say      your command blocks' output
-          pane?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> one part of the pane         the width · act.nextModel/nextEffort
-                         or null }
+                         [ { tree, width }, ... ]     usage · context · model · effort · the time
+                         or null: nothing to say      your command blocks' output · the task file
+          pane?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> one part of the pane         the width · act: nextModel · nextEffort
+                         or null }                    compact · toggleTaskfile · nextTier
 
 
 <span class="h">  DISPLAY BLOCKS</span><span class="d">:  HOW THE BAND FITS ONE LINE</span>
@@ -118,10 +119,12 @@
         4  still too long?  narrow the first block (the summary); its alert outlasts its counts
         5  never wraps; with nothing to say, the line disappears
 
-        124 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
-         64 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
-         38 cols   2 tasks waiting   5h ▓▓▓░░  64%
-         20 cols   2 tasks waiting
+        112 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64% 5-hour limit   ◕ 72% compact
+        100 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64%   ◕ 72%
+         80 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up
+         64 cols   2 waiting · 1 active   T-005 was stopped partway, pick it up
+         42 cols   2 waiting · 1 active   T-005 needs you
+         20 cols   T-005 needs you
 
         the pane has room to spare: each block's part, stacked in the pane setting's order
 </pre></div></body></html>

@@ -5,38 +5,61 @@ modboard was called agent-board until 0.5.0.
 
 ## Unreleased
 
-- A `taskfile` block in the `/board` pane: when the checkout has a `task.md`
-  (or `tasks.md`, `todo.md`), one line says how much of it is open, and
-  clicking it (or pressing `t`) shows what's left under its headings, up to
-  eight items, then a count of the rest. Checked-off items aren't shown. It's on
-  by default (`pane: tasks,taskfile,usage`) and shows nothing without a file.
-- The pane is quieter. Headings are dimmed, and rows lose their ◐/○ mark
-  (the heading says the state). "Not started" shows eight tasks, then
-  "N more"; in-progress and stopped-partway tasks are never cut. The usage
-  bar is plain with room left and takes colour only from 70%.
-- A `compact` block: the context window as a ring that fills (○ ◔ ◑ ◕ ●,
-  yellow from 70%, red from 90%), and clicking it runs `/compact`. It's
-  in the pane by default, and in the band once the context is half full.
-- Usage is drawn with the same ring instead of a bar, so "how full" always
-  looks the same.
-- The band's default is now `summary,usage,compact`. Model and effort are
-  still blocks you can add; Claude Code already shows both.
-- Task rows only say who ("backend", "you"); the heading says what. "Needs
-  picking up" is now "Stopped partway".
-- The weekly limit is no longer shown on the board; the 5-hour limit stays.
-- The task file's priorities: P0–P9 read from headings (`## P0 — …`,
-  `## Sync (P1)`), from items (`- [ ] P2 …`) and from tables with a
-  Priority column. A priority button then turns through the tiers the file
-  has, like the effort button: `P0 · 3`, `P1 · 5`, …, `all`, and round
-  again (or press `p`), showing one tier at a time. It starts on the most
-  urgent. `all` lists every priority in order, each named once where it
-  starts, with unprioritised items last, after a dash.
-- Task files are also found in `docs/`, tables with a task and a status or
-  priority column are read, struck-through items count as done, markdown
-  marks are taken off for display, and once a file checks anything off its
-  plain bullets are left out as notes.
-- `board taskfile` prints that file's items; `--json` gives them as data. It
-  reads no board and never writes one.
+The board can now show a project's own task file, with its priorities, and a
+compact button. The display is quieter: colour, marks and words appear only
+where they tell you something.
+
+### Added
+
+- **A `taskfile` block** in the `/board` pane. When the checkout has a
+  `task.md`, `tasks.md` or `todo.md` (any case) at its root or in `docs/`,
+  one line says how much of it is open. Click it (or press `t`) to see
+  what's left: up to eight items, then a count of the rest. Checked-off
+  items stay in the file and out of the pane. Nothing in it is claimed or
+  written; to work an item through the board, `board add` it.
+- **Task file priorities.** P0–P9 are read from headings (`## P0 — …`,
+  `## Sync (P1)`), from items (`- [ ] P2 …`, which wins over its heading)
+  and from tables with a Priority column.
+- **A priority button** beside the task file, which turns through the tiers
+  the file has the way the effort button turns through levels: `P0 · 3`,
+  `P1 · 5`, …, `all`, and round again (or press `p`). It starts on the most
+  urgent and shows one tier at a time. `all` lists every priority in order,
+  each named once where it starts, with unprioritised items last, after a
+  dash.
+- **A `compact` block**: the context window as a ring that fills
+  (○ ◔ ◑ ◕ ●), and clicking it (or pressing `c`) runs `/compact`. It's in the
+  pane by default, and in the band once the context is half full.
+- **`board taskfile`** prints the task file's items; `--json` gives them as
+  data. It reads no board and writes nothing.
+
+### Changed
+
+- **Defaults.** The band is now `summary,usage,compact`, and the pane
+  `tasks,taskfile,compact,usage`. Model and effort are still blocks you can
+  add to the band; Claude Code already shows both.
+- **One ring for "how full".** Usage is drawn with the same ring as the
+  context instead of a bar, and the two line up in the pane.
+- **Colour only when something needs you**: yellow from 70%, red from 90%.
+  With room left, usage and context stay plain (usage used to be green).
+- **The weekly limit is left off the board.** The 5-hour limit stays;
+  `/usage` has the rest.
+- **A quieter pane.** Headings are dimmed. Rows lose their ◐/○ mark, since
+  the heading says the state, and name only who ("backend", "you"), since
+  the heading says what. "Needs picking up" is now "Stopped partway".
+  "Not started" shows eight tasks, then "N more"; what's in progress or
+  stopped partway is never cut.
+- **The clock** in the pane is dimmed instead of bold.
+
+### Reading task files
+
+- Tables are read when they have a task column and a priority or status
+  column; a status of done, complete or ✅ counts as checked off.
+- Struck-through items (`~~old plan~~`) count as done.
+- Once a file checks anything off, its plain bullets are notes, not tasks,
+  and are left out.
+- Markdown marks (`**`, backticks, link syntax) and status emoji are taken
+  off item text and headings for display.
+- A broken link named `task.md` reads as no task file, not an error.
 
 ## 0.5.1 — 2026-11-19
 

@@ -48,8 +48,8 @@
                  ┌───────────────────┴────────────────────┐
                  ▼                                        ▼
         band above the prompt                    /board pane
-        summary · usage · model                  tasks · usage · agents
-        effort · clock · context                 model · effort · clock · context
+        summary · usage · compact                tasks · taskfile · compact · usage
+        model · effort · clock · context         agents · model · effort · clock · context
         + your own blocks                        + your own blocks
 
 
@@ -65,5 +65,5 @@
           │ or session silent 3 min     │   │  release --handoff,
           └─────────────────────────────┘   │  or its session ends
                                             ▼
-                                          ○ Needs picking up ──── claim ────▶ ◐ In progress
+                                          ○ Stopped partway ───── claim ────▶ ◐ In progress
                                                                               (the next agent reads the handoff first)
