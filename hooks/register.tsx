@@ -5,6 +5,7 @@ import type { Agent, Task, TaskFile } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 import { groupOpen, type GroupName } from './blocks/tasks'
+import { tone } from './blocks/meter'
 import { nextTier, openItems } from './blocks/taskfile'
 
 // The mod is an adapter: every board read and write goes through bin/board.mjs,
@@ -17,6 +18,8 @@ const PANE = 'modboard'
 const HEARTBEAT_MS = 60_000
 const PRESENCE_MS = 60_000
 const POLL_MS = 3_000
+// Pane blocks that draw a bar; together they make one section.
+const BARS = new Set(['compact', 'usage', 'context'])
 const COMMAND_MS = 30_000
 const NAME_TRIES = 9
 
@@ -30,10 +33,13 @@ const custom = atom({ plugin: 'modboard', key: 'custom' } as const, {} as Record
 const taskfile = atom({ plugin: 'modboard', key: 'taskfile' } as const, { file: null, items: [] } as TaskFile)
 const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, false)
 // Whether the pane is open now: set when it is placed, cleared when it closes,
-// by full board or by its own ✕.
+// by modBOARD on the band or by its own ✕.
 const paneOpen = atom({ plugin: 'modboard', key: 'paneOpen' } as const, false)
 const taskfileTier = atom({ plugin: 'modboard', key: 'taskfileTier' } as const, '')
 const groupsOpen = atom({ plugin: 'modboard', key: 'groupsOpen' } as const, {} as Record<string, boolean>)
+// Why the last read of the board failed, or '' when it worked: the pane would
+// otherwise go on showing old tasks as if they were current.
+const boardError = atom({ plugin: 'modboard', key: 'boardError' } as const, '')
 
 let session = ''
 let lastBeat = 0
@@ -47,14 +53,19 @@ async function board($: EngineInterface, args: string[]) {
   return cli($, [...args, '--as', await read($, me)])
 }
 
-// Take the name asked for in BOARD_AGENT, or the next free one after it; with
-// none asked for, a name from the session id, which no other session has.
+// The board names the session by what it runs and when it joined ("claude 1",
+// "claude 2"), unless BOARD_AGENT asks for a name: then that one, or the next
+// free one after it.
+async function joined($: EngineInterface) {
+  const out = await cli($, ['join', 'claude', '--session', session, '--json'])
+  try {
+    if (out.ok) return (JSON.parse(out.text) as { name: string }).name
+  } catch {}
+  return `claude:${session.slice(0, 8)}`
+}
+
 async function takeName($: EngineInterface, wanted: string | undefined) {
-  if (!wanted) {
-    const name = `claude:${session.slice(0, 8)}`
-    await cli($, ['register', name, '--session', session])
-    return name
-  }
+  if (!wanted) return joined($)
   for (let i = 1; i <= NAME_TRIES; i++) {
     const name = i === 1 ? wanted : `${wanted}-${i}`
     const taken = await cli($, ['register', name, '--session', session])
@@ -64,9 +75,8 @@ async function takeName($: EngineInterface, wanted: string | undefined) {
     }
     if (taken.code !== 7) break
   }
-  const name = `claude:${session.slice(0, 8)}`
+  const name = await joined($)
   $.ui.toast(`board: could not take the name "${wanted}", so this session is "${name}"`)
-  await cli($, ['register', name, '--session', session])
   return name
 }
 
@@ -85,13 +95,27 @@ async function estimateContext($: EngineInterface) {
 // Whether any shown block reads task.md; when none does, it is never read.
 let readsTaskfile = false
 
+// What went wrong, in one line: the board's own message, or the error line of
+// a crash ("EACCES: permission denied, open '…/board.json'"), not its stack.
+function reason(text: string) {
+  const lines = text.split('\n').map(l => l.trim())
+  const line = lines.find(l => /^board:/.test(l)) ?? lines.find(l => /^\w*Error\b/.test(l)) ?? lines.find(Boolean) ?? ''
+  return line.replace(/^board:\s*/, '').replace(/^\w*Error:\s*/, '')
+}
+
 async function refresh($: EngineInterface) {
-  const out = await cli($, ['view', '--json'])
-  if (out.ok) {
-    const view = JSON.parse(out.text) as { tasks: Task[]; agents: Agent[] }
-    await update($, tasks, () => view.tasks)
-    await update($, agents, () => view.agents)
+  let problem = ''
+  try {
+    const out = await cli($, ['view', '--json'])
+    if (out.ok) {
+      const view = JSON.parse(out.text) as { tasks: Task[]; agents: Agent[] }
+      await update($, tasks, () => view.tasks)
+      await update($, agents, () => view.agents)
+    } else problem = reason(out.text) || `the board CLI exited with ${out.code}`
+  } catch {
+    problem = 'the board CLI could not run (is node on PATH?)'
   }
+  if ((await read($, boardError)) !== problem) await update($, boardError, () => problem)
   if (readsTaskfile) {
     const file = await cli($, ['taskfile', '--json'])
     let parsed: TaskFile | undefined
@@ -147,7 +171,7 @@ const TOOLS = [
   {
     name: 'board_release',
     description:
-      'Give up a task you hold without finishing it. Always write a handoff: what is done, what is left, where to look — the next agent starts from it.',
+      'Give up a task you hold without finishing it. Always write a handoff: what is done, what is left, where to look, each part separated by a semicolon ("done X; left Y; see Z") — the next agent starts from it.',
     schema: { id: { type: 'string' }, handoff: { type: 'string' } },
     required: ['id', 'handoff'],
     args: (i: any) => ['release', i.id, '--handoff', i.handoff],
@@ -247,13 +271,24 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       await $.command.run({ command: 'effort', args: to }).catch(() => $.ui.toast(`board: could not set effort to ${to}`))
       await update($, effort, () => to)
     },
-    // The same call /compact makes. Claude Code refuses it while a turn runs.
-    // full board: opens the pane, or closes it when it is already open.
+    // modBOARD on the band: opens the pane, or closes it when it is already open.
     openBoard: async () => {
       if (!(await read($, paneOpen))) return void (await openBoard($))
       await $.ui.close({ id: PANE }).catch(() => {})
       await update($, paneOpen, () => false)
     },
+    // A task's box on the band. With the pane closed, it opens the pane at
+    // the group that holds the task, unfolded, so the task and its note are
+    // in view. With the pane open, it folds or unfolds that group, and the
+    // pane stays open: modBOARD is what closes it.
+    showGroup: async (name: string) => {
+      if (!(await read($, paneOpen))) {
+        await update($, groupsOpen, chosen => ({ ...chosen, [name]: true }))
+        return void (await openBoard($))
+      }
+      await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
+    },
+    // The same call /compact makes. Claude Code refuses it while a turn runs.
     compact: async () => {
       $.ui.toast('board: compacting the conversation…')
       await $.session.compact().catch(() => $.ui.toast("board: can't compact while Claude is working; press again when it's idle"))
@@ -445,10 +480,66 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const c = await context($, e.props.bodyColumns ?? 40, { Box, Text, Button }, actions($, cycles))
-    const parts = pane.map(b => b.pane!(c)).filter(part => part !== null)
+    const parts = pane.map(b => ({ block: b, part: b.pane!(c) })).filter(p => p.part !== null)
+    // Sections, in order: each block on its own, except that bars side by
+    // side (context, the 5-hour limit) make one, under a Limits heading.
+    const sections: (typeof parts)[] = []
+    for (const p of parts) {
+      const last = sections.at(-1)
+      if (last && BARS.has(p.block.name) && BARS.has(last[0]!.block.name)) last.push(p)
+      else sections.push([p])
+    }
+    const limits = (bars: typeof parts) => {
+      const open = groupOpen(c.groupsOpen, 'limits')
+      // Folded, the heading keeps the figures, each in its bar's colour.
+      const seen = new Set<string>()
+      const brief = bars
+        .flatMap(b => b.block.brief?.(c) ?? [])
+        .filter(f => !seen.has(f.name) && seen.add(f.name))
+      return (
+        <Box flexDirection="column">
+          <Box>
+            <Button key="group-limits" plain onPress={() => c.act.toggleGroup('limits')}>
+              <Text bold>{`${open ? '▾' : '▸'} Limits`}</Text>
+            </Button>
+            {!open &&
+              brief.flatMap(f => [
+                <Text dimColor> · </Text>,
+                <Text color={tone(f.percent)} dimColor={!tone(f.percent)}>{`${f.name} ${Math.round(f.percent)}%`}</Text>,
+              ])}
+          </Box>
+          {open && (
+            <Box flexDirection="column" marginTop={1} paddingLeft={2}>
+              {bars.map((b, i) => (i ? <Box marginTop={1}>{b.part}</Box> : b.part))}
+            </Box>
+          )}
+        </Box>
+      )
+    }
+    const body = (section: typeof parts) => (BARS.has(section[0]!.block.name) ? limits(section) : section[0]!.part)
+    // A grey rule between sections.
+    const rule = '─'.repeat(Math.max(1, (e.props.bodyColumns ?? 40) - 2))
+    const problem = await read($, boardError)
     return (
-      <Box flexDirection="column" gap={1} paddingX={1}>
-        {parts}
+      <Box flexDirection="column" paddingX={1}>
+        {/* First, in red, when the board stopped answering: what is below is old. */}
+        {problem ? (
+          <Box marginBottom={1}>
+            <Text color="error" wrap="truncate">{`board not updating: ${problem}`}</Text>
+          </Box>
+        ) : null}
+        {sections.map((section, i) =>
+          i === 0 ? (
+            body(section)
+          ) : (
+            <Box flexDirection="column" marginTop={1}>
+              <Box marginBottom={1}>
+                <Text dimColor>{rule}</Text>
+              </Box>
+              {body(section)}
+            </Box>
+          ),
+        )}
       </Box>
     )
   })
