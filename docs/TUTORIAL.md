@@ -254,7 +254,7 @@ thing: **yellow or red, look here.**
 |---|---|
 | `2 waiting · 1 active` | the board at a glance; `active` is green |
 | `T-005 stopped partway` | in yellow, the one thing left unfinished: work someone handed off, or an agent that stopped responding |
-| `full board` | opens the `/board` pane, like typing `/board` |
+| `full board` | opens the `/board` pane, like typing `/board`; click it again to close the pane |
 | `model Sonnet 5.5   effort low` | the session's model and effort. Click either to switch to the next one |
 
 The 5-hour limit and the context are in the `/board` pane, where both bars turn yellow at 70% and red at 90%. On a narrow window the line shortens and drops parts from the right;

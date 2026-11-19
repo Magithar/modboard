@@ -596,6 +596,11 @@ test('full board on the band opens the board pane', { options: { band: 'summary,
     opened.push(e)
     return { value: { isPlaced: true } }
   })
+  const closed: string[] = []
+  on('ui.close', (_$, e: any) => {
+    closed.push(e.id)
+    return { value: undefined }
+  })
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   expect(await texts(band)).toContain('full board')
@@ -603,6 +608,11 @@ test('full board on the band opens the board pane', { options: { band: 'summary,
   expect((await band.find({ key: 'board' }))?.props.plain).toBe(true)
   await band.press({ key: 'board' })
   expect(opened.map(e => e.id)).toEqual(['modboard'])
+  // Pressed again while the board is open, it closes it; then opens it again.
+  await band.press({ key: 'board' })
+  expect(closed).toEqual(['modboard'])
+  await band.press({ key: 'board' })
+  expect(opened.map(e => e.id)).toEqual(['modboard', 'modboard'])
 })
 
 test('full board sits last but outlasts model and effort on a short line', { options: { band: 'summary,model,effort,board' } } as any, async ($, on) => {

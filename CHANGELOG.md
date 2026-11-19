@@ -53,7 +53,8 @@ where they tell you something.
 - **A shorter band.** It reads "2 waiting · 1 active   T-005 stopped
   partway": `active` in green, what was left partway in yellow, with no
   "pick it up".
-- **A `full board` button on the band** opens the `/board` pane: a plain
+- **A `full board` button on the band** opens the `/board` pane, and
+  closes it when it's already open: a plain
   word, like the model's, at the line's right end by Claude Code's `[-]`.
   On a short line, model and effort drop before it.
 - **The 5-hour limit keeps its bar**, now plain with room left instead of

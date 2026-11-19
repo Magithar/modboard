@@ -242,7 +242,7 @@ as comma-separated lists, in order:
 | Block | Band | Pane | Shows |
 |---|---|---|---|
 | `summary` | ✓ | | what's waiting and active (green), and the one thing left partway (yellow) |
-| `board` | ✓ | | `full board`, a plain button that opens the `/board` pane. It sits at the line's right end, by Claude Code's `[-]`, and on a short line outlasts everything but the summary |
+| `board` | ✓ | | `full board`, a plain button that opens the `/board` pane, and closes it when it's open. It sits at the line's right end, by Claude Code's `[-]`, and on a short line outlasts everything but the summary |
 | `tasks` | | ✓ | in progress, stopped partway and not started, each a heading you click (or `i`, `s`, `n`) to open or close; not started shows up to eight; then a count of done |
 | `taskfile` | | ✓ | the project's `task.md`: how much is open; click it to see what's left, and click its priority to turn it |
 | `usage` | ✓ | ✓ | the 5-hour limit as a bar: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |

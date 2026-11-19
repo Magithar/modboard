@@ -29,6 +29,9 @@ const effort = atom({ plugin: 'modboard', key: 'effort' } as const, '')
 const custom = atom({ plugin: 'modboard', key: 'custom' } as const, {} as Record<string, string>)
 const taskfile = atom({ plugin: 'modboard', key: 'taskfile' } as const, { file: null, items: [] } as TaskFile)
 const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, false)
+// Whether the pane is open now: set when it is placed, cleared when it closes,
+// by full board or by its own ✕.
+const paneOpen = atom({ plugin: 'modboard', key: 'paneOpen' } as const, false)
 const taskfileTier = atom({ plugin: 'modboard', key: 'taskfileTier' } as const, '')
 const groupsOpen = atom({ plugin: 'modboard', key: 'groupsOpen' } as const, {} as Record<string, boolean>)
 
@@ -222,10 +225,13 @@ function after(cycle: string[], current: string) {
 // Open the /board pane, fresh: the board and the task file read again first.
 // Ask for room for the whole board; the surface may give less, and the pane's
 // body scrolls with the wheel when it does.
+
 async function openBoard($: EngineInterface) {
   await refresh($)
   await estimateContext($)
-  return $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
+  const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
+  if (opened.isPlaced) await update($, paneOpen, () => true)
+  return opened
 }
 
 function actions($: EngineInterface, cycles: { models: string[]; efforts: string[] }): Ctx['act'] {
@@ -242,8 +248,11 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       await update($, effort, () => to)
     },
     // The same call /compact makes. Claude Code refuses it while a turn runs.
+    // full board: opens the pane, or closes it when it is already open.
     openBoard: async () => {
-      await openBoard($)
+      if (!(await read($, paneOpen))) return void (await openBoard($))
+      await $.ui.close({ id: PANE }).catch(() => {})
+      await update($, paneOpen, () => false)
     },
     compact: async () => {
       $.ui.toast('board: compacting the conversation…')
@@ -393,6 +402,13 @@ export const register: Register = (on, options) => {
     if (opened.isPlaced) return { text: 'Board pane opened.' }
     const list = (await read($, tasks)).filter(t => t.status !== 'done')
     return { text: list.map(t => `${SYMBOL[t.status]} ${t.id}  ${t.title}${t.claim ? `  ${t.claim.owner}` : ''}`).join('\n') || '(no open tasks)' }
+  })
+
+  // The pane's own ✕ closes it too.
+  on('ui.close', async ($, e, next) => {
+    const result = await next(e)
+    if (e.id === PANE && (result as any)?.deny === undefined) await update($, paneOpen, () => false)
+    return result
   })
 
   // The band: one line above the prompt, quiet when no block has anything to say.

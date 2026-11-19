@@ -25,6 +25,6 @@ export type Usage = {
 
 declare module 'claude-code' {
   interface PluginState {
-    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; groupsOpen: Record<string, boolean> }
+    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean> }
   }
 }
