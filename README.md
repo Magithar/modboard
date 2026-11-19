@@ -10,45 +10,36 @@
 </p>
 
 <p align="center">
-  <b>A task board several coding agents share at once.</b>
+  <b>A task board several coding agents share at once.</b><br/>
+  Works with Claude Code, Codex, OpenCode and anything with a shell, a person included.
 </p>
 
 <p align="center">
-  Works with <a href="#claude-code">Claude Code</a>,
-  <a href="#codex-opencode-or-any-agent-with-a-shell">Codex</a>,
-  <a href="#codex-opencode-or-any-agent-with-a-shell">OpenCode</a>, and
-  <a href="#codex-opencode-or-any-agent-with-a-shell">anything with a shell</a>, a person included.
-</p>
-
-<p align="center">
-  <a href="docs/TUTORIAL.md">Tutorial</a> ·
   <a href="#see-it-in-action">Demo</a> ·
-  <a href="#install">Install</a> ·
-  <a href="#usage">Usage</a> ·
-  <a href="#how-it-fits-together">How it works</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#everyday-use">Everyday use</a> ·
   <a href="#what-you-see">What you see</a> ·
-  <a href="#your-taskmd">Your task.md</a>
-  <br/>
+  <a href="#settings">Settings</a> ·
+  <a href="#how-it-works">How it works</a> ·
   <a href="#make-your-own-block">Make your own block</a> ·
-  <a href="#what-has-been-tested">Tested</a> ·
-  <a href="#project-structure">Structure</a> ·
-  <a href="#known-limitations">Limitations</a> ·
-  <a href="#contributing">Contributing</a>
+  <a href="docs/TUTORIAL.md">Tutorial</a>
 </p>
 
 <br/>
 
-Two Claude Code sessions, a Codex session and a person can all claim tasks
-from one board, see who holds what, and hand unfinished work to each other
-without losing context.
+## What it does
 
-- **One claim wins.** Two agents never end up on the same task.
-- **Crashed work comes back.** A task held by a dead agent returns to the board
-  on its own.
-- **Done means verified.** Nothing is marked done without saying how it was
-  checked.
-- **Your task.md, beside the board.** The pane lists what's left in your
-  project's own task file, by priority. [See it](#your-taskmd).
+Two Claude Code sessions, a Codex session and a person can all take tasks from
+one board, see who holds what, and hand unfinished work to each other without
+losing context.
+
+| | |
+|---|---|
+| **One claim wins** | Two agents never end up on the same task. |
+| **Crashed work comes back** | A task held by an agent that died returns to the board on its own. |
+| **Handoffs keep context** | An agent that stops partway leaves a note; the next one reads it and carries on. |
+| **Done means verified** | Nothing is marked done without saying how it was checked. |
+| **Your task.md, beside the board** | The pane lists what's left in your project's own task file, by priority. |
 
 ---
 
@@ -69,100 +60,90 @@ before the two workers start is cut.
 4. `claude 3` reads the handoff, finishes T-003, and the pane ends on
    `Done · 3`.
 
-What each part of the screen means: [what you see](#what-you-see). The pane
-also shows your project's task file under To do; the demo has none, so see
+The demo project has no task file, so To do doesn't appear here; see
 [Your task.md](#your-taskmd).
 
 ---
 
-## Install
+## Quick start
 
 > [!TIP]
 > New here? The [tutorial](docs/TUTORIAL.md) walks you from install to two
 > agents sharing a board, your task.md on it, and every button, in about
 > fifteen minutes.
 
-| Agent | How |
-|---|---|
-| Claude Code | `claude --plugin-dir /path/to/modboard` ([steps](#claude-code)) |
-| Codex, OpenCode, a shell | put `board` on your PATH and the protocol in `AGENTS.md` ([steps](#codex-opencode-or-any-agent-with-a-shell)) |
-| A person | the same `board` CLI |
-
-### The CLI
-
-Every agent goes through it, Claude Code included.
+**1. Install the `board` CLI.** Every agent uses it, Claude Code included.
 
 ```bash
-git clone https://github.com/Magithar/modboard.git
-cd modboard && npm link        # puts `board` on your PATH
+npm install -g modboard
 ```
 
-Or from npm:
+Or from source: `git clone https://github.com/Magithar/modboard.git`, then
+`cd modboard && npm link`. Inside one project only: `npm install --save-dev
+modboard`, then `npx board …`.
 
-```bash
-npm install -g modboard          # `board` on your PATH
-npm install --save-dev modboard  # inside a project, then `npx board ...`
-```
+**2. Connect your agents.**
 
-### Claude Code
+| Agent | What to do | Its name on the board |
+|---|---|---|
+| **Claude Code** | `claude --plugin-dir /path/to/modboard` | `claude 1`, `claude 2`, … |
+| **Codex** | put the protocol below in `AGENTS.md` | `codex 1`, `codex 2`, … |
+| **OpenCode, a shell** | `export BOARD_AGENT=opencode`, and the protocol in `AGENTS.md` | the name you set |
+| **A person** | use the same `board` commands | the name you set |
 
-```bash
-claude --plugin-dir /path/to/modboard
-```
+The protocol, for any agent's instructions:
 
-The session gets the board's tools, a line above the prompt and the `/board`
-pane.
+> Claim a task before working on it. Note progress. If you stop without
+> finishing, release it with a handoff. Never touch a task another agent holds.
 
-The board names the session by what it runs and when it joined: the first is
-`claude 1`, the next `claude 2`. The pane's top line says which one it is. To
-choose a name instead, start it with `BOARD_AGENT=frontend`.
+Claude Code gets the board's tools, a line above the prompt and the `/board`
+pane. Names come by themselves: the board numbers sessions as they join. To
+pick one yourself, start with `BOARD_AGENT=frontend`.
 
 > [!IMPORTANT]
 > **Early access.** The Claude Code mod uses Claude Code's function-hooks API,
 > which is early access and can change between releases. It needs Claude Code
 > **2.1.295 or newer**. The CLI has no such dependency.
 
-### Codex, OpenCode, or any agent with a shell
-
-Codex needs no name: it marks every shell it runs with its thread, and the
-board names each thread by when it joined, `codex 1`, then `codex 2`. Any
-other agent gives each session its own name:
+**3. Add a task and open the board.**
 
 ```bash
-export BOARD_AGENT=opencode
+board add "Add a login page" --accept "signing in works"
 ```
 
-Then put this protocol in its instructions (`AGENTS.md`):
-
-> Claim a task before working on it. Note progress. If you stop without
-> finishing, release it with a handoff. Never touch a task another agent holds.
+Then type `/board` in Claude Code.
 
 ---
 
-## Usage
+## Everyday use
 
 ```bash
-export BOARD_AGENT=frontend               # your name; Codex and Claude need none
-
 board list                                # ○ todo  ◐ claimed  ● done
 board show T-001                          # description, notes, handoffs
 board claim T-001                         # exit 6 if another agent holds it
-board note T-001 "what changed"           # also renews your lease
-board heartbeat                           # renew all your leases
+board note T-001 "what changed"           # also renews your claim
 board release T-001 --handoff "done X; left Y; see Z"
-board done T-001 --note "ran X, saw Y"    # required: how you verified it
-board release-all                         # free everything you hold
+board done T-001 --note "ran X, saw Y"    # required: how you checked it
 board add "title" --desc "..." --accept "how to tell it is done"
-
-board agents                              # live agents
-board view                                # every task and live agent, as JSON
-board doctor                              # ledger vs state
-board taskfile                            # the project's task.md, read only
 ```
 
-Each command answers in a line or two for a person (`claimed T-001 … it's
-yours until 14:05`); `--json` prints the data instead, for scripts. `view` and
-`events` are for programs and always print JSON.
+Each command answers in a line or two (`claimed T-001 … it's yours until
+14:05`). Add `--json` for the data instead.
+
+<details>
+<summary><b>More commands, exit codes and the Claude Code tools</b></summary>
+
+<br/>
+
+```bash
+board heartbeat                           # renew all your claims
+board release-all                         # free everything you hold
+board whoami                              # the name the board gave you
+board agents                              # who is live
+board view                                # every task and live agent, as JSON
+board doctor                              # check the ledger against the state
+board taskfile                            # the project's task.md, read only
+```
 
 | Exit code | Meaning |
 |---|---|
@@ -174,76 +155,14 @@ yours until 14:05`); `--json` prints the data instead, for scripts. `view` and
 | 7 | name in use |
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
-`board_claim`, `board_note`, `board_release` and `board_done`. Tool activity
-renews the session's leases.
+`board_claim`, `board_note`, `board_release` and `board_done`. Any tool call
+renews the session's claims.
 
-The CLI and the tools keep the board's precise terms (claim, release, handoff,
-lease) because agents act on them. The display uses plain words instead, so you
-can read it without learning those terms.
+The CLI and the tools use the board's precise terms (claim, release, handoff,
+lease), because agents act on them. The display uses plain words, so you can
+read it without learning those terms.
 
----
-
-## How it fits together
-
-![How modboard fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
-
-One zero-dependency Node CLI owns all state. The Claude Code mod is an adapter
-over that CLI. It adds what only Claude Code's host can provide: the session's
-identity, a heartbeat on every tool call, and a live pane. Any other agent uses
-the same CLI directly.
-
-**Storage is a block.**
-The engine never touches files. It reads a snapshot from a Store and commits
-conditional writes ("only if this task is still at the version I read"). Any
-backend that can do that atomically can hold a board. See
-[Make your own block](#a-storage-block-an-adapter).
-
-**Where the board lives.**
-`.modboard/` next to the git *common* dir, so every worktree of a repo shares
-one board. Set `BOARD_DIR` to override it. Add `.modboard/` to `.gitignore`,
-because it is runtime state. A board made before the rename, in
-`.agent-board/`, keeps working where it is.
-
-**Claims.**
-One lock per board (an atomic `mkdir`). The state file is replaced with an
-atomic rename. Exactly one claimant wins, and only the owner can note, release
-or finish a task.
-
-**Leases.**
-A claim lasts 15 minutes (`BOARD_LEASE_MS`). `heartbeat` or `note` renews it.
-An expired claim goes back to todo, and the ledger records it, so an agent that
-crashed doesn't hold a task forever.
-
-A Claude session pings the board every minute while it is open, so if one is
-killed outright its claims go back after 3 minutes of silence
-(`BOARD_PRESENCE_MS`), not 15. An agent that never ran `board register` (a
-plain shell) keeps the lease alone.
-
-**Names.**
-The board names a session by what it runs and when it joined: `claude 1`,
-`claude 2`, `codex 1`. A session keeps its name while it is open; once it ends,
-the next new session takes the lowest free number. Codex sends no presence
-ping, so its name and claims last as long as its leases.
-
-To choose a name, start a session with `BOARD_AGENT=frontend`. If another live
-session already holds it, the new one becomes `frontend-2` and gets a toast
-explaining why.
-
-**Handoffs.**
-`release --handoff "..."` leaves a note that the next agent reads with `show`
-before it continues. When a Claude session ends (exit, `/clear`, resume,
-logout), the mod releases everything that session holds, with an automatic
-handoff. That matters because a restarted session comes back with a new
-identity.
-
-**Done means verified.**
-`done` needs a `--note` saying how the task was checked, against its `--accept`
-criteria if it has any.
-
-**Ledger.**
-Every change is appended to `ledger.jsonl`, including lost claims
-(`claim-rejected`, with the holder). `board doctor` checks that the ledger and
-the state agree.
+</details>
 
 ---
 
@@ -253,25 +172,24 @@ The display shows only what needs you. Everything else waits until you ask.
 
 ### The band
 
-One line above the prompt, always visible while there's work on the board:
+One line above the prompt, while there's work on the board:
 
 ![The line above the prompt: 2 waiting · 1 active in green, T-005 in a yellow box, Sonnet 5.5, low, and modBOARD in green at the right end beside Claude Code's [-]](docs/band.png)
 
-- **`1 active`** is green: work is moving.
-- **`T-005` in a yellow box** (`[T-005]` below) is unfinished: someone stopped
-  it partway and left a handoff. Up to three boxes, then `+N`. A box is a
-  button: click it to open `/board` at the Unfinished group, and click again
-  to fold the group.
-- **The model and effort** are buttons too: click one to switch to the next.
-- With nothing waiting or in progress, the line disappears.
+| Part | What it means | Click it to |
+|---|---|---|
+| `2 waiting · 1 active` | tasks not started, and tasks being worked on (green) | |
+| `T-005` in a yellow box | someone stopped it partway and left a handoff; up to three boxes, then `+N` | open `/board` at Unfinished; again to fold it |
+| `Sonnet 5.5` · `low` | the model and effort | switch to the next one |
+| `modBOARD` | the board | open or close `/board` |
 
-The 5-hour limit and the context live in the `/board` pane; add `usage` or
-`compact` to the band setting to bring them back to the line.
+With nothing waiting or in progress, the line disappears. It never wraps: in a
+narrow window the last parts drop off first.
 
-The line never wraps, and stays clear of Claude Code's own `[-]` control at its
-right end. In a narrow window its parts shorten first, then the last ones drop
-off. The summary keeps its full form longest, and the alert outlasts the
-counts:
+<details>
+<summary><b>How the band fits a narrow window</b></summary>
+
+<br/>
 
 ```
  66 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   low   modBOARD
@@ -281,14 +199,12 @@ counts:
  20 cols   [T-005]
 ```
 
-The boxes name the one thing that needs you: a task someone stopped partway
-that nobody has picked up. A claim gone idle stays off the line, since its
-lease frees it on its own; the pane marks it `idle`.
+The boxes outlast the counts, because they're the one thing that needs you. A
+claim gone idle stays off the line, since its lease frees it on its own; the
+pane marks it `idle`. The line stays clear of Claude Code's own `[-]` at its
+right end.
 
-When they're on the line, the 5-hour limit is a bar shown once it passes half,
-and the context is a bar of its own; clicking it compacts the conversation, as
-`/compact` does. Both are plain with room left, yellow from 70% and red from
-90%.
+</details>
 
 ### The `/board` pane
 
@@ -308,77 +224,26 @@ and the context is a bar of its own; clicking it compacts the conversation, as
   </tr>
 </table>
 
-The pane shows what needs you and keeps the rest one click away.
+| Section | What it shows |
+|---|---|
+| **In progress** | who is on what. `codex 1 · idle` in yellow: no word from it for most of its claim |
+| **Unfinished** | work stopped partway, with the handoff as points |
+| **Not started** | everything waiting |
+| **Done** | what's finished, and who finished it |
+| **To do** | what's left in [your task.md](#your-taskmd) |
+| **Limits** | the context window (with a `compact` button) and the 5-hour limit |
 
-- **Each group's heading is a button** with its count. In progress and
-  Unfinished start open, because they need you; Not started starts closed, so
-  the whole board fits without scrolling. Opened, a group shows every task in
-  it.
-- **A row only names who.** The heading says what's happening, so there are
-  no marks and no repeated phrases.
-- **The bars sit under Limits**, which folds the same way; folded, it keeps
-  their figures: `▸ Limits · context 72% · 5-hour 64%`.
-- **Colour appears only when something asks for you**: a warning, or a limit
-  past 70%.
-- If the pane is shorter than the board, its body scrolls with the mouse
-  wheel.
-- If the board stops answering (the `board` CLI fails), the pane says so at the
-  top in red, `board not updating: …`, until it answers again.
-
-### Choosing blocks
-
-The band and the pane are both stacks of display blocks, chosen in the plugin's
-settings (`/config`) as comma-separated lists, in order:
-
-| Block | Band | Pane | Shows |
-|---|:-:|:-:|---|
-| `summary` | ✓ | | what's waiting and active (green), and the one thing left partway (yellow) |
-| `board` | ✓ | | `modBOARD` in the logo's green: a button that opens and closes the `/board` pane. It sits at the line's right end, by Claude Code's `[-]`, and on a short line outlasts everything but the summary |
-| `tasks` | | ✓ | in progress, unfinished, not started and done, each a heading you click to open or close |
-| `taskfile` | | ✓ | the project's `task.md`: how much is open; click it to see what's left, and click its priority to turn it |
-| `usage` | ✓ | ✓ | the 5-hour limit as a bar: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |
-| `compact` | ✓ | ✓ | the context window as a bar, and a button that compacts the conversation. Always in the pane; in the band once Claude Code reports the context |
-| `model` | ✓ | ✓ | the session's model; click it to switch to the next one |
-| `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest |
-| `clock` | ✓ | ✓ | the time |
-| `context` | ✓ | ✓ | context fill and the session's cost |
-| `agents` | | ✓ | who is live on the board |
-
-The defaults:
-
-```
-band: summary,model,effort,board
-pane: tasks,taskfile,compact,usage
-```
-
-### Model and effort
-
-Click the model or the effort to switch: each click runs Claude Code's own
-`/model` or `/effort`, the same as typing the command. In the `/board` pane they
-also answer to `m` and `e`.
-
-- `/effort` saves the level as your default for new sessions, except `max`,
-  which lasts for this session only.
-- The `models` setting lists what the model block steps through (default
-  `opus,sonnet,haiku`), and `efforts` lists the effort levels (default
-  `low,medium,high,xhigh,max`).
-- A model or effort changed by hand shows on the next request.
-- Until the session's first request, the effort block shows the level it will
-  start on: `CLAUDE_CODE_EFFORT_LEVEL` if set, else the model's own
-  `effortLevel` under `modelSettings`, else the general `effortLevel` setting.
+- **Every heading is a button.** Click to open or close it. In progress and
+  Unfinished start open, because they need you.
+- **Colour only when something needs you**: yellow for unfinished or idle work
+  and a limit past 70%, red past 90%.
+- If the board stops answering, a red `board not updating: …` line says so at
+  the top until it answers again.
 
 ### Your task.md
 
-If the checkout has a `task.md`, `tasks.md` or `todo.md` (in any case) at its
-root or in `docs/`, the pane shows one quiet line, `To do`, with how much of it
-is open. Click it to see what's left, under a dim line naming the file it came
-from.
-
-When the file has priorities, a second button turns through them, the way the
-effort button turns through levels. Each press steps to the next priority the
-file has, then to `all`, then round to the most urgent again, and shows that
-tier. It starts on the most urgent, and `all` shows every open item, most
-urgent first, each row with its own priority:
+If your project has a `task.md`, `tasks.md` or `todo.md` (any case) at its
+root or in `docs/`, the pane shows what's left in it under **To do**.
 
 <table>
   <tr>
@@ -391,32 +256,141 @@ urgent first, each row with its own priority:
   </tr>
 </table>
 
-Priority is read wherever your file keeps it:
+- **Click `To do`** to open it. Each click reads the file again.
+- **Click the priority** (`P0`) to step through the tiers the file has, then
+  `all`, then round again.
+- **Priorities** are read from a heading (`## P0 — launch`, `## Sync (P1)`),
+  an item (`- [ ] P2 Benchmarks`, which wins over its heading), or a table with
+  a Priority column.
+- **Only what's left shows.** Checked-off, struck-through (`~~old~~`) and
+  done table rows stay out.
+- **It's read-only.** The board never writes the file, and its items can't be
+  claimed. To work one through the board, `board add` it.
 
-- **a heading**: `## P0 — foundation` or `## Sync (P1)`, for everything under it
-- **an item**: `- [ ] P2 Benchmarks`, which wins over its heading
-- **a table**: a Priority column beside a Task column, one item per row
+<details>
+<summary><b>More on how the list is built</b></summary>
 
-How the list is built:
+<br/>
 
-- Within a priority the file's own order is kept. Items with none appear under
-  `all`, last, marked with a dash. A tier the file doesn't have is skipped.
-- Without priorities, the list keeps the file's order under its headings.
-- Only what's left is shown, every open item. Checked-off and struck-through
-  (`~~old~~`) items, or a table row whose status is done, stay in the file and
-  out of the pane. Once a file checks anything off, its plain bullets count as
-  notes, not tasks.
-- Each click reads the file again, so what you just added is there.
+- Within a priority, the file's own order is kept. Items with no priority come
+  last under `all`, marked with a dash. A tier the file doesn't have is
+  skipped.
+- Without any priorities, the list keeps the file's order under its headings,
+  and there's no priority button.
+- A table row counts as done when its Status says done, complete or ✅.
+- Once a file checks anything off, its plain bullets count as notes, not
+  tasks.
+- `board taskfile` prints the whole list; `--json` gives it as data.
 
-`board taskfile` prints the whole file. The list is there to read: nothing in
-it is claimed or added to the board, and the board never writes the file. To
-work an item through the board, `board add` it. With no such file, the line
-doesn't appear.
+</details>
 
-### Your own blocks
+---
 
-Show a command's output with no code, or write a block of your own: see
-[Make your own block](#make-your-own-block).
+## Settings
+
+Open the plugin's settings with `/config`.
+
+### What shows where
+
+The band and the pane are each a list of display blocks, in order:
+
+```
+band: summary,model,effort,board        (the default)
+pane: tasks,taskfile,compact,usage      (the default)
+```
+
+| Block | Band | Pane | Shows |
+|---|:-:|:-:|---|
+| `summary` | ✓ | | what's waiting and active, and the unfinished boxes |
+| `board` | ✓ | | the `modBOARD` button |
+| `tasks` | | ✓ | In progress, Unfinished, Not started and Done |
+| `taskfile` | | ✓ | your task.md under To do |
+| `compact` | ✓ | ✓ | the context window as a bar, and a button that compacts the conversation |
+| `usage` | ✓ | ✓ | the 5-hour limit as a bar (in the band only past 50%) |
+| `model` | ✓ | ✓ | the model; click to switch |
+| `effort` | ✓ | ✓ | the effort level; click to step through |
+| `clock` | ✓ | ✓ | the time |
+| `context` | ✓ | ✓ | context fill and the session's cost, as text |
+| `agents` | | ✓ | who is live on the board |
+
+On a short band, the last blocks drop first, so put what matters most first.
+
+### Model and effort
+
+Clicking the model or effort runs Claude Code's own `/model` or `/effort`, the
+same as typing it. In the pane they also answer to `m` and `e`.
+
+| Setting | Default | What it is |
+|---|---|---|
+| `models` | `opus,sonnet,haiku` | what the model button steps through |
+| `efforts` | `low,medium,high,xhigh,max` | what the effort button steps through |
+
+`/effort` saves the level as your default for new sessions, except `max`,
+which lasts for this session only. Before the first request, the effort shows
+the level the session will start on: `CLAUDE_CODE_EFFORT_LEVEL` if set, else
+the model's own `effortLevel` under `modelSettings`, else the general
+`effortLevel`.
+
+### Environment
+
+| Variable | Default | What it does |
+|---|---|---|
+| `BOARD_AGENT` | numbered for you | the name to use on the board |
+| `BOARD_DIR` | `.modboard/` by the repo | where the board lives |
+| `BOARD_LEASE_MS` | 15 minutes | how long a claim lasts without a note or heartbeat |
+| `BOARD_PRESENCE_MS` | 3 minutes | how long a Claude session can be silent before its claims go back |
+
+---
+
+## How it works
+
+![How modboard fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
+
+One small Node CLI, `board`, owns the board; it has no dependencies. The Claude
+Code mod sits on top of it and adds what only Claude Code can: the session's
+name, a heartbeat on every tool call, and the display. Every other agent uses
+the CLI directly.
+
+| Rule | How it works |
+|---|---|
+| **Where the board lives** | `.modboard/`, beside the repo's git folder, so every worktree shares one board. Add it to `.gitignore`. |
+| **One claim wins** | Each change takes a lock and replaces the board in one step, so exactly one claimant wins. Only the holder can note, release or finish a task. |
+| **Claims expire** | A claim lasts 15 minutes; a note or heartbeat renews it. An expired claim goes back to waiting. |
+| **Crashes recover fast** | An open Claude session pings the board every minute. If it's killed, its claims go back after 3 minutes of silence. |
+| **Names** | The board numbers sessions as they join: `claude 1`, `codex 1`. A session keeps its name while it's open; a new one takes the lowest free number. |
+| **Handoffs** | `release --handoff` leaves a note the next agent reads first. A Claude session that ends releases what it holds, with a handoff of its own. |
+| **Done means verified** | `done` needs a `--note` on how the task was checked, against its `--accept` criteria if it has any. |
+| **A ledger** | Every change, lost claims included, is appended to `ledger.jsonl`. `board doctor` checks it against the board. |
+
+<details>
+<summary><b>More detail</b></summary>
+
+<br/>
+
+- **Storage is a block.** The engine never touches files itself. It reads a
+  snapshot from a store and commits conditional writes ("only if this task is
+  still at the version I read"). Any backend that can do that in one step can
+  hold a board: see [a storage block](#a-storage-block-an-adapter).
+- **The lock** is an atomic `mkdir`, and the board file is replaced with an
+  atomic rename.
+- **Names you choose:** if another live session already holds the name you
+  ask for, the new one becomes `frontend-2` and a toast says why.
+- **Codex** sends no presence ping, so its name and claims last as long as its
+  claims' leases. An agent that never registered (a plain shell) is the same.
+- **A board made before the rename**, in `.agent-board/`, keeps working where
+  it is.
+
+</details>
+
+### What modboard is not
+
+- **Not a project manager:** no due dates, assignees or per-team boards.
+- **Not an agent runner:** it never starts, stops or prompts an agent.
+- **Not a sync service:** one board lives in one place; the storage block
+  decides where.
+
+It's a **claim ledger**: who holds what, what was left for the next agent, and
+how each finished task was checked.
 
 ---
 
@@ -451,7 +425,7 @@ The quickest way. Two steps, both in the plugin's settings (`/config`):
 **2. Add the name** to `band` or `pane`, like a built-in block:
 
 ```
-band: summary,ci,usage
+band: summary,ci,model,effort,board
 ```
 
 That's it. Every 30 seconds the command runs, and the block shows the first
@@ -518,7 +492,7 @@ What a block gets (the full shape is in [`types.tsx`](hooks/blocks/types.tsx)):
 - plan usage and context fill, the model and effort, the time, the width
 - your command blocks' output, and the project's task file
 - `act`, for what a click can do: switch the model or effort, run `/compact`,
-  open the task file or turn its priority
+  open a group, the task file or the pane
 
 Two rules keep the display calm:
 
@@ -560,7 +534,7 @@ export function createStore(config, { dir }) {
     now: () => Date.now(),
 
     // { tasks:  { 'T-001': { ...task,  version: 3 } },
-    //   agents: { frontend: { ...agent, version: 1 } } }
+    //   agents: { 'claude 1': { ...agent, version: 1 } } }
     snapshot: async () => { /* read everything */ },
 
     // writes: [{ kind: 'task' | 'agent', key, value, expect }]
@@ -646,11 +620,16 @@ leaves the two out of step, `verify()` says so and `board doctor` reports it.
 
 ---
 
-## What has been tested
+## Testing
 
-These tests ran on 2026-10-12 with two live Claude Code sessions (Sonnet 5.5,
-v2.1.296), one shell acting as Codex, and no extra instructions to the agents
-beyond the tool descriptions:
+<details>
+<summary><b>Tested live with two Claude Code sessions and a shell</b></summary>
+
+<br/>
+
+These ran on 2026-10-12 with two live Claude Code sessions (Sonnet 5.5,
+v2.1.296), one shell acting as Codex, and no instructions to the agents beyond
+the tool descriptions:
 
 | Test | Result |
 |---|---|
@@ -660,108 +639,46 @@ beyond the tool descriptions:
 | `codex` claims a task from the shell | Claude was refused, said so, and left it alone |
 | An agent's lease runs out | the task returns to todo, and the ledger records `expire` |
 
-### Automated tests
+The task file, priorities, compact button and automatic names came later, and
+have run in live sessions while being built, including the demo above, but not
+through this full set.
+
+</details>
+
+<details>
+<summary><b>Automated tests</b></summary>
+
+<br/>
 
 **`npm test`** runs the CLI tests and the store contract:
 
-- a 20-way claim race, ownership, handoff, lease expiry, heartbeat,
-  rejected-claim logging, verified done, release-all
-- the store contract against the file block and an in-memory reference block
+- a 20-way claim race, ownership, handoffs, lease expiry, heartbeats,
+  rejected-claim logging, verified done, release-all, automatic names
+- the store contract against the file block and an in-memory block
   (concurrent claims and adds, stale writes, names)
 - that the CLI loads a block named in `config.json` and refuses a broken one
 - that `board taskfile` reads each way a task file keeps items and priorities
-  (headings, items, tables, `docs/`) without touching the board
 
-**`claude plugin test .`** runs the mod tests: the pane's sections and alerts
-and the eight-row limit, the band and when it stays quiet, names and their
-fallback, the tools, the verification note, release on session end, usage and
-the context bars, the compact button, the task file's list and its priority
-button's whole turn, and choosing blocks.
+**`claude plugin test .`** runs the mod's tests: the band and how it fits a
+line, the pane's groups and what folds, handoff points, the task file and its
+priority button, the Limits heading, the error line, names, the tools, release
+on session end, and choosing blocks.
 
-> [!NOTE]
-> The task file, priority and compact features were added after the live tests
-> above, and have so far run only under the automated tests.
+</details>
 
----
+### Known limitations
 
-## What modboard is not
-
-- **Not a project manager:** no due dates, assignees or boards per team
-- **Not an agent runner:** it never starts, stops or prompts an agent
-- **Not a sync service:** one board lives in one place, the storage block
-  decides where
-
-modboard is a **claim ledger**: who holds what, what was left for the next
-agent, and how each finished task was checked.
-
----
-
-## Project structure
-
-```
-modboard/
-├── bin/
-│   └── board.mjs            # the one CLI every agent uses
-├── lib/
-│   ├── engine.mjs           # the rules: claims, leases, handoffs, names, the ledger
-│   ├── load-store.mjs       # finds the storage block that config.json names
-│   ├── store-file.mjs       # the built-in storage block: a folder
-│   ├── taskfile.mjs         # reads a project's task file and its priorities, for display
-│   └── contract.mjs         # the tests every storage block must pass
-├── examples/
-│   └── store-memory.mjs     # a complete storage block in about 20 lines
-├── hooks/
-│   ├── hooks.json
-│   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
-│   └── blocks/              # one file per display block, listed in index.ts;
-│                            # meter.tsx is the bar that usage and compact share
-├── types/index.d.ts
-├── .claude-plugin/
-│   ├── plugin.json          # the mod's manifest and settings
-│   └── icon.png             # the plugin's icon, the logo's mark
-├── test/                    # CLI and store contract tests (npm test)
-├── tests/                   # mod tests (claude plugin test .)
-├── docs/
-│   ├── TUTORIAL.md          # a walk-through from install to two agents
-│   ├── system.txt  .png     # how it fits together
-│   ├── blocks.txt  .png     # how blocks work
-│   ├── band.mjs    .png     # the band image, drawn from the real blocks
-│   ├── board-live.gif       # a live recording of three Claude sessions
-│   ├── logo.png             # the modBOARD logo
-│   ├── pane-*.png           # screenshots of the /board pane
-│   ├── taskfile-*.png       # the To do list, at P0 and at all
-│   └── render.mjs           # rebuilds every image from its .txt
-├── CHANGELOG.md             # what changed in each version
-├── ROADMAP.md               # what's planned next
-└── CONTRIBUTING.md          # how to contribute
-```
-
-Each diagram's source is plain text. After editing a `.txt`,
-`node docs/render.mjs` rebuilds its page and image.
-
----
-
-## Known limitations
-
-- **It doesn't work across machines yet.** The storage socket is in place, but
-  the only block built is local files. A database or server block comes when a
-  real cross-device need does.
-- **Usage is per session.** The usage block shows the session's own plan usage,
-  which Claude Code reports, not the other agents'.
-- **A crash skips the release on session end.** If a Claude process is killed
-  outright, its claims are freed once its session has been silent for
-  3 minutes. A plain CLI agent that never registered waits out its lease
-  (15 minutes).
-- **A verification note is the agent's own claim.** The board requires one but
+- **One machine for now.** The storage socket is in place, but the only block
+  built keeps the board in local files.
+- **Usage is per session.** The usage bar shows this session's own plan usage,
+  not the other agents'.
+- **A killed CLI agent waits out its lease.** A killed Claude session frees its
+  claims after 3 minutes of silence; a plain CLI agent that never registered
+  waits out the full 15.
+- **A verification note is the agent's word.** The board requires one but
   doesn't run the check itself.
-- **The task file is read-only.** The board shows it but never writes it, and
-  its items can't be claimed. Add one with `board add` to work it through the
-  board.
-- **The compact button asks Claude Code to run `/compact`.** Whether a mod's
-  request compacts exactly as typing it does is not yet checked in a live
-  session.
-- **The demo recording predates the quieter pane.** It still shows row marks
-  and "is on it".
+- **The task file is read-only.** Add an item with `board add` to work it
+  through the board.
 
 ---
 
@@ -773,15 +690,47 @@ claude plugin test .        # the mod's tests
 claude plugin validate .    # the mod's manifest and hooks
 ```
 
-- Changing what the board shows? Run both test suites.
-- Adding a storage block or a display block? Start at
-  [Make your own block](#make-your-own-block).
-- [CONTRIBUTING.md](CONTRIBUTING.md) has the full checklist, where each kind of
-  change goes, and the style the project keeps.
-- [CHANGELOG.md](CHANGELOG.md) lists what changed in each version, and
-  [ROADMAP.md](ROADMAP.md) what's planned next.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the checklist, where each kind of change
+goes, and the style the project keeps. [CHANGELOG.md](CHANGELOG.md) lists what
+changed in each version, and [ROADMAP.md](ROADMAP.md) what's planned next.
 
----
+<details>
+<summary><b>Project structure</b></summary>
+
+<br/>
+
+```
+modboard/
+├── bin/board.mjs            # the one CLI every agent uses
+├── lib/
+│   ├── engine.mjs           # the rules: claims, leases, handoffs, names, the ledger
+│   ├── load-store.mjs       # finds the storage block that config.json names
+│   ├── store-file.mjs       # the built-in storage block: a folder
+│   ├── taskfile.mjs         # reads a project's task file and its priorities
+│   └── contract.mjs         # the tests every storage block must pass
+├── examples/
+│   └── store-memory.mjs     # a complete storage block in about 20 lines
+├── hooks/
+│   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
+│   └── blocks/              # one file per display block, listed in index.ts
+├── .claude-plugin/
+│   ├── plugin.json          # the mod's manifest and settings
+│   └── icon.png             # the plugin's icon
+├── test/                    # CLI and store contract tests (npm test)
+├── tests/                   # mod tests (claude plugin test .)
+└── docs/
+    ├── TUTORIAL.md          # from install to two agents sharing a board
+    ├── system.txt  .png     # how it fits together
+    ├── blocks.txt  .png     # how blocks work
+    ├── render.mjs           # rebuilds each diagram from its .txt
+    ├── band.mjs    .png     # the band image
+    ├── board-live.gif       # the live demo
+    ├── pane-*.png           # screenshots of the /board pane
+    ├── taskfile-*.png       # the To do list, at P0 and at all
+    └── logo.png             # the modBOARD logo
+```
+
+</details>
 
 ## License
 
