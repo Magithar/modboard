@@ -299,6 +299,19 @@ disappears.
    5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
 
+<table>
+  <tr>
+    <td><img src="pane-board.png" alt="The /board pane as it opens: In progress with an idle codex 1 row in yellow, Unfinished with each handoff as points, Not started and Done folded, To do, and the Limits bars"/></td>
+    <td><img src="pane-done.png" alt="Done opened, listing who finished each task, and To do opened at P0, showing the task file's most urgent items"/></td>
+    <td><img src="pane-all.png" alt="Not started opened, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
+  </tr>
+  <tr>
+    <td align="center">As it opens</td>
+    <td align="center">Done and To do opened</td>
+    <td align="center">Not started, every priority, Limits folded</td>
+  </tr>
+</table>
+
 - **The headings say what's happening; each row says who.** Your own tasks
   are bold.
 - **Yellow rows need you**: an agent gone idle (`codex 1 · idle`: no note or

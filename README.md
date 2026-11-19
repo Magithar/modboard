@@ -319,6 +319,19 @@ and the context is a bar of its own; clicking it compacts the conversation, as
    5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
 
+<table>
+  <tr>
+    <td><img src="docs/pane-board.png" alt="The /board pane as it opens: In progress with an idle codex 1 row in yellow, Unfinished with each handoff as points, Not started and Done folded, To do, and the Limits bars"/></td>
+    <td><img src="docs/pane-done.png" alt="Done opened, listing who finished each task, and To do opened at P0, showing the task file's most urgent items"/></td>
+    <td><img src="docs/pane-all.png" alt="Not started opened, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
+  </tr>
+  <tr>
+    <td align="center">As it opens</td>
+    <td align="center">Done and To do opened</td>
+    <td align="center">Not started, every priority, Limits folded</td>
+  </tr>
+</table>
+
 The pane shows what needs you and keeps the rest one click away.
 
 - **Each group's heading is a button** with its count. In progress and
@@ -752,6 +765,7 @@ modboard/
 │   ├── band.mjs    .png     # the band image, drawn from the real blocks
 │   ├── board-live.gif       # a live recording of three Claude sessions
 │   ├── logo.png             # the modBOARD logo
+│   ├── pane-*.png           # screenshots of the /board pane
 │   └── render.mjs           # rebuilds every image from its .txt
 ├── CHANGELOG.md             # what changed in each version
 ├── ROADMAP.md               # what's planned next
