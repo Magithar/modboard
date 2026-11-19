@@ -32,16 +32,7 @@ and takes T-002. `frontend` writes part of T-003, then hands it off. The band
 above its prompt says "T-003 was stopped partway, pick it up". `backend` reads
 the handoff, finishes T-003, and the pane ends on "3 done".
 
-The same story through the CLI, as a plain transcript:
-
-![A real run: two agents add tasks, one loses a claim race, one hands work off, the other finishes with a verified note and picks the handoff up](docs/demo.png)
-
-A real run of the CLI, unedited: `frontend` and `backend` share one board.
-`backend` loses the race for T-001 and takes T-002 instead. `frontend` stops
-partway and leaves a handoff, and `backend` finishes its own task with a note
-saying how it was checked, then picks T-001 up and reads the handoff first.
-Inside Claude Code the same board shows above the prompt and in `/board`
-([what you see](#what-you-see)).
+What each part of the screen means: [what you see](#what-you-see).
 
 ---
 
@@ -509,7 +500,6 @@ agent-board/
 └── docs/
     ├── system.txt  .png     # how it fits together
     ├── blocks.txt  .png     # how blocks work
-    ├── demo.txt    .png     # a real run of the CLI
     ├── board-live.gif       # a live recording of three Claude sessions
     └── render.mjs           # rebuilds every image from its .txt
 ```

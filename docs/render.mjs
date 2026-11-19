@@ -1,7 +1,7 @@
 // Rebuilds each diagram's page from its plain text, docs/<name>.txt, then
 // docs/<name>.png with headless Chrome when it is installed. Edit the .txt,
 // then run (with no names, every diagram):
-//   node docs/render.mjs [system] [blocks] [demo]
+//   node docs/render.mjs [system] [blocks]
 
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -16,7 +16,6 @@ const LINES = '┌┐└┘├┤┬┴┼─│▶▼▲'
 const TITLES = {
   system: ['how it fits together', 'one CLI owns the board; Claude sessions and other agents all go through it'],
   blocks: ['how blocks work', 'storage blocks hold the board; display blocks draw it in each Claude session'],
-  demo: ['a real run', 'two agents share one board through the CLI: a lost race, a handoff, a verified done'],
 }
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const version = JSON.parse(fs.readFileSync(path.join(DIR, '..', 'package.json'), 'utf8')).version
