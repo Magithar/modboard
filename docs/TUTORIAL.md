@@ -396,6 +396,19 @@ press shows the next tier, then `all`, then round again:
 In `all`, every row shows its own priority, so each line is one task. Items
 with no priority come last, marked with a dash.
 
+In a real session, with a longer `TASKS.md`, it looks like this:
+
+<table>
+  <tr>
+    <td valign="top"><img src="taskfile-p0.png" alt="To do open at P0: 9 open, from TASKS.md, and the three P0 items, each after a grey dot" width="380"/></td>
+    <td valign="top"><img src="taskfile-all.png" alt="To do turned to all: each open item with its priority, P0 first, then P1, P2, and items without one marked with a dash" width="380"/></td>
+  </tr>
+  <tr>
+    <td align="center"><code>P0</code>: the most urgent tier</td>
+    <td align="center"><code>all</code>: every item, by priority</td>
+  </tr>
+</table>
+
 Priority is read wherever your file keeps it:
 
 | Where | Looks like | Applies to |
