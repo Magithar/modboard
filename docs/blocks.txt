@@ -1,6 +1,6 @@
   TWO KINDS OF BLOCK
 
-        storage block     where the board is kept        one per board     .agent-board/config.json
+        storage block     where the board is kept        one per board     .modboard/config.json
         (an adapter)
 
         display block     what a Claude session shows    many, in order    the plugin's settings
@@ -15,15 +15,15 @@
 
   STORAGE BLOCKS:  HOW ONE IS FOUND
 
-                           .agent-board/config.json   { "store": "...", ...its own settings }
+                           .modboard/config.json      { "store": "...", ...its own settings }
                                          │
                  ┌───────────────────────┼───────────────────────┐
                  ▼                       ▼                       ▼
             "file"                  "./my-block.mjs"        "my-store"
             built in                starts with . or /      anything else: a package
             lib/store-file.mjs      a file, relative to     looked up in node_modules
-                                    .agent-board/           from the board's folder up,
-                 │                       │                  then beside agent-board
+                                    .modboard/              from the board's folder up,
+                 │                       │                  then beside modboard
                  │                       │                       │
                  └───────────────────────┼───────────────────────┘
                                          ▼
@@ -49,7 +49,7 @@
                 └─── a version moved: retry (max 50) ───┘
 
         check a block:   storeContract('my block', () => createStore(config, { dir }))
-                         from @magithar/agent-board/lib/contract.mjs
+                         from modboard/lib/contract.mjs
 
 
   STORAGE BLOCKS:  WHY THE VERSIONS   (agents A and B claim T-001 at the same moment)

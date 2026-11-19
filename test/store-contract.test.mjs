@@ -15,7 +15,7 @@ import { createStore as memory } from '../examples/store-memory.mjs'
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'board-'))
 
-storeContract('file', () => fileStore(path.join(tmp(), '.agent-board')))
+storeContract('file', () => fileStore(path.join(tmp(), '.modboard')))
 storeContract('memory (example)', () => memory())
 
 function board(dir, args) {
@@ -27,7 +27,7 @@ function board(dir, args) {
 }
 
 test('config.json can name a block file, which the CLI loads', () => {
-  const dir = path.join(tmp(), '.agent-board')
+  const dir = path.join(tmp(), '.modboard')
   fs.mkdirSync(dir, { recursive: true })
   // A block of its own: the file block, saving under a folder of its choosing.
   fs.writeFileSync(
@@ -41,9 +41,9 @@ test('config.json can name a block file, which the CLI loads', () => {
   assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, './my-block.mjs')
 })
 
-test('config.json can name a block package installed in the project, not beside agent-board', () => {
+test('config.json can name a block package installed in the project, not beside modboard', () => {
   const project = tmp()
-  const dir = path.join(project, '.agent-board')
+  const dir = path.join(project, '.modboard')
   fs.mkdirSync(dir, { recursive: true })
   const block = `import { fileStore } from ${JSON.stringify(path.join(ROOT, 'lib/store-file.mjs'))}\n` +
     `export const createStore = (config, { dir }) => fileStore(dir + '/' + config.folder)\n`
@@ -65,7 +65,7 @@ test('config.json can name a block package installed in the project, not beside 
 })
 
 test('a block that cannot load, or breaks the contract shape, is refused by name', () => {
-  const dir = path.join(tmp(), '.agent-board')
+  const dir = path.join(tmp(), '.modboard')
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './missing.mjs' }))
   const missing = board(dir, ['list'])

@@ -6,7 +6,7 @@
 // all of its writes or none, and only where every version still matches.
 //
 // Check a block with the contract suite:
-//   import { storeContract } from '@magithar/agent-board/lib/contract.mjs'
+//   import { storeContract } from 'modboard/lib/contract.mjs'
 //   storeContract('my block', () => createStore(config, { dir }))
 
 export const createStore = () => memoryStore()

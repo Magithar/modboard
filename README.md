@@ -1,8 +1,8 @@
-<h1 align="center">agent-board</h1>
+<h1 align="center">modboard</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
-  <img src="https://img.shields.io/github/package-json/v/Magithar/agent-board?label=version" alt="Version"/>
+  <img src="https://img.shields.io/github/package-json/v/Magithar/modboard?label=version" alt="Version"/>
   <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node 18 or newer"/>
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen.svg" alt="No dependencies"/>
   <img src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-d97757.svg" alt="Claude Code 2.1.295 or newer"/>
@@ -42,7 +42,7 @@ What each part of the screen means: [what you see](#what-you-see).
 
 | Agent | How |
 |-------|-----|
-| Claude Code | `claude --plugin-dir /path/to/agent-board` ([steps](#claude-code)) |
+| Claude Code | `claude --plugin-dir /path/to/modboard` ([steps](#claude-code)) |
 | Codex, OpenCode, a shell | put `board` on your PATH and the protocol in `AGENTS.md` ([steps](#codex-opencode-or-any-agent-with-a-shell)) |
 | A person | the same `board` CLI |
 
@@ -51,18 +51,17 @@ What each part of the screen means: [what you see](#what-you-see).
 Every agent goes through it, Claude Code included:
 
 ```bash
-git clone https://github.com/Magithar/agent-board.git
-cd agent-board && npm link        # puts `board` on your PATH
+git clone https://github.com/Magithar/modboard.git
+cd modboard && npm link        # puts `board` on your PATH
 ```
 
-Or from npm, inside a project: `npm install --save-dev @magithar/agent-board`,
-then `npx board ...`. To try it without installing:
-`npx -p @magithar/agent-board board list`.
+Or from npm: `npm install -g modboard` puts `board` on your PATH, or
+`npm install --save-dev modboard` inside a project, then `npx board ...`.
 
 ### Claude Code
 
 ```bash
-BOARD_AGENT=frontend claude --plugin-dir /path/to/agent-board
+BOARD_AGENT=frontend claude --plugin-dir /path/to/modboard
 ```
 
 `BOARD_AGENT` is optional. It sets the name this session uses on the board.
@@ -122,7 +121,7 @@ instead, so you can read it without learning those terms.
 
 ## How it fits together
 
-![How agent-board fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
+![How modboard fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
 
 One zero-dependency Node CLI owns all state. The Claude Code mod is an
 adapter over that CLI. It adds what only Claude Code's host can provide: the
@@ -133,9 +132,10 @@ other agent uses the same CLI directly.
   from a Store and commits conditional writes ("only if this task is still at
   the version I read"). Any backend that can do that atomically can hold a
   board. See [Make your own block](#a-storage-block-an-adapter).
-- **Where the board lives:** `.agent-board/` next to the git *common* dir, so
+- **Where the board lives:** `.modboard/` next to the git *common* dir, so
   every worktree of a repo shares one board. Set `BOARD_DIR` to override it.
-  Add `.agent-board/` to `.gitignore`, because it is runtime state.
+  Add `.modboard/` to `.gitignore`, because it is runtime state. A board made
+  before the rename, in `.agent-board/`, keeps working where it is.
 - **Claims:** one lock per board (an atomic `mkdir`). The state file is
   replaced with an atomic rename. Exactly one claimant wins, and only the
   owner can note, release or finish a task.
@@ -252,12 +252,12 @@ of your own: see [Make your own block](#make-your-own-block).
 
 ## Make your own block
 
-agent-board is built from blocks, and you can add your own. There are two
+modboard is built from blocks, and you can add your own. There are two
 kinds:
 
 | Kind | What it does | How many | Where you choose it |
 |---|---|---|---|
-| **Storage block** (an adapter) | holds the board: a folder, a database, a server | one per board | `.agent-board/config.json` |
+| **Storage block** (an adapter) | holds the board: a folder, a database, a server | one per board | `.modboard/config.json` |
 | **Display block** | draws part of the board inside a Claude session | many, in order | the plugin's `band` and `pane` settings |
 
 ![How blocks work: the three ways to make your own, how a storage block (an adapter) is found, what the engine asks of it, where display blocks come from and how the band fits them on one line](docs/blocks.png)
@@ -302,8 +302,8 @@ Three things follow from this:
   `board doctor` reports it.
 
 **1. Write the module.** One file that exports `createStore(config, { dir })`.
-`config` is everything in `.agent-board/config.json`, so your block's own
-settings (a URL, a table name) go there too. `dir` is the `.agent-board/`
+`config` is everything in `.modboard/config.json`, so your block's own
+settings (a URL, a table name) go there too. `dir` is the `.modboard/`
 folder. It returns five methods, all of which may be async:
 
 ```js
@@ -351,7 +351,7 @@ as a test suite:
 
 ```js
 // my-block.test.mjs, run with: node --test
-import { storeContract } from '@magithar/agent-board/lib/contract.mjs'
+import { storeContract } from 'modboard/lib/contract.mjs'
 import { createStore } from './my-block.mjs'
 
 storeContract('my block', () => createStore({ /* test settings */ }, { dir: '/tmp/board-test' }))
@@ -360,13 +360,13 @@ storeContract('my block', () => createStore({ /* test settings */ }, { dir: '/tm
 Each run should start from an empty board, so give each `createStore` call a
 fresh table or folder.
 
-**3. Point a board at it.** In `.agent-board/config.json`, name it in one of
+**3. Point a board at it.** In `.modboard/config.json`, name it in one of
 three ways. Everything besides `store` is passed to your block:
 
 ```json
 { "store": "file" }                                     the built-in default
-{ "store": "./stores/my-block.mjs", "url": "..." }      a block file, relative to .agent-board/
-{ "store": "agent-board-my-block", "url": "..." }       a block published as a package
+{ "store": "./stores/my-block.mjs", "url": "..." }      a block file, relative to .modboard/
+{ "store": "modboard-my-block", "url": "..." }       a block published as a package
 ```
 
 Then check it: `board add "first task"`, `board view`, and `board doctor`.
@@ -374,9 +374,9 @@ The CLI refuses a block that won't load or is missing a method, and says
 which (exit 2).
 
 **4. Share it (optional).** Publish it as a package whose entry exports
-`createStore` (through `exports` or `main`), with `@magithar/agent-board` as a
+`createStore` (through `exports` or `main`), with `modboard` as a
 dev dependency for the contract tests. Anyone can then
-`npm install agent-board-my-block` in their project and name it in
+`npm install modboard-my-block` in their project and name it in
 `config.json`. A package is found the way Node finds any package: in the
 `node_modules` of the project that holds the board, or a folder above it.
 
@@ -467,13 +467,13 @@ blocks).
 
 ---
 
-## What agent-board is not
+## What modboard is not
 
 - Not a project manager: no due dates, assignees or boards per team
 - Not an agent runner: it never starts, stops or prompts an agent
 - Not a sync service: one board lives in one place, the storage block decides where
 
-agent-board is a **claim ledger**: who holds what, what was left for the next
+modboard is a **claim ledger**: who holds what, what was left for the next
 agent, and how each finished task was checked.
 
 ---
@@ -481,7 +481,7 @@ agent, and how each finished task was checked.
 ## Project structure
 
 ```
-agent-board/
+modboard/
 ├── bin/
 │   └── board.mjs            # the one CLI every agent uses
 ├── lib/

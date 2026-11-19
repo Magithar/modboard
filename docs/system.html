@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><title>agent-board system</title>
+<!doctype html><html><head><meta charset="utf-8"><title>modboard system</title>
   <style>
   body{margin:0;background:#141414}
   .wrap{padding:28px 30px;display:inline-block}
@@ -8,7 +8,7 @@
   font:13px/1.17 Menlo,"SF Mono",monospace;color:#dcdcdc}
   .d{color:#5e5e5e} .h{color:#d97757;font-weight:700} .c{color:#d97757} .g{color:#4ec27a} .m{color:#9a9a9a} .p{color:#f0f0f0;font-weight:700}
   </style></head><body><div class="wrap">
-  <p class="t">agent-board · how it fits together</p>
+  <p class="t">modboard · how it fits together</p>
   <p class="s">v0.5.0 · one CLI owns the board; Claude sessions and other agents all go through it</p>
   <pre><span class="h">  WHO WORKS ON THE BOARD</span><span class="d"></span>
 
@@ -38,7 +38,7 @@
                                  <span class="d">└</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┬</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┘</span>
                                                <span class="d">│</span>
                                  <span class="d">┌</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┴</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┐</span>
-                                 <span class="d">│</span> lib/load-store.mjs        <span class="d">│</span>   reads .agent-board/config.json
+                                 <span class="d">│</span> lib/load-store.mjs        <span class="d">│</span>   reads .modboard/config.json
                                  <span class="d">└</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┬</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┘</span>
                                                <span class="d">│</span>
                                  <span class="d">┌</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┴</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┐</span>

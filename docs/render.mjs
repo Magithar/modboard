@@ -35,7 +35,7 @@ for (const name of names) {
     })
     .join('\n')
 
-  const page = `<!doctype html><html><head><meta charset="utf-8"><title>agent-board ${name}</title>
+  const page = `<!doctype html><html><head><meta charset="utf-8"><title>modboard ${name}</title>
   <style>
   body{margin:0;background:#141414}
   .wrap{padding:28px 30px;display:inline-block}
@@ -45,7 +45,7 @@ for (const name of names) {
   font:13px/1.17 Menlo,"SF Mono",monospace;color:#dcdcdc}
   .d{color:#5e5e5e} .h{color:#d97757;font-weight:700} .c{color:#d97757} .g{color:#4ec27a} .m{color:#9a9a9a} .p{color:#f0f0f0;font-weight:700}
   </style></head><body><div class="wrap">
-  <p class="t">agent-board · ${title}</p>
+  <p class="t">modboard · ${title}</p>
   <p class="s">v${version} · ${subtitle}</p>
   <pre>${body}</pre></div></body></html>`
   fs.writeFileSync(path.join(DIR, `${name}.html`), page)

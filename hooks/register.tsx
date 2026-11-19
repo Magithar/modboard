@@ -11,20 +11,20 @@ import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 // heartbeats, usage readings, and a display built from blocks (./blocks): a
 // one-line band above the prompt, and the /board pane.
 
-const PANE = 'agent-board'
+const PANE = 'modboard'
 const HEARTBEAT_MS = 60_000
 const PRESENCE_MS = 60_000
 const POLL_MS = 3_000
 const COMMAND_MS = 30_000
 const NAME_TRIES = 9
 
-const tasks = atom({ plugin: 'agent-board', key: 'tasks' } as const, [])
-const agents = atom({ plugin: 'agent-board', key: 'agents' } as const, [])
-const me = atom({ plugin: 'agent-board', key: 'me' } as const, '')
-const usage = atom({ plugin: 'agent-board', key: 'usage' } as const, { limits: [] })
-const model = atom({ plugin: 'agent-board', key: 'model' } as const, '')
-const effort = atom({ plugin: 'agent-board', key: 'effort' } as const, '')
-const custom = atom({ plugin: 'agent-board', key: 'custom' } as const, {} as Record<string, string>)
+const tasks = atom({ plugin: 'modboard', key: 'tasks' } as const, [])
+const agents = atom({ plugin: 'modboard', key: 'agents' } as const, [])
+const me = atom({ plugin: 'modboard', key: 'me' } as const, '')
+const usage = atom({ plugin: 'modboard', key: 'usage' } as const, { limits: [] })
+const model = atom({ plugin: 'modboard', key: 'model' } as const, '')
+const effort = atom({ plugin: 'modboard', key: 'effort' } as const, '')
+const custom = atom({ plugin: 'modboard', key: 'custom' } as const, {} as Record<string, string>)
 
 let session = ''
 let lastBeat = 0
@@ -254,7 +254,7 @@ export const register: Register = (on, options) => {
         inputSchema: { type: 'object', properties: t.schema ?? {}, required: t.required ?? [] },
         isDeferred: false,
       })
-    await $.command.register({ name: 'board', description: 'Open the shared agent board pane' })
+    await $.command.register({ name: 'board', description: 'Open the modboard pane' })
 
     await refresh($)
     $.clock.every(POLL_MS, () => refresh($).catch(() => {}))
@@ -271,7 +271,7 @@ export const register: Register = (on, options) => {
   })
 
   for (const t of TOOLS)
-    on('tool.call', { tool: `mcp__agent-board__${t.name}` }, async ($, e) => {
+    on('tool.call', { tool: `mcp__modboard__${t.name}` }, async ($, e) => {
       const out = await board($, t.args(e))
       await refresh($)
       return { result: out.ok ? out.text : `error: ${out.text}` }
@@ -320,7 +320,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'board' }, async $ => {
     await refresh($)
-    const opened = await $.ui.open({ id: PANE, title: 'Agent board' })
+    const opened = await $.ui.open({ id: PANE, title: 'modboard' })
     if (opened.isPlaced) return { text: 'Board pane opened.' }
     const list = (await read($, tasks)).filter(t => t.status !== 'done')
     return { text: list.map(t => `${SYMBOL[t.status]} ${t.id}  ${t.title}${t.claim ? `  ${t.claim.owner}` : ''}`).join('\n') || '(no open tasks)' }

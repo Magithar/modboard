@@ -2,12 +2,14 @@
 // board — an agent-neutral task board. Any agent (Claude, Codex, a human)
 // coordinates through this one CLI; nothing else writes the board.
 //
-// The board lives in <repo>/.agent-board/, beside the git *common* dir so
-// every worktree of a repo shares one board (BOARD_DIR overrides). Which
-// storage block holds it is named in .agent-board/config.json (see
+// The board lives in <repo>/.modboard/, beside the git *common* dir so
+// every worktree of a repo shares one board (BOARD_DIR overrides). A board
+// made before the rename, in .agent-board/, is used where it already exists.
+// Which storage block holds it is named in .modboard/config.json (see
 // lib/load-store.mjs); the default is the built-in "file" block.
 
 import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 
 import { BoardError, createEngine } from '../lib/engine.mjs'
@@ -20,10 +22,16 @@ function boardDir() {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim()
-    return path.join(path.dirname(common), '.agent-board')
+    return inside(path.dirname(common))
   } catch {
-    return path.resolve('.agent-board')
+    return inside(process.cwd())
   }
+}
+
+function inside(root) {
+  const old = path.join(root, '.agent-board')
+  const now = path.join(root, '.modboard')
+  return !fs.existsSync(now) && fs.existsSync(old) ? old : now
 }
 
 function parseArgs(argv) {

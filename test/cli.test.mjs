@@ -10,7 +10,7 @@ const BOARD = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin
 
 function fresh() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'board-'))
-  const env = { ...process.env, BOARD_DIR: path.join(dir, '.agent-board') }
+  const env = { ...process.env, BOARD_DIR: path.join(dir, '.modboard') }
   const run = (args, extra = {}) => {
     try {
       return { code: 0, out: execFileSync('node', [BOARD, ...args], { env: { ...env, ...extra }, encoding: 'utf8', stdio: 'pipe' }) }
@@ -137,4 +137,19 @@ test('release-all frees every task an ending session holds, with a handoff', () 
   assert.match(b.json(['show', 'T-002']).notes.at(-1).text, /^HANDOFF: alice ended without releasing/)
   assert.equal(b.json(['show', 'T-003']).claim.owner, 'bob')
   assert.equal(b.json(['doctor']).ok, true)
+})
+
+test('a new board goes in .modboard/; one made before the rename keeps working in .agent-board/', () => {
+  const env = { ...process.env }
+  delete env.BOARD_DIR
+  const add = cwd => execFileSync('node', [BOARD, 'add', 'x', '--as', 'lead'], { cwd, env, stdio: 'pipe' })
+  // Outside any git repo, the board sits in the folder the CLI runs in.
+  const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'board-'))
+  add(fresh)
+  assert.ok(fs.existsSync(path.join(fresh, '.modboard', 'board.json')))
+  const old = fs.mkdtempSync(path.join(os.tmpdir(), 'board-'))
+  fs.mkdirSync(path.join(old, '.agent-board'))
+  add(old)
+  assert.ok(fs.existsSync(path.join(old, '.agent-board', 'board.json')))
+  assert.ok(!fs.existsSync(path.join(old, '.modboard')))
 })
