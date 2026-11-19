@@ -101,6 +101,7 @@ board add "title" --desc "..." --accept "how to tell it is done"
 board agents                              # live agents
 board view                                # every task and live agent, as JSON
 board doctor                              # ledger vs state
+board taskfile                            # the project's task.md, read only
 ```
 
 Each command answers in a line or two for a person (`claimed T-001 … it's
@@ -171,7 +172,7 @@ The display shows only what needs you. Everything else waits until you ask.
 **One line above the prompt**, always visible while there's work on the board:
 
 ```
-2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░ 64%   model Sonnet 5.5   effort medium
+2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64% 5-hour limit   ◕ 72% compact
 ```
 
 The line never wraps, and stays clear of Claude Code's own `[-]` control at
@@ -180,38 +181,51 @@ last ones drop off. The first block (the summary) keeps its full form longest,
 and the alert outlasts the counts:
 
 ```
-124 cols   2 tasks waiting   5-hour limit ▓▓▓▓▓▓░░░░  64%   model Sonnet 5.5   effort low
- 64 cols   2 tasks waiting   5h ▓▓▓░░  64%   Sonnet 5.5   low
- 38 cols   2 tasks waiting   5h ▓▓▓░░  64%
- 20 cols   2 tasks waiting
+112 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64% 5-hour limit   ◕ 72% compact
+100 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64%   ◕ 72%
+ 80 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up
+ 64 cols   2 waiting · 1 active   T-005 was stopped partway, pick it up
+ 42 cols   2 waiting · 1 active   T-005 needs you
+ 20 cols   T-005 needs you
 ```
 
 The alert names the one thing that needs you: a task someone stopped partway
 that nobody has picked up, or an agent that stopped responding (its claim is
-about to run out). Usage appears only once a limit passes 50%. It's green
-with room left, yellow from 70% and red from 90%. With nothing waiting or in
-progress, the line disappears.
+about to run out). Usage and context share one ring that fills
+(○ ◔ ◑ ◕ ●), and each appears only once it passes half. It's plain with room
+left, yellow from 70% and red from 90%. Clicking the context ring runs
+`/compact`. The model and effort switches are there if you want them (add
+`model,effort` to the band), but Claude Code already shows both, so they're
+off by default. With nothing waiting or in progress, the line disappears.
 
 **`/board`** opens the full pane:
 
 ```
  In progress
- ◐  T-004  Add a test script           you're on it
- ◐  T-007  Write the README            backend is on it
- ◐  T-006  Add a LICENSE file          codex stopped responding
+ T-004  Add a test script           you
+ T-007  Write the README            backend
+ T-006  Add a LICENSE file          codex stopped responding
 
- Needs picking up
- ○  T-005  Ghost task                  frontend stopped partway · see its note
+ Stopped partway
+ T-005  Ghost task                  frontend · see its note
 
  Not started
- ○  T-008  Add dark mode
+ T-008  Add dark mode
 
  3 done
 
- Usage
- 5-hour limit   ▓▓▓▓▓▓░░░░  64%   resets 12:00
- weekly limit   ▓▓░░░░░░░░  20%   resets in 3d
+ ▸ task.md · 4 open
+
+ ◕  72%  compact
+
+ ◑  64%  5-hour limit · resets 12:00
 ```
+
+The pane shows what needs you in full and keeps the rest short. Headings
+are quiet, and say what's happening, so a row only names who: no marks, no
+repeated phrases. Past eight tasks, "Not started" ends in a count ("4 more").
+What's in progress or stopped partway is never cut. Colour appears only when
+something asks for you: a warning, or a limit past 70%.
 
 Both are stacks of display blocks, chosen in the plugin's settings (`/config`)
 as comma-separated lists, in order:
@@ -219,19 +233,42 @@ as comma-separated lists, in order:
 | Block | Band | Pane | Shows |
 |---|---|---|---|
 | `summary` | ✓ | | what's waiting and in progress, and the one thing that needs you |
-| `tasks` | | ✓ | in progress, then work stopped partway, then not started, then a count of done |
-| `usage` | ✓ | ✓ | plan usage per window: in the band past 50%, in the pane with resets |
-| `model` | ✓ | ✓ | the session's model; click it to switch to the next one |
-| `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest |
+| `tasks` | | ✓ | in progress, then work stopped partway, then not started (up to eight), then a count of done |
+| `taskfile` | | ✓ | the project's `task.md`: how much is open; click it (or press `t`) to see what's left |
+| `usage` | ✓ | ✓ | the 5-hour limit as a ring that fills: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |
+| `compact` | ✓ | ✓ | the context window as the same ring; click it (or press `c`) to run `/compact`. In the band from half full |
+| `model` | ✓ | ✓ | the session's model; click it to switch to the next one. Off by default |
+| `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest. Off by default |
 | `clock` | ✓ | ✓ | the time |
 | `context` | ✓ | ✓ | context fill and the session's cost |
 | `agents` | | ✓ | who is live on the board |
 
-The defaults are `band: summary,usage,model,effort` and `pane: tasks,usage`.
+The defaults are `band: summary,usage,compact` and `pane: tasks,taskfile,compact,usage`.
 
-Each row says who has a task as a sentence (`backend is on it`, `frontend
-stopped partway`) rather than a bare name, which could mean whoever made,
-holds or dropped it.
+**task.md.** If the checkout has a `task.md` (or `tasks.md`, `todo.md`, in
+any case) at its root, the pane shows one quiet line: the file and how much
+of it is open. Click it (or press `t`) to see what's left, in the file's
+order under its headings:
+
+```
+ ▾ task.md · 14 open
+
+ Sprint
+   Write the parser
+   Add tests
+   Fix login bug
+
+ Later
+   Ship it
+   Add metrics
+   6 more
+```
+
+Only what's left is shown, up to eight items, then a count of the rest.
+Checked-off items stay in the file and out of the pane. `board taskfile`
+prints the whole file. The list is there to read. Nothing in it is claimed
+or added to the board, and the board never writes the file. To work an item
+through the board, `board add` it. With no such file, the line doesn't appear.
 
 Click `model` or `effort` to switch: each click runs Claude Code's own
 `/model` or `/effort`, the same as typing the command. (In the `/board` pane
@@ -487,6 +524,7 @@ modboard/
 │   ├── engine.mjs           # the rules: claims, leases, handoffs, names, the ledger
 │   ├── load-store.mjs       # finds the storage block that config.json names
 │   ├── store-file.mjs       # the built-in storage block: a folder
+│   ├── taskfile.mjs         # reads a project's task.md for display
 │   └── contract.mjs         # the tests every storage block must pass
 ├── examples/
 │   └── store-memory.mjs     # a complete storage block in about 20 lines

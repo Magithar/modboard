@@ -3,6 +3,30 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+- A `taskfile` block in the `/board` pane: when the checkout has a `task.md`
+  (or `tasks.md`, `todo.md`), one line says how much of it is open, and
+  clicking it (or pressing `t`) shows what's left under its headings, up to
+  eight items, then a count of the rest. Checked-off items aren't shown. It's on
+  by default (`pane: tasks,taskfile,usage`) and shows nothing without a file.
+- The pane is quieter. Headings are dimmed, and rows lose their ◐/○ mark
+  (the heading says the state). "Not started" shows eight tasks, then
+  "N more"; in-progress and stopped-partway tasks are never cut. The usage
+  bar is plain with room left and takes colour only from 70%.
+- A `compact` block: the context window as a ring that fills (○ ◔ ◑ ◕ ●,
+  yellow from 70%, red from 90%), and clicking it runs `/compact`. It's
+  in the pane by default, and in the band once the context is half full.
+- Usage is drawn with the same ring instead of a bar, so "how full" always
+  looks the same.
+- The band's default is now `summary,usage,compact`. Model and effort are
+  still blocks you can add; Claude Code already shows both.
+- Task rows only say who ("backend", "you"); the heading says what. "Needs
+  picking up" is now "Stopped partway".
+- The weekly limit is no longer shown on the board; the 5-hour limit stays.
+- `board taskfile` prints that file's items; `--json` gives them as data. It
+  reads no board and never writes one.
+
 ## 0.5.1 — 2026-11-19
 
 Docs and package details only. The code is the same as 0.5.0.

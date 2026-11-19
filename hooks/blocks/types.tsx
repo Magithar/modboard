@@ -1,4 +1,4 @@
-import type { Agent, Task, Usage } from '../../types'
+import type { Agent, Task, TaskFile, Usage } from '../../types'
 
 // What every block draws from. `ui` is the surface's own element table.
 export type Ctx = {
@@ -13,9 +13,12 @@ export type Ctx = {
   effort: string
   // The last line each command block printed, by block name.
   custom: Record<string, string>
+  // The project's task.md, and whether its list is open in the pane.
+  taskfile: TaskFile
+  taskfileOpen: boolean
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; compact: () => Promise<void> }
 }
 
 // One way a block can draw in the band, and how many columns it takes.
@@ -31,6 +34,9 @@ export type Block = {
   band?: (c: Ctx) => BandForm[] | null
   pane?: (c: Ctx) => any
 }
+
+// How many rows a long list shows in the pane before the rest become a count.
+export const SHOWN = 8
 
 // A run of text that never wraps, and its width.
 export function words(Text: any, text: string, props: Record<string, unknown> = {}): BandForm {

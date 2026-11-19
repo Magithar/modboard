@@ -153,3 +153,25 @@ test('a new board goes in .modboard/; one made before the rename keeps working i
   assert.ok(fs.existsSync(path.join(old, '.agent-board', 'board.json')))
   assert.ok(!fs.existsSync(path.join(old, '.modboard')))
 })
+
+test('taskfile reads the project task.md without touching the board', () => {
+  const b = fresh()
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'project-'))
+  const env = { BOARD_TASKFILE_DIR: project }
+  assert.deepEqual(b.json(['taskfile'], env), { file: null, items: [] })
+  fs.writeFileSync(
+    path.join(project, 'TASK.md'),
+    '# Sprint\n\nSome prose.\n\n- [ ] Write the parser\n- [x] Sketch the pane\n  - [ ] nested step\n\n## Later\n\n1. plain item\n\n```\n- not an item\n```\n',
+  )
+  const read = b.json(['taskfile'], env)
+  assert.equal(read.file, 'TASK.md')
+  assert.deepEqual(read.items, [
+    { text: 'Write the parser', done: false, section: 'Sprint', depth: 0 },
+    { text: 'Sketch the pane', done: true, section: 'Sprint', depth: 0 },
+    { text: 'nested step', done: false, section: 'Sprint', depth: 1 },
+    { text: 'plain item', done: null, section: 'Later', depth: 0 },
+  ])
+  assert.match(b.run(['taskfile'], env).out, /^TASK\.md\n\[ \] Write the parser\n\[x\] Sketch the pane\n  \[ \] nested step\n- plain item/)
+  // Nothing was added to the board, and no board was made.
+  assert.equal(fs.existsSync(b.env.BOARD_DIR), false)
+})

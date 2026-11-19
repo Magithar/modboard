@@ -6,5 +6,5 @@ const hhmm = (now: number) => `${pad(new Date(now).getHours())}:${pad(new Date(n
 export const clock: Block = {
   name: 'clock',
   band: ({ ui: { Text }, now }) => [words(Text, hhmm(now), { dimColor: true })],
-  pane: ({ ui: { Text }, now }) => <Text bold>{hhmm(now)}</Text>,
+  pane: ({ ui: { Text }, now }) => <Text dimColor>{hhmm(now)}</Text>,
 }

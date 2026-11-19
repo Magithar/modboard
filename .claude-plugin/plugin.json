@@ -19,14 +19,14 @@
     "band": {
       "type": "string",
       "title": "Band blocks",
-      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, usage, model, effort, clock, context, or your own from Your own blocks.",
-      "default": "summary,usage,model,effort"
+      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, usage, compact, model, effort, clock, context, or your own from Your own blocks.",
+      "default": "summary,usage,compact"
     },
     "pane": {
       "type": "string",
       "title": "Pane blocks",
-      "description": "Blocks in the /board pane, in order, comma-separated: tasks, usage, model, effort, clock, context, agents, or your own from Your own blocks.",
-      "default": "tasks,usage"
+      "description": "Blocks in the /board pane, in order, comma-separated: tasks, taskfile (the project's task.md, behind a button), compact (context ring and a /compact button), usage, model, effort, clock, context, agents, or your own from Your own blocks.",
+      "default": "tasks,taskfile,compact,usage"
     },
     "blocks": {
       "type": "string",

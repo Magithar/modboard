@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Agent, Task } from '../types'
+import type { Agent, Task, TaskFile } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 
@@ -25,6 +25,8 @@ const usage = atom({ plugin: 'modboard', key: 'usage' } as const, { limits: [] }
 const model = atom({ plugin: 'modboard', key: 'model' } as const, '')
 const effort = atom({ plugin: 'modboard', key: 'effort' } as const, '')
 const custom = atom({ plugin: 'modboard', key: 'custom' } as const, {} as Record<string, string>)
+const taskfile = atom({ plugin: 'modboard', key: 'taskfile' } as const, { file: null, items: [] } as TaskFile)
+const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, false)
 
 let session = ''
 let lastBeat = 0
@@ -61,12 +63,24 @@ async function takeName($: EngineInterface, wanted: string | undefined) {
   return name
 }
 
+// Whether any shown block reads task.md; when none does, it is never read.
+let readsTaskfile = false
+
 async function refresh($: EngineInterface) {
   const out = await cli($, ['view', '--json'])
-  if (!out.ok) return
-  const view = JSON.parse(out.text) as { tasks: Task[]; agents: Agent[] }
-  await update($, tasks, () => view.tasks)
-  await update($, agents, () => view.agents)
+  if (out.ok) {
+    const view = JSON.parse(out.text) as { tasks: Task[]; agents: Agent[] }
+    await update($, tasks, () => view.tasks)
+    await update($, agents, () => view.agents)
+  }
+  if (readsTaskfile) {
+    const file = await cli($, ['taskfile', '--json'])
+    let read: TaskFile | undefined
+    try {
+      read = file.ok ? (JSON.parse(file.text) as TaskFile) : undefined
+    } catch {}
+    if (read) await update($, taskfile, () => read!)
+  }
 }
 
 const TOOLS = [
@@ -202,6 +216,12 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       await $.command.run({ command: 'effort', args: to }).catch(() => $.ui.toast(`board: could not set effort to ${to}`))
       await update($, effort, () => to)
     },
+    compact: async () => {
+      await $.command.run({ command: 'compact' }).catch(() => $.ui.toast('board: could not compact the conversation'))
+    },
+    toggleTaskfile: async () => {
+      await update($, taskfileOpen, open => !open)
+    },
   }
 }
 
@@ -217,6 +237,8 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     model: await read($, model),
     effort: await read($, effort),
     custom: await read($, custom),
+    taskfile: await read($, taskfile),
+    taskfileOpen: await read($, taskfileOpen),
     act,
   }
 }
@@ -224,8 +246,9 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
 export const register: Register = (on, options) => {
   const { commands, problems } = parseCommandBlocks(options.blocks, BLOCKS.map(b => b.name))
   const all = [...BLOCKS, ...Object.keys(commands).map(commandBlock)]
-  const band = pick(all, options.band, 'summary,usage,model,effort').filter(b => b.band)
-  const pane = pick(all, options.pane, 'tasks,usage').filter(b => b.pane)
+  const band = pick(all, options.band, 'summary,usage,compact').filter(b => b.band)
+  const pane = pick(all, options.pane, 'tasks,taskfile,compact,usage').filter(b => b.pane)
+  readsTaskfile = [...band, ...pane].some(b => b.name === 'taskfile')
   const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
 
   on('session.start', async ($, e, next) => {

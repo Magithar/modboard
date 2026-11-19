@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-import type { Task } from '../types'
+import type { Task, TaskFile } from '../types'
 
 const task = (id: string, status: Task['status'], owner?: string): Task => ({
   id,
@@ -19,7 +19,14 @@ const NOW = Date.parse('2026-10-12T09:41:00')
 function host(
   on: On,
   tasks: Task[],
-  { agent, taken = [], effort, envEffort, modelEffort }: { agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string } = {},
+  {
+    agent,
+    taken = [],
+    effort,
+    envEffort,
+    modelEffort,
+    taskfile = { file: null, items: [] },
+  }: { agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -30,6 +37,10 @@ function host(
     calls.push(['/model', e.args])
     model = `claude-${e.args}-5-5`
     return { text: `Set model to ${e.args}` }
+  })
+  on('command.run', { command: 'compact' } as any, () => {
+    calls.push(['/compact'])
+    return { text: 'Compacted' }
   })
   on('command.run', { command: 'effort' } as any, (_$, e: any) => {
     calls.push(['/effort', e.args])
@@ -53,7 +64,8 @@ function host(
       const failed = cmd === 'false'
       return { value: { exitCode: failed ? 1 : 0, stdout: failed ? '' : `\n${cmd.replace(/^echo /, '')}\nsecond line`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     }
-    const stdout = argv[2] === 'view' ? JSON.stringify({ tasks, agents: [{ name: 'codex', lastSeen: '' }] }) : 'ok'
+    const stdout =
+      argv[2] === 'view' ? JSON.stringify({ tasks, agents: [{ name: 'codex', lastSeen: '' }] }) : argv[2] === 'taskfile' ? JSON.stringify(taskfile) : 'ok'
     return {
       value: {
         exitCode: refused ? 7 : 0,
@@ -74,6 +86,8 @@ const texts = async (ui: any) => (await ui.findAll({ type: 'Text' })).map((t: an
 const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 100 } } as const
 // The band without the model and effort switches, for tests about the rest of it.
 const QUIET = { options: { band: 'summary,usage' } } as any
+// The band with the model and effort switches, which are off by default.
+const FULL = { options: { band: 'summary,usage,model,effort' } } as any
 const inMinutes = (m: number) => new Date(NOW + m * 60_000).toISOString()
 const handedOff = (id: string, by: string): Task => ({ ...task(id, 'todo'), notes: [{ at: '', by, text: 'HANDOFF: part 1 done' }] })
 
@@ -92,10 +106,11 @@ test('the pane groups in progress, then not started, and counts done', async ($,
     expect(shown.indexOf('In progress')).toBeLessThan(shown.indexOf('title of T-001'))
     expect(shown.indexOf('title of T-003')).toBeLessThan(shown.indexOf('Not started'))
     expect(shown.indexOf('Not started')).toBeLessThan(shown.indexOf('title of T-002'))
-    // Who has a task is said as a sentence, never a bare name.
-    expect(shown).toContain("you're on it")
-    expect(shown).toContain('codex is on it')
-    expect(shown).not.toContain('Needs picking up')
+    // The heading says what is happening; the row only says who.
+    expect(shown).toContain('you')
+    expect(shown).toContain('codex')
+    expect(shown.some((t: string) => t.includes('on it'))).toBe(false)
+    expect(shown).not.toContain('Stopped partway')
     // A lease with time to spare says nothing; only one that needs you does.
     expect(shown.some((t: string) => /partway|responding/.test(t))).toBe(false)
     expect(shown).toContain('1 done')
@@ -111,13 +126,13 @@ test('the pane flags a handoff nobody picked up and a claim going quiet', async 
   ])
   await $.session.start(START)
   const wide = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 80 } } as any)
-  expect(await texts(wide)).toContain('frontend stopped partway · see its note')
+  expect(await texts(wide)).toContain('frontend · see its note')
   await wide.unmount()
   // Narrow, it still says who stopped.
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const shown = await texts(ui)
-  expect(shown).toContain('Needs picking up')
-  expect(shown).toContain('frontend stopped partway')
+  expect(shown).toContain('Stopped partway')
+  expect(shown).toContain('frontend')
   expect(shown).toContain('codex stopped responding')
   expect(shown).not.toContain('Not started')
 })
@@ -208,32 +223,65 @@ test('usage shows in the pane with resets, and in the band only past half', QUIE
   await $.session.measure(measure(31) as any)
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const inPane = await texts(pane)
-  expect(inPane).toContain('▓▓▓')
-  expect(inPane).toContain('░░░░░░░')
-  expect(inPane).toContain('  31%')
-  expect(inPane).toContain('   resets 12:00')
-  expect(inPane).toContain('   resets in 3d')
-  expect(inPane).toContain('5-hour limit')
-  expect(inPane).toContain('weekly limit')
+  // The same ring as the context, then what it measures and when it resets.
+  expect(inPane).toEqual(expect.arrayContaining(['◔', '  31%', '  5-hour limit · resets 12:00']))
+  // The weekly window is left off the board.
+  expect(inPane.some((t: string) => t.includes('weekly'))).toBe(false)
   let band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   expect((await texts(band)).some((t: string) => t.endsWith('limit'))).toBe(false)
   await band.unmount()
 
   await $.session.measure(measure(72.4) as any)
   band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
-  expect(await texts(band)).toEqual(expect.arrayContaining(['5-hour limit', '▓▓▓▓▓▓▓', '░░░', '  72%']))
+  expect(await texts(band)).toEqual(expect.arrayContaining(['◕', ' 72%', ' 5-hour limit']))
 })
 
-test('usage is green with room, yellow from 70%, red from 90%', QUIET, async ($, on) => {
+const atContext = (percent: number) => ({ ...measure(10), context: { window: 200000, percent }, changed: ['context'] })
+
+test('the compact button shows the context as a ring that fills, and compacts when pressed', async ($, on) => {
+  const calls = host(on, [task('T-001', 'todo')])
+  on('session.measure', (_$, e: any) => ({ changed: e.changed }))
+  await $.session.start(START)
+  for (const [percent, mark, color] of [[5, '○', undefined], [30, '◔', undefined], [55, '◑', undefined], [75, '◕', 'warning'], [95, '●', 'error']] as const) {
+    await $.session.measure(atContext(percent) as any)
+    const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+    const ring = await pane.find({ type: 'Text', text: mark })
+    expect(ring?.props.color).toBe(color)
+    expect(await texts(pane)).toContain(` ${`${percent}%`.padStart(4)}`)
+    // The ring is its own label.
+    expect(await texts(pane)).not.toContain('context')
+    await pane.unmount()
+  }
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await pane.press({ key: 'compact' })
+  expect(calls).toContainEqual(['/compact'])
+})
+
+test('the band offers compact only once the context is half full', { options: { band: 'compact' } } as any, async ($, on) => {
+  const calls = host(on, [task('T-001', 'todo')])
+  on('session.measure', (_$, e: any) => ({ changed: e.changed }))
+  await $.session.start(START)
+  await $.session.measure(atContext(40) as any)
+  let band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  expect(await band.find({ key: 'compact' })).toBeUndefined()
+  await band.unmount()
+  await $.session.measure(atContext(72) as any)
+  band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  expect((await band.find({ key: 'compact' }))?.props.label).toBe('◕ 72% compact')
+  await band.press({ key: 'compact' })
+  expect(calls).toContainEqual(['/compact'])
+})
+
+test('usage is plain with room, yellow from 70%, red from 90%', QUIET, async ($, on) => {
   host(on, [task('T-001', 'todo')])
   on('session.measure', (_$, e: any) => ({ changed: e.changed }))
   await $.session.start(START)
-  for (const [percent, color] of [[64, 'success'], [72, 'warning'], [93, 'error']] as const) {
+  for (const [percent, mark, color] of [[64, '◕', undefined], [72, '◕', 'warning'], [93, '●', 'error']] as const) {
     await $.session.measure(measure(percent) as any)
     const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
-    const used = await band.find({ type: 'Text', text: /^▓+$/ })
-    expect(used?.props.color).toBe(color)
-    expect((await band.find({ type: 'Text', text: /^░+$/ }))?.props.dimColor).toBe(true)
+    expect((await band.find({ type: 'Text', text: mark }))?.props.color).toBe(color)
+    // Plain means dim: nothing to act on yet.
+    expect((await band.find({ type: 'Text', text: ` ${percent}%` }))?.props.dimColor).toBe(!color)
     await band.unmount()
   }
 })
@@ -252,6 +300,81 @@ test('the band and pane settings pick blocks and their order', { options: { band
   expect(shown.some((t: string) => t.includes('%  ') || t === 'Usage')).toBe(false)
 })
 
+const TASKFILE: TaskFile = {
+  file: 'task.md',
+  items: [
+    { text: 'Write the parser', done: false, section: 'Sprint', depth: 0 },
+    { text: 'Sketch the pane', done: true, section: 'Sprint', depth: 0 },
+    { text: 'Ship it', done: false, section: 'Later', depth: 0 },
+  ],
+}
+
+test('the task.md button says what is left, and shows only that when pressed', async ($, on) => {
+  host(on, [task('T-001', 'todo')], { taskfile: TASKFILE })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect((await ui.find({ key: 'taskfile' }))?.props.label).toBe('▸ task.md · 2 open')
+  expect(await texts(ui)).not.toContain('Write the parser')
+  await ui.press({ key: 'taskfile' })
+  expect((await ui.find({ key: 'taskfile' }))?.props.label).toBe('▾ task.md · 2 open')
+  const shown = await texts(ui)
+  expect(shown.indexOf('Sprint')).toBeLessThan(shown.indexOf('Write the parser'))
+  expect(shown.indexOf('Write the parser')).toBeLessThan(shown.indexOf('Later'))
+  expect(shown.indexOf('Later')).toBeLessThan(shown.indexOf('Ship it'))
+  // Done is the file's business, not the pane's.
+  expect(shown).not.toContain('Sketch the pane')
+  // The board's own tasks stay where they were, above it.
+  expect(shown.indexOf('title of T-001')).toBeLessThan(shown.indexOf('Sprint'))
+  await ui.press({ key: 'taskfile' })
+  expect(await texts(ui)).not.toContain('Write the parser')
+})
+
+test('a long task.md shows the first eight open items, then a count of the rest', async ($, on) => {
+  const items = Array.from({ length: 20 }, (_, n) => ({ text: `item ${n + 1}`, done: n % 4 === 3, section: n < 10 ? 'Sprint' : 'Later', depth: 0 }))
+  host(on, [], { taskfile: { file: 'task.md', items } })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect((await ui.find({ key: 'taskfile' }))?.props.label).toBe('▸ task.md · 15 open')
+  await ui.press({ key: 'taskfile' })
+  const shown = (await texts(ui)).filter((t: string) => t.startsWith('item '))
+  expect(shown).toEqual(['item 1', 'item 2', 'item 3', 'item 5', 'item 6', 'item 7', 'item 9', 'item 10'])
+  expect(await texts(ui)).toContain('7 more')
+})
+
+test('a task.md with everything checked off says so', async ($, on) => {
+  host(on, [], { taskfile: { file: 'task.md', items: [{ text: 'a', done: true, section: '', depth: 0 }] } })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect((await ui.find({ key: 'taskfile' }))?.props.label).toBe('▸ task.md · all done')
+})
+
+test('a long backlog shows eight not started, then a count; what needs you is never cut', async ($, on) => {
+  const backlog = Array.from({ length: 12 }, (_, n) => task(`T-${String(n + 10).padStart(3, '0')}`, 'todo'))
+  const working = Array.from({ length: 10 }, (_, n) => task(`T-${String(n + 30).padStart(3, '0')}`, 'claimed', 'codex'))
+  host(on, [...backlog, ...working])
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const shown = await texts(ui)
+  expect(shown.filter((t: string) => /^title of T-03/.test(t))).toHaveLength(10)
+  expect(shown.filter((t: string) => /^title of T-0[12]/.test(t))).toHaveLength(8)
+  expect(shown).toContain('4 more')
+  // The state is in the heading, not a mark on every row.
+  expect(shown.some((t: string) => t === '◐' || t === '○')).toBe(false)
+})
+
+test('with no task.md the pane shows no button for it', async ($, on) => {
+  host(on, [task('T-001', 'todo')])
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await ui.find({ key: 'taskfile' })).toBeUndefined()
+})
+
+test('task.md is never read when no shown block uses it', { options: { pane: 'tasks' } } as any, async ($, on) => {
+  const calls = host(on, [], { taskfile: TASKFILE })
+  await $.session.start(START)
+  expect(calls.some(argv => argv[2] === 'taskfile')).toBe(false)
+})
+
 test('an empty board says how to add a task', async ($, on) => {
   host(on, [])
   await $.session.start(START)
@@ -266,7 +389,7 @@ test('one task reads as one task', QUIET, async ($, on) => {
   expect(await texts(ui)).toEqual(['1 task waiting'])
 })
 
-test('the model block shows the model and switches to the next one when pressed', async ($, on) => {
+test('the model block shows the model and switches to the next one when pressed', FULL, async ($, on) => {
   const calls = host(on, [task('T-001', 'todo')])
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
@@ -278,7 +401,7 @@ test('the model block shows the model and switches to the next one when pressed'
   expect(calls).toContainEqual(['/model', 'opus'])
 })
 
-test('the effort block shows the level and steps to the next when pressed', async ($, on) => {
+test('the effort block shows the level and steps to the next when pressed', FULL, async ($, on) => {
   const calls = host(on, [task('T-001', 'todo')], { effort: 'medium' })
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
@@ -288,28 +411,28 @@ test('the effort block shows the level and steps to the next when pressed', asyn
   expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort high')
 })
 
-test('effort shows the saved level before the session has sent anything', async ($, on) => {
+test('effort shows the saved level before the session has sent anything', FULL, async ($, on) => {
   host(on, [task('T-001', 'todo')], { effort: 'low' })
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort low')
 })
 
-test("the model's own saved effort wins over the general one", async ($, on) => {
+test("the model's own saved effort wins over the general one", FULL, async ($, on) => {
   host(on, [task('T-001', 'todo')], { effort: 'medium', modelEffort: 'low' })
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort low')
 })
 
-test('CLAUDE_CODE_EFFORT_LEVEL overrides the saved level', async ($, on) => {
+test('CLAUDE_CODE_EFFORT_LEVEL overrides the saved level', FULL, async ($, on) => {
   host(on, [task('T-001', 'todo')], { effort: 'low', envEffort: 'high' })
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   expect((await band.find({ key: 'effort' }))?.props.label).toBe('effort high')
 })
 
-test('the models and efforts settings choose what the blocks step through', { options: { models: 'sonnet,fable', efforts: 'low,max' } } as any, async ($, on) => {
+test('the models and efforts settings choose what the blocks step through', { options: { band: 'summary,usage,model,effort', models: 'sonnet,fable', efforts: 'low,max' } } as any, async ($, on) => {
   const calls = host(on, [task('T-001', 'todo')], { effort: 'max' })
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
@@ -319,7 +442,7 @@ test('the models and efforts settings choose what the blocks step through', { op
   expect(calls).toContainEqual(['/effort', 'low'])
 })
 
-test('effort steps through every level in order and wraps from the highest to the lowest', async ($, on) => {
+test('effort steps through every level in order and wraps from the highest to the lowest', FULL, async ($, on) => {
   const calls = host(on, [task('T-001', 'todo')], { effort: 'medium' })
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
@@ -341,14 +464,24 @@ async function bandAt($: any, columns: number) {
   return shown
 }
 
-test('the band never wraps: it narrows its parts, then leaves the last ones out', async ($, on) => {
+test('the band defaults to what needs you: no model or effort', async ($, on) => {
+  host(on, [task('T-001', 'todo')])
+  on('session.measure', (_$, e: any) => ({ changed: e.changed }))
+  await $.session.start(START)
+  await $.session.measure({ ...measure(64), context: { window: 200000, percent: 72 } } as any)
+  const shown = await bandAt($, 140)
+  expect(shown).toEqual(['1 task waiting', '◕', ' 64%', ' 5-hour limit', '◕', ' 72%', ' compact'])
+})
+
+
+test('the band never wraps: it narrows its parts, then leaves the last ones out', FULL, async ($, on) => {
   host(on, [task('T-001', 'todo'), task('T-002', 'todo')], { effort: 'low' })
   on('session.measure', (_$, e: any) => ({ changed: e.changed }))
   await $.session.start(START)
   await $.session.measure(measure(64) as any)
 
   const wide = await bandAt($, 124)
-  expect(wide).toEqual(expect.arrayContaining(['2 tasks waiting', '5-hour limit', 'model ', 'Sonnet 5.5', 'effort ', 'low']))
+  expect(wide).toEqual(expect.arrayContaining(['2 tasks waiting', ' 5-hour limit', 'model ', 'Sonnet 5.5', 'effort ', 'low']))
 
   const medium = await bandAt($, 64)
   expect(medium).toEqual(expect.arrayContaining(['2 tasks waiting', 'Sonnet 5.5', 'low']))
@@ -357,7 +490,8 @@ test('the band never wraps: it narrows its parts, then leaves the last ones out'
 
   const narrow = await bandAt($, 38)
   expect(narrow).toContain('2 tasks waiting')
-  expect(narrow).toContain('5h')
+  expect(narrow).toContain('◕')
+  expect(narrow).not.toContain(' 5-hour limit')
   expect(narrow).not.toContain('Sonnet 5.5')
 
   const tiny = await bandAt($, 20)
@@ -371,7 +505,7 @@ test('when the line is short, the alert outlasts the counts', async ($, on) => {
   expect(await bandAt($, 20)).toEqual(['T-005 needs you'])
 })
 
-test('at every width, what the band draws fits the line', async ($, on) => {
+test('at every width, what the band draws fits the line', FULL, async ($, on) => {
   host(on, [handedOff('T-005', 'frontend'), task('T-001', 'claimed', 'codex')], { effort: 'xhigh' })
   on('session.measure', (_$, e: any) => ({ changed: e.changed }))
   on('ui.render', { component: 'AbovePrompt' } as any, ($: any, e: any) => {
