@@ -40,8 +40,8 @@ where they tell you something.
   shows from the start: Claude Code's local estimate of the context until
   the first reply, then each reply's measurement. It's always in the pane,
   and in the band.
-- **Collapsible task groups.** In progress, Stopped partway and Not started
-  are each a heading you click to open or close,
+- **Collapsible task groups.** In progress, Unfinished, Not started and
+  Done are each a heading you click to open or close,
   with its count: `▾ In progress · 3`. What needs you starts open; Not
   started starts closed, so the whole board fits without scrolling.
 - **`/board` asks for a taller pane**, room for the whole board. Where the
@@ -57,9 +57,9 @@ where they tell you something.
 
 - **Defaults.** The band is now `summary,model,effort,board`: the 5-hour limit
   and the context moved to the pane, which is `tasks,taskfile,compact,usage`.
-- **A shorter band.** It reads "2 waiting · 1 active   T-005 stopped
-  partway": `active` in green, what was left partway in yellow, with no
-  "pick it up".
+- **A shorter band.** It reads `2 waiting · 1 active   [T-005]`: `active`
+  in green, and each task left partway in a yellow box, with no "pick it
+  up".
 - **A red line when the board stops answering**: `board not updating: …`
   at the top of the pane, with the reason, while the `board` CLI fails. What
   is below it is the last board it read. It goes once the board answers.

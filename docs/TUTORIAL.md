@@ -273,12 +273,12 @@ disappears.
  ▾ In progress · 3
 
    T-004  Add a test script                          you
-   T-007  Write the README                       backend
+   T-007  Write the README                      claude 2
    T-006  Add a LICENSE file                codex 1 · idle
 
  ▾ Unfinished · 1
 
-   T-005  Ghost task                            frontend
+   T-005  Ghost task                            claude 3
           · layout done
           · saving isn't wired yet
 
