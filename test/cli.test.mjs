@@ -71,7 +71,8 @@ test('an expired lease frees the task for every reader and is recorded', async (
 
 test('a registered session that goes silent loses its claims before the lease runs out', async () => {
   const b = fresh()
-  const quick = { BOARD_PRESENCE_MS: '300' }
+  // Wide margins: each CLI call is a new Node process, slower when suites run in parallel.
+  const quick = { BOARD_PRESENCE_MS: '1500' }
   for (const title of ['crashed', 'alive', 'plain']) b.run(['add', title])
   b.run(['register', 'ghost', '--session', 's1'], quick)
   b.run(['register', 'alive', '--session', 's2'], quick)
@@ -79,9 +80,9 @@ test('a registered session that goes silent loses its claims before the lease ru
   b.run(['claim', 'T-002', '--as', 'alive'], quick)
   // A plain CLI agent that never registered keeps its lease alone.
   b.run(['claim', 'T-003', '--as', 'codex'], quick)
-  await new Promise(resolve => setTimeout(resolve, 200))
+  await new Promise(resolve => setTimeout(resolve, 1000))
   b.run(['register', 'alive', '--session', 's2'], quick)
-  await new Promise(resolve => setTimeout(resolve, 200))
+  await new Promise(resolve => setTimeout(resolve, 1000))
   const tasks = b.json(['list'], quick)
   const by = id => tasks.find(t => t.id === id)
   assert.equal(by('T-001').status, 'todo')
