@@ -1,7 +1,7 @@
 // Rebuilds each diagram's page from its plain text, docs/<name>.txt, then
 // docs/<name>.png with headless Chrome when it is installed. Edit the .txt,
 // then run (with no names, every diagram):
-//   node docs/render.mjs [system] [blocks]
+//   node docs/render.mjs [system] [blocks] [demo]
 
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -16,6 +16,7 @@ const LINES = '┌┐└┘├┤┬┴┼─│▶▼▲'
 const TITLES = {
   system: ['how it fits together', 'one CLI owns the board; Claude sessions and other agents all go through it'],
   blocks: ['how blocks work', 'storage blocks hold the board; display blocks draw it in each Claude session'],
+  demo: ['a real run', 'two agents share one board through the CLI: a lost race, a handoff, a verified done'],
 }
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const version = JSON.parse(fs.readFileSync(path.join(DIR, '..', 'package.json'), 'utf8')).version
@@ -27,8 +28,10 @@ for (const name of names) {
   const body = text
     .split('\n')
     .map(line => {
-      const title = /^(  [A-Z][A-Z ']+)(.*)$/.exec(line)
-      if (title) return `<span class="h">${esc(title[1])}</span><span class="d">${esc(title[2])}</span>`
+      const title = /^(  [A-Z][A-Z ';,]+)((?::  | {2,}).*)?$/.exec(line)
+      if (title) return `<span class="h">${esc(title[1])}</span><span class="d">${esc(title[2] ?? '')}</span>`
+      const command = /^(  )(\$ )(.*)$/.exec(line)
+      if (command) return `${command[1]}<span class="d">${command[2]}</span><span class="p">${esc(command[3])}</span>`
       return [...line].map(ch => (LINES.includes(ch) ? `<span class="d">${ch}</span>` : CLASS[ch] ? `<span class="${CLASS[ch]}">${ch}</span>` : esc(ch))).join('')
     })
     .join('\n')
@@ -41,7 +44,7 @@ for (const name of names) {
   .s{font:13px -apple-system,sans-serif;color:#8a8a8a;margin:0 0 16px}
   pre{margin:0;background:#0c0c0c;border:1px solid #2a2a2a;border-radius:10px;padding:22px 24px;
   font:13px/1.17 Menlo,"SF Mono",monospace;color:#dcdcdc}
-  .d{color:#5e5e5e} .h{color:#d97757;font-weight:700} .c{color:#d97757} .g{color:#4ec27a} .m{color:#9a9a9a}
+  .d{color:#5e5e5e} .h{color:#d97757;font-weight:700} .c{color:#d97757} .g{color:#4ec27a} .m{color:#9a9a9a} .p{color:#f0f0f0;font-weight:700}
   </style></head><body><div class="wrap">
   <p class="t">agent-board · ${title}</p>
   <p class="s">v${version} · ${subtitle}</p>

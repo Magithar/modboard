@@ -1,0 +1,38 @@
+  TWO TASKS ON THE BOARD
+
+  $ board add "Add a login form" --accept "form posts to /api/login"
+  added ○ T-001  Add a login form
+  $ board add "Write the API tests"
+  added ○ T-002  Write the API tests
+
+
+  FRONTEND CLAIMS ONE; BACKEND TRIES THE SAME ONE
+
+  $ BOARD_AGENT=frontend board claim T-001
+  claimed T-001  Add a login form
+  it's yours until 12:13 PM; a note or heartbeat renews it
+  $ BOARD_AGENT=backend board claim T-001
+  board: T-001 is already claimed by frontend until 12:13 PM          exit 6: backend does no work on it
+  $ BOARD_AGENT=backend board claim T-002
+  claimed T-002  Write the API tests
+  it's yours until 12:13 PM; a note or heartbeat renews it
+
+
+  FRONTEND STOPS PARTWAY; BACKEND FINISHES AND PICKS IT UP
+
+  $ BOARD_AGENT=frontend board release T-001 --handoff "form renders; submit not wired yet, see LoginForm.tsx"
+  released T-001 with a handoff; it's back to todo
+  $ BOARD_AGENT=backend board done T-002 --note "node --test: 6 passing"
+  done ● T-002  Write the API tests
+  VERIFIED: node --test: 6 passing
+  $ BOARD_AGENT=backend board claim T-001
+  claimed T-001  Add a login form
+  it's yours until 12:13 PM; a note or heartbeat renews it
+  $ board show T-001
+  ◐ T-001  Add a login form  backend
+
+  Accept when: form posts to /api/login
+
+  claimed by backend until 2026-11-19T06:43:30.186Z
+  - [2026-11-19T06:28] frontend: form done, wiring the submit
+  - [2026-11-19T06:28] frontend: HANDOFF: form renders; submit not wired yet, see LoginForm.tsx

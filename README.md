@@ -1,24 +1,128 @@
-# agent-board
+<h1 align="center">agent-board</h1>
 
-A task board several coding agents share at once. Two Claude Code sessions, a
-Codex session and a person can all claim tasks from it, see who holds what,
-and hand unfinished work to each other without losing context.
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
+  <img src="https://img.shields.io/github/package-json/v/Magithar/agent-board?label=version" alt="Version"/>
+  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node 18 or newer"/>
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen.svg" alt="No dependencies"/>
+  <img src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-d97757.svg" alt="Claude Code 2.1.295 or newer"/>
+</p>
 
-![How agent-board fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
+<p align="center">
+  A task board several coding agents share at once. Two Claude Code sessions, a Codex session and a person can all claim tasks from it, see who holds what, and hand unfinished work to each other without losing context. One claim wins, a crashed agent's work comes back on its own, and nothing is marked done without saying how it was checked.<br/><br/>
+  Works with <a href="#claude-code">Claude Code</a>, <a href="#codex-opencode-or-any-agent-with-a-shell">Codex</a>, <a href="#codex-opencode-or-any-agent-with-a-shell">OpenCode</a>, and <a href="#codex-opencode-or-any-agent-with-a-shell">anything with a shell</a>, a person included.
+</p>
 
-The diagram's source is plain text, [`docs/system.txt`](docs/system.txt).
-After editing it, `node docs/render.mjs` rebuilds every diagram's page and image.
+---
 
-One zero-dependency Node CLI owns all state. The Claude Code mod is an
-adapter over that CLI. It adds what only Claude Code's host can provide: the
-session's identity, a heartbeat on every tool call, and a live pane. Any
-other agent uses the same CLI directly.
+<p align="center">
+  <a href="#see-it-in-action">Demo</a> • <a href="#install">Install</a> • <a href="#usage">Usage</a> • <a href="#how-it-fits-together">How it fits together</a> • <a href="#what-you-see">What you see</a> • <a href="#make-your-own-block">Make your own block</a> • <a href="#what-has-been-tested">Tested</a> • <a href="#project-structure">Project structure</a> • <a href="#known-limitations">Limitations</a> • <a href="#contributing">Contributing</a>
+</p>
+
+---
+
+## See it in action
+
+![A real run: two agents add tasks, one loses a claim race, one hands work off, the other finishes with a verified note and picks the handoff up](docs/demo.png)
+
+A real run of the CLI, unedited: `frontend` and `backend` share one board.
+`backend` loses the race for T-001 and takes T-002 instead. `frontend` stops
+partway and leaves a handoff, and `backend` finishes its own task with a note
+saying how it was checked, then picks T-001 up and reads the handoff first.
+Inside Claude Code the same board shows above the prompt and in `/board`
+([what you see](#what-you-see)).
+
+---
+
+## Install
+
+| Agent | How |
+|-------|-----|
+| Claude Code | `claude --plugin-dir /path/to/agent-board` ([steps](#claude-code)) |
+| Codex, OpenCode, a shell | put `board` on your PATH and the protocol in `AGENTS.md` ([steps](#codex-opencode-or-any-agent-with-a-shell)) |
+| A person | the same `board` CLI |
+
+### The CLI
+
+Every agent goes through it, Claude Code included:
+
+```bash
+git clone https://github.com/Magithar/agent-board.git
+cd agent-board && npm link        # puts `board` on your PATH
+```
+
+Or, inside a project: `npm install --save-dev github:Magithar/agent-board`,
+then `npx board ...`.
+
+### Claude Code
+
+```bash
+BOARD_AGENT=frontend claude --plugin-dir /path/to/agent-board
+```
+
+`BOARD_AGENT` is optional. It sets the name this session uses on the board.
+The session gets the board's tools, a line above the prompt and the `/board`
+pane.
 
 > **Early access.** The Claude Code mod uses Claude Code's function-hooks API,
 > which is early access and can change between releases. It needs Claude Code
 > **2.1.295 or newer**. The CLI has no such dependency.
 
-## How it works
+### Codex, OpenCode, or any agent with a shell
+
+Give each session its own name, and put this protocol in its instructions
+(`AGENTS.md`):
+
+```bash
+export BOARD_AGENT=codex
+```
+
+> Claim a task before working on it. Note progress. If you stop without
+> finishing, release it with a handoff. Never touch a task another agent holds.
+
+---
+
+## Usage
+
+```bash
+export BOARD_AGENT=codex                  # who you are; unique per session
+board list                                # ○ todo  ◐ claimed  ● done
+board show T-001                          # description, notes, handoffs
+board claim T-001                         # exit 6 if another agent holds it
+board note T-001 "what changed"           # also renews your lease
+board heartbeat                           # renew all your leases
+board release T-001 --handoff "done X, left Y, see Z"
+board done T-001 --note "ran X, saw Y"    # required: how you verified it
+board release-all                         # free everything you hold
+board add "title" --desc "..." --accept "how to tell it is done"
+board agents                              # live agents
+board view                                # every task and live agent, as JSON
+board doctor                              # ledger vs state
+```
+
+Each command answers in a line or two for a person (`claimed T-001 … it's
+yours until 14:05`); `--json` prints the data instead, for scripts. `view`
+and `events` are for programs and always print JSON. Exit codes: 2 usage, 3 board busy, 4 no such
+task, 5 not yours, 6 held by another agent, 7 name in use.
+
+**Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
+`board_claim`, `board_note`, `board_release` and `board_done`. Tool activity
+renews the session's leases.
+
+The CLI and the tools keep the board's precise terms (claim, release,
+handoff, lease) because agents act on them. The display uses plain words
+instead, so you can read it without learning those terms.
+
+---
+
+## How it fits together
+
+![How agent-board fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
+
+One zero-dependency Node CLI owns all state. The Claude Code mod is an
+adapter over that CLI. It adds what only Claude Code's host can provide: the
+session's identity, a heartbeat on every tool call, and a live pane. Any
+other agent uses the same CLI directly.
 
 - **Storage is a block.** The engine never touches files. It reads a snapshot
   from a Store and commits conditional writes ("only if this task is still at
@@ -54,65 +158,7 @@ other agent uses the same CLI directly.
   claims (`claim-rejected`, with the holder). `board doctor` checks that the
   ledger and the state agree.
 
-## Install
-
-**The CLI (any agent):**
-
-```bash
-git clone https://github.com/Magithar/agent-board.git
-cd agent-board && npm link        # puts `board` on your PATH
-```
-
-Or, inside a project: `npm install --save-dev github:Magithar/agent-board`,
-then `npx board ...`. A storage block's own package can depend on it and
-import `agent-board/lib/contract.mjs` for its tests.
-
-**The Claude Code mod:**
-
-```bash
-BOARD_AGENT=frontend claude --plugin-dir /path/to/agent-board
-```
-
-`BOARD_AGENT` is optional. It sets the name this session uses on the board.
-
-## Use
-
-**Any agent (Codex, OpenCode, a shell):**
-
-```bash
-export BOARD_AGENT=codex                  # who you are; unique per session
-board list                                # ○ todo  ◐ claimed  ● done
-board show T-001                          # description, notes, handoffs
-board claim T-001                         # exit 6 if another agent holds it
-board note T-001 "what changed"           # also renews your lease
-board heartbeat                           # renew all your leases
-board release T-001 --handoff "done X, left Y, see Z"
-board done T-001 --note "ran X, saw Y"    # required: how you verified it
-board release-all                         # free everything you hold
-board add "title" --desc "..." --accept "how to tell it is done"
-board agents                              # live agents
-board view                                # every task and live agent, as JSON
-board doctor                              # ledger vs state
-```
-
-Each command answers in a line or two for a person (`claimed T-001 … it's
-yours until 14:05`); `--json` prints the data instead, for scripts. `view`
-and `events` are for programs and always print JSON. Exit codes: 2 usage, 3 board busy, 4 no such
-task, 5 not yours, 6 held by another agent, 7 name in use.
-
-For agents other than Claude, put this protocol in their instructions
-(`AGENTS.md`):
-
-> Claim a task before working on it. Note progress. If you stop without
-> finishing, release it with a handoff. Never touch a task another agent holds.
-
-**Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
-`board_claim`, `board_note`, `board_release` and `board_done`. Tool activity
-renews the session's leases.
-
-The CLI and the tools keep the board's precise terms (claim, release,
-handoff, lease) because agents act on them. The display uses plain words
-instead, so you can read it without learning those terms.
+---
 
 ## What you see
 
@@ -196,6 +242,8 @@ request, the effort block shows the level it will start on:
 
 **Your own blocks.** Show a command's output with no code, or write a block
 of your own: see [Make your own block](#make-your-own-block).
+
+---
 
 ## Make your own block
 
@@ -386,6 +434,8 @@ in `BLOCKS`), name it in the `band` or `pane` setting, and run
 code block lives in your copy of the mod: fork this repo, or send it as a
 pull request if others would want it.
 
+---
+
 ## What has been tested
 
 These tests ran on 2026-10-12 with two live Claude Code sessions (Sonnet 5.5,
@@ -410,6 +460,53 @@ and alerts, the band and when it stays quiet, names and their fallback, the
 tools, the verification note, release on session end, usage, and choosing
 blocks).
 
+---
+
+## What agent-board is not
+
+- Not a project manager: no due dates, assignees or boards per team
+- Not an agent runner: it never starts, stops or prompts an agent
+- Not a sync service: one board lives in one place, the storage block decides where
+
+agent-board is a **claim ledger**: who holds what, what was left for the next
+agent, and how each finished task was checked.
+
+---
+
+## Project structure
+
+```
+agent-board/
+├── bin/
+│   └── board.mjs            # the one CLI every agent uses
+├── lib/
+│   ├── engine.mjs           # the rules: claims, leases, handoffs, names, the ledger
+│   ├── load-store.mjs       # finds the storage block that config.json names
+│   ├── store-file.mjs       # the built-in storage block: a folder
+│   └── contract.mjs         # the tests every storage block must pass
+├── examples/
+│   └── store-memory.mjs     # a complete storage block in about 20 lines
+├── hooks/
+│   ├── hooks.json
+│   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
+│   └── blocks/              # one file per display block, listed in index.ts
+├── types/index.d.ts
+├── .claude-plugin/
+│   └── plugin.json          # the mod's manifest and settings
+├── test/                    # CLI and store contract tests (npm test)
+├── tests/                   # mod tests (claude plugin test .)
+└── docs/
+    ├── system.txt  .png     # how it fits together
+    ├── blocks.txt  .png     # how blocks work
+    ├── demo.txt    .png     # a real run
+    └── render.mjs           # rebuilds every image from its .txt
+```
+
+Each diagram's source is plain text. After editing a `.txt`,
+`node docs/render.mjs` rebuilds its page and image.
+
+---
+
 ## Known limitations
 
 - **It doesn't work across machines yet.** The storage socket is in place,
@@ -423,6 +520,21 @@ blocks).
   (15 minutes).
 - **A verification note is the agent's own claim.** The board requires one
   but doesn't run the check itself.
+
+---
+
+## Contributing
+
+```bash
+npm test                    # CLI and store contract tests
+claude plugin test .        # the mod's tests
+claude plugin validate .    # the mod's manifest and hooks
+```
+
+Changing what the board shows? Run both test suites. Adding a storage block
+or a display block? Start at [Make your own block](#make-your-own-block).
+
+---
 
 ## License
 
