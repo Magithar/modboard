@@ -71,16 +71,17 @@ through each kind.
 ## Style
 
 - **Plain words in anything a person reads**: the band, the pane, CLI output,
-  docs. "Stopped partway", not "released with handoff". The CLI flags and the
+  docs. "Unfinished", not "released with handoff". The CLI flags and the
   tools keep the precise terms (claim, lease, handoff), because agents act on
   them.
 - **Say a thing once.** If the heading or the order already says it, the row
-  doesn't: under "In progress", a row names only who ("backend").
+  doesn't: under "In progress", a row names only who ("claude 2").
 - **Colour only when something needs the person**: theme `warning` from
-  70%, `error` from 90%, and alerts. Nothing is green for "fine".
-- **Show what's left, then a count.** Long lists stop at eight rows
-  (`SHOWN` in `hooks/blocks/types.tsx`) and end in "N more". Work that needs
-  the person is never cut.
+  70%, `error` from 90%, and alerts. Green is kept for the `modBOARD` logo
+  and for work that is moving (`1 active`), never for "fine".
+- **Fold, don't cut.** A long list is a heading with its count
+  (`▸ Not started · 12`); opened, it shows every row and the pane scrolls.
+  Work that needs the person starts open.
 - **One look for one idea.** Anything that fills up uses the bar in
   `hooks/blocks/meter.tsx`: the context and the 5-hour limit both do.
 - **No new dependencies** in the CLI or engine.

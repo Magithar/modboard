@@ -11,19 +11,26 @@ where they tell you something.
 
 ### Added
 
+- **Sessions are named for you**, by what they run and when they joined:
+  `claude 1`, `claude 2`, `codex 1`. Nothing to set: a Claude session joins
+  when it starts, and a Codex thread when it first runs `board` (Codex marks
+  its shells with `CODEX_THREAD_ID`). A session keeps its name while it is
+  open; a new one takes the lowest free number. `BOARD_AGENT` still picks a
+  name of your own. New `board join` and `board whoami` commands.
 - **A `taskfile` block** in the `/board` pane. When the checkout has a
   `task.md`, `tasks.md` or `todo.md` (any case) at its root or in `docs/`,
-  one line says how much of it is open. Click it to see
-  what's left: every open item, read again from the file on each click,
+  one line, `To do · 9 open`, says how much of it is open. Click it to see
+  what's left, under a dim line naming the file (`from TASKS.md`): every open item, read again from the file on each click,
   so what you just added shows. Checked-off
   items stay in the file and out of the pane. Nothing in it is claimed or
   written; to work an item through the board, `board add` it.
+- **Each task file item has a grey dot** before it, as a handoff's points do.
 - **Task file priorities.** P0–P9 are read from headings (`## P0 — …`,
   `## Sync (P1)`), from items (`- [ ] P2 …`, which wins over its heading)
   and from tables with a Priority column.
-- **A priority button** beside the task file, which turns through the tiers
-  the file has the way the effort button turns through levels: `P0 · 3`,
-  `P1 · 5`, …, `all`, and round again. It starts on the most
+- **A priority button**, bold like `compact`, beside the task file, which turns through the tiers
+  the file has the way the effort button turns through levels: `P0`,
+  `P1`, …, `all`, and round again. It starts on the most
   urgent and shows one tier at a time. `all` lists every priority in order,
   each row with its own priority, with unprioritised items last, marked
   with a dash.
@@ -34,7 +41,7 @@ where they tell you something.
   the first reply, then each reply's measurement. It's always in the pane,
   and in the band.
 - **Collapsible task groups.** In progress, Stopped partway and Not started
-  are each a heading you click (or press `i`, `s`, `n`) to open or close,
+  are each a heading you click to open or close,
   with its count: `▾ In progress · 3`. What needs you starts open; Not
   started starts closed, so the whole board fits without scrolling.
 - **`/board` asks for a taller pane**, room for the whole board. Where the
@@ -53,9 +60,20 @@ where they tell you something.
 - **A shorter band.** It reads "2 waiting · 1 active   T-005 stopped
   partway": `active` in green, what was left partway in yellow, with no
   "pick it up".
-- **A `full board` button on the band** opens the `/board` pane, and
-  closes it when it's already open: a plain
-  word, like the model's, at the line's right end by Claude Code's `[-]`.
+- **A red line when the board stops answering**: `board not updating: …`
+  at the top of the pane, with the reason, while the `board` CLI fails. What
+  is below it is the last board it read. It goes once the board answers.
+- **Each unfinished task is a yellow box on the band**: `[T-005] [T-008]`,
+  up to three, then `+N`. A box is a button: it opens `/board` at the
+  Unfinished group, and pressed again folds the group; the pane stays open
+  until `modBOARD` closes it. In the pane the id stays grey, like every other.
+- **A claim gone idle leaves the band**, since its lease frees it on its
+  own; in the pane its row reads `codex 1 · idle`, in yellow.
+- **The band's model and effort lose their labels**: `Sonnet 5.5   low`,
+  since each says what it is. The pane keeps them.
+- **A `modBOARD` button on the band**, bold in the logo's green, opens the
+  `/board` pane, and closes it when it's already open: a plain word, like
+  the model's, at the line's right end by Claude Code's `[-]`.
   On a short line, model and effort drop before it.
 - **The 5-hour limit keeps its bar**, now plain with room left instead of
   green.
@@ -65,9 +83,25 @@ where they tell you something.
   `/usage` has the rest.
 - **A quieter pane.** Rows lose their ◐/○ mark, since the heading says the
   state, and name only who ("backend", "you"), since the heading says what.
-  "Needs picking up" is now "Stopped partway". Opened, "Not started" shows
-  eight tasks, then "N more"; what's in progress or stopped partway is
-  never cut.
+  "Needs picking up" is now "Unfinished". A heading's name is a bold
+  button and its count is grey beside it, so only the name highlights. Opened, a group shows every
+  task in it.
+- **Work stopped partway shows its handoff** under the title, dim: what's
+  done and what's left, as the agent wrote it, one point a line where it
+  used semicolons. It replaces "see its note". Handoffs are now asked for as
+  "done X; left Y; see Z".
+- **Done is a group**, `▸ Done · 3`, closed like Not started. Opened, it
+  lists what's finished, the latest first, and who finished each.
+- **The pane opens with `modBOARD`**, bold in the logo's green (heading size
+  where the surface has sizes), this session's name, and, at the right,
+  what waits and what's active, as the band counts them.
+- **Room around each open group**: a blank line under its heading and after
+  its rows.
+- **A grey rule between the pane's sections**: the board, To do, and the
+  bars, which stay together as one.
+- **The bars sit under a Limits heading**, `▾ Limits`, which folds like the
+  task groups. It starts open. Folded, it keeps the figures, `▸ Limits ·
+  context 72% · 5-hour 64%`, each yellow or red as its bar would be.
 - **The clock** in the pane is dimmed instead of bold.
 
 ### Reading task files

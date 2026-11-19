@@ -64,12 +64,14 @@ Or from npm: `npm install -g modboard` puts `board` on your PATH, or
 ### Claude Code
 
 ```bash
-BOARD_AGENT=frontend claude --plugin-dir /path/to/modboard
+claude --plugin-dir /path/to/modboard
 ```
 
-`BOARD_AGENT` is optional. It sets the name this session uses on the board.
-The session gets the board's tools, a line above the prompt and the `/board`
-pane.
+The board names the session by what it runs and when it joined: the first
+is `claude 1`, the next `claude 2`. The `/board` pane's top line says which
+one it is. The session gets the board's tools, a line above the prompt and
+the pane. To choose a name instead, start it with
+`BOARD_AGENT=frontend`.
 
 > **Early access.** The Claude Code mod uses Claude Code's function-hooks API,
 > which is early access and can change between releases. It needs Claude Code
@@ -77,12 +79,10 @@ pane.
 
 ### Codex, OpenCode, or any agent with a shell
 
-Give each session its own name, and put this protocol in its instructions
-(`AGENTS.md`):
-
-```bash
-export BOARD_AGENT=codex
-```
+Codex needs no name: it marks every shell it runs with its thread, and the
+board names each thread by when it joined, `codex 1`, then `codex 2`. Any
+other agent gives each session its own name with `export BOARD_AGENT=opencode`.
+Then put this protocol in its instructions (`AGENTS.md`):
 
 > Claim a task before working on it. Note progress. If you stop without
 > finishing, release it with a handoff. Never touch a task another agent holds.
@@ -92,13 +92,13 @@ export BOARD_AGENT=codex
 ## Usage
 
 ```bash
-export BOARD_AGENT=codex                  # who you are; unique per session
+export BOARD_AGENT=frontend               # your name; Codex and Claude need none
 board list                                # ○ todo  ◐ claimed  ● done
 board show T-001                          # description, notes, handoffs
 board claim T-001                         # exit 6 if another agent holds it
 board note T-001 "what changed"           # also renews your lease
 board heartbeat                           # renew all your leases
-board release T-001 --handoff "done X, left Y, see Z"
+board release T-001 --handoff "done X; left Y; see Z"
 board done T-001 --note "ran X, saw Y"    # required: how you verified it
 board release-all                         # free everything you hold
 board add "title" --desc "..." --accept "how to tell it is done"
@@ -150,12 +150,13 @@ other agent uses the same CLI directly.
   its claims go back after 3 minutes of silence (`BOARD_PRESENCE_MS`), not 15.
   An agent that never ran `board register` (a plain shell) keeps the lease
   alone.
-- **Names:** start a session with `BOARD_AGENT=frontend` to name it. If
-  another live session already holds the name, the new one becomes
-  `frontend-2` and gets a toast explaining why. Without a name, a session is
-  `claude:<session id>`. An open session keeps its name with a presence
-  heartbeat; a name is freed when its session ends or goes silent for
-  3 minutes.
+- **Names:** the board names a session by what it runs and when it joined:
+  `claude 1`, `claude 2`, `codex 1`. A session keeps its name while it is
+  open; once it ends, the next new session takes the lowest free number.
+  Codex sends no presence ping, so its name and claims last as long as its
+  leases. To choose a name, start a session with `BOARD_AGENT=frontend`. If
+  another live session already holds it, the new one becomes `frontend-2`
+  and gets a toast explaining why.
 - **Handoffs:** `release --handoff "..."` leaves a note that the next agent
   reads with `show` before it continues. When a Claude session ends (exit,
   `/clear`, resume, logout), the mod releases everything that session holds,
@@ -175,10 +176,13 @@ The display shows only what needs you. Everything else waits until you ask.
 
 **One line above the prompt**, always visible while there's work on the board:
 
-![The line above the prompt: 2 waiting · 1 active in green, T-005 stopped partway in yellow, model Sonnet 5.5, effort low, and full board at the right end beside Claude Code's [-]](docs/band.png)
+![The line above the prompt: 2 waiting · 1 active in green, T-005 in a yellow box, Sonnet 5.5, low, and modBOARD in green at the right end beside Claude Code's [-]](docs/band.png)
 
-`1 active` is green: work is moving. `T-005 stopped partway` is yellow:
-something was left unfinished. The 5-hour limit and the context live in the
+`1 active` is green: work is moving. `T-005` in a yellow box (`[T-005]`
+below) is unfinished: someone stopped it partway and left a handoff. Up to
+three boxes, then `+N`. A box
+is a button: click it to open `/board` at the Unfinished group, and click
+again to fold the group. The 5-hour limit and the context live in the
 `/board` pane; add `usage` or `compact` to the band setting to bring them
 back to the line.
 
@@ -188,18 +192,17 @@ last ones drop off. The first block (the summary) keeps its full form longest,
 and the alert outlasts the counts:
 
 ```
- 94 cols   2 waiting · 1 active   T-005 stopped partway   model Sonnet 5.5   effort low   full board
- 80 cols   2 waiting · 1 active   T-005 stopped partway   Sonnet 5.5   low   full board
- 74 cols   2 waiting · 1 active   T-005 stopped partway   Sonnet 5.5   full board
- 62 cols   2 waiting · 1 active   T-005 stopped partway   full board
- 50 cols   2 waiting · 1 active   T-005 stopped partway
- 42 cols   2 waiting · 1 active   T-005 partway
- 20 cols   T-005 partway
+ 66 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   low   modBOARD
+ 60 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   modBOARD
+ 48 cols   2 waiting · 1 active   [T-005]   modBOARD
+ 36 cols   2 waiting · 1 active   [T-005]
+ 20 cols   [T-005]
 ```
 
-The alert names the one thing that needs you: a task someone stopped partway
-that nobody has picked up, or an agent that stopped responding (its claim is
-about to run out). The 5-hour limit is a bar, shown once it passes half.
+The boxes name the one thing that needs you: a task someone stopped partway
+that nobody has picked up. A claim gone idle stays off the line, since its
+lease frees it on its own; the pane marks it `idle`. If the board stops answering (the `board` CLI fails), the pane says so at
+the top in red, `board not updating: …`, until it answers again. The 5-hour limit is a bar, shown once it passes half.
 The context is a bar of its own, and clicking it compacts the
 conversation, as `/compact` does. Both are plain with room left, yellow from 70% and red from
 90%. Click the model or effort to switch to the next one. With nothing
@@ -208,30 +211,46 @@ waiting or in progress, the line disappears.
 **`/board`** opens the full pane:
 
 ```
+ modBOARD · claude 1               13 waiting · 3 active
+
  ▾ In progress · 3
-   T-004  Add a test script           you
-   T-007  Write the README            backend
-   T-006  Add a LICENSE file          codex stopped responding
- ▾ Stopped partway · 1
-   T-005  Ghost task                  frontend · see its note
+
+   T-004  Add a test script                          you
+   T-007  Write the README                       backend
+   T-006  Add a LICENSE file                codex 1 · idle
+
+ ▾ Unfinished · 1
+
+   T-005  Ghost task                            frontend
+          · layout done
+          · saving isn't wired yet
+
  ▸ Not started · 12
-   3 done
 
- ▸ TASKS.md · 4 open   P0 · 2
+ ▸ Done · 3
 
- context       ▓▓▓▓▓▓▓░░░  72%   compact
+ ───────────────────────────────────────────────────────
 
- 5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
+ ▸ To do · 4 open   P0
+
+ ───────────────────────────────────────────────────────
+
+ ▾ Limits
+
+   context       ▓▓▓▓▓▓▓░░░  72%   compact
+
+   5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
 
 The pane shows what needs you and keeps the rest one click away. Each group's
-heading is a button with its count: In progress and Stopped partway start
+heading is a button with its count: In progress and Unfinished start
 open, because they need you, and Not started starts closed, so the whole
-board fits without scrolling. Click a heading (or press `i`, `s`, `n`) to
+board fits without scrolling. Click a heading to
 open or close it. The heading says what's happening, so a row only names
 who: no marks, no repeated phrases. If the pane is shorter than the board,
-its body scrolls with the mouse wheel. Past eight tasks, "Not started" ends in a count ("4 more").
-What's in progress or stopped partway is never cut. Colour appears only when
+its body scrolls with the mouse wheel. Opened, a group shows every task in it. The bars sit
+under **Limits**, which folds the same way; folded, it keeps their figures:
+`▸ Limits · context 72% · 5-hour 64%`. Colour appears only when
 something asks for you: a warning, or a limit past 70%.
 
 Both are stacks of display blocks, chosen in the plugin's settings (`/config`)
@@ -240,8 +259,8 @@ as comma-separated lists, in order:
 | Block | Band | Pane | Shows |
 |---|---|---|---|
 | `summary` | ✓ | | what's waiting and active (green), and the one thing left partway (yellow) |
-| `board` | ✓ | | `full board`, a plain button that opens the `/board` pane, and closes it when it's open. It sits at the line's right end, by Claude Code's `[-]`, and on a short line outlasts everything but the summary |
-| `tasks` | | ✓ | in progress, stopped partway and not started, each a heading you click (or `i`, `s`, `n`) to open or close; not started shows up to eight; then a count of done |
+| `board` | ✓ | | `modBOARD`, bold in the logo's green, a plain button that opens the `/board` pane, and closes it when it's open. It sits at the line's right end, by Claude Code's `[-]`, and on a short line outlasts everything but the summary |
+| `tasks` | | ✓ | in progress, unfinished, not started and done, each a heading you click to open or close |
 | `taskfile` | | ✓ | the project's `task.md`: how much is open; click it to see what's left, and click its priority to turn it |
 | `usage` | ✓ | ✓ | the 5-hour limit as a bar: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |
 | `compact` | ✓ | ✓ | the context window as a bar, like the 5-hour limit's, and a button that compacts the conversation. Always in the pane; in the band once Claude Code reports the context |
@@ -254,8 +273,9 @@ as comma-separated lists, in order:
 The defaults are `band: summary,model,effort,board` and `pane: tasks,taskfile,compact,usage`.
 
 **task.md.** If the checkout has a `task.md`, `tasks.md` or `todo.md` (in
-any case) at its root or in `docs/`, the pane shows one quiet line: the
-file and how much of it is open. Click it to see what's left.
+any case) at its root or in `docs/`, the pane shows one quiet line,
+`To do`, with how much of it is open. Click it to see what's left, under a
+dim line naming the file it came from.
 
 When the file has priorities, a second button turns through them, the way
 the effort button turns through levels. Each press steps to the next
@@ -263,17 +283,21 @@ priority the file has, then to `all`, then round to the most urgent again,
 and shows that tier. It starts on the most urgent:
 
 ```
- ▾ TASKS.md · 6 open   P0 · 3
+ ▾ To do · 6 open   P0
 
- Build local ledger
- Wire news discovery
- Fix silent capture
+   from TASKS.md
+
+   · Build local ledger
+   · Wire news discovery
+   · Fix silent capture
 ```
 
 `all` shows every open item, most urgent first, each row with its own priority:
 
 ```
- ▾ TASKS.md · 6 open   all
+ ▾ To do · 6 open   all
+
+   from TASKS.md
 
  P0  Build local ledger
  P0  Wire news discovery
@@ -301,7 +325,7 @@ it is claimed or added to the board, and the board never writes the file. To
 work an item through the board, `board add` it. With no such file, the line
 doesn't appear.
 
-Click `model` or `effort` to switch: each click runs Claude Code's own
+Click the model or the effort to switch: each click runs Claude Code's own
 `/model` or `/effort`, the same as typing the command. (In the `/board` pane
 they also answer to `m` and `e`.) Note that `/effort` saves the level as your
 default for new sessions, except `max`, which lasts for this session only. The `models` setting lists what
@@ -587,9 +611,11 @@ modboard/
 │   ├── TUTORIAL.md          # a walk-through from install to two agents
 │   ├── system.txt  .png     # how it fits together
 │   ├── blocks.txt  .png     # how blocks work
+│   ├── band.mjs    .png     # the band image, drawn from the real blocks
 │   ├── board-live.gif       # a live recording of three Claude sessions
 │   └── render.mjs           # rebuilds every image from its .txt
 ├── CHANGELOG.md             # what changed in each version
+├── ROADMAP.md               # what's planned next
 └── CONTRIBUTING.md          # how to contribute
 ```
 
@@ -634,7 +660,8 @@ Changing what the board shows? Run both test suites. Adding a storage block
 or a display block? Start at [Make your own block](#make-your-own-block).
 [CONTRIBUTING.md](CONTRIBUTING.md) has the full checklist, where each kind of
 change goes, and the style the project keeps. [CHANGELOG.md](CHANGELOG.md)
-lists what changed in each version.
+lists what changed in each version, and [ROADMAP.md](ROADMAP.md) what's
+planned next.
 
 ---
 

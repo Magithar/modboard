@@ -80,8 +80,9 @@ added ○ T-003  Add dark mode
 
 ### Say who you are
 
-Every change to the board is made by someone. Set your name once per
-terminal:
+Every change to the board is made by someone. Claude and Codex sessions are
+named for you (`claude 1`, `codex 1`); from your own terminal, set your name
+once:
 
 ```bash
 export BOARD_AGENT=frontend
@@ -187,15 +188,16 @@ VERIFIED: ran the app, signed in at /login, landed on /home
 ## 3. Open the board in Claude Code
 
 The Claude Code mod gives a session the board's tools, a line above the
-prompt, and a `/board` pane. Start a session with the mod and a name:
+prompt, and a `/board` pane. Start a session with the mod:
 
 ```bash
 cd ~/code/my-app
-BOARD_AGENT=frontend claude --plugin-dir /path/to/modboard
+claude --plugin-dir /path/to/modboard
 ```
 
-`/path/to/modboard` is the clone from part 1. The name is optional; without
-one, the session is named from its id (`claude:3f2a9c1e`).
+`/path/to/modboard` is the clone from part 1. The board names the session
+`claude 1`, and the `/board` pane's top line says so. To pick a name
+instead, start it with `BOARD_AGENT=frontend`.
 
 Now ask Claude to work the board, in plain words:
 
@@ -216,23 +218,25 @@ Open a second terminal in the same repository, or in a worktree of it.
 Worktrees share the board:
 
 ```bash
-BOARD_AGENT=backend claude --plugin-dir /path/to/modboard
+claude --plugin-dir /path/to/modboard
 ```
 
-Tell both sessions to work the board. What you'll see:
+This one is `claude 2`. Each session's `/board` pane names it at the top
+(`modBOARD · claude 2`), so you can tell the terminals apart. Tell both sessions to work the board. What you'll see:
 
 - **They never do the same task.** If both go for T-002, one claim wins;
   the other session is refused, says who holds it, and takes another.
-- **Work survives a stop.** If you stop `frontend` partway, or tell it to
-  hand off, it releases with a handoff. The line above `backend`'s prompt
-  says *T-002 stopped partway*, and `backend` reads the
+- **Work survives a stop.** If you stop `claude 1` partway, or tell it to
+  hand off, it releases with a handoff. The line above `claude 2`'s prompt
+  shows *T-002* in a yellow box, and `claude 2` reads the
   handoff before resuming.
 - **A crashed session doesn't hold work hostage.** If a session is killed
   outright, its claims come back after its session has been silent for 3
   minutes. A plain CLI agent's claim comes back when its 15-minute lease
   runs out.
-- **Names don't collide.** If you start a second `frontend` while the first
-  is live, the new one becomes `frontend-2` and says so.
+- **Names don't collide.** A third session becomes `claude 3`. If you name
+  sessions yourself and start a second `frontend` while the first is live,
+  the new one becomes `frontend-2` and says so.
 
 When a session ends normally (exit, `/clear`), it releases what it holds,
 with a handoff note saying it ended.
@@ -247,15 +251,15 @@ thing: **yellow or red, look here.**
 ### The line above the prompt
 
 ```
-2 waiting · 1 active   T-005 stopped partway   model Sonnet 5.5   effort low   full board
+2 waiting · 1 active   [T-005]   Sonnet 5.5   low   modBOARD
 ```
 
 | Part | Says |
 |---|---|
 | `2 waiting · 1 active` | the board at a glance; `active` is green |
-| `T-005 stopped partway` | in yellow, the one thing left unfinished: work someone handed off, or an agent that stopped responding |
-| `full board` | opens the `/board` pane, like typing `/board`; click it again to close the pane |
-| `model Sonnet 5.5   effort low` | the session's model and effort. Click either to switch to the next one |
+| `[T-005]` | a yellow box: click it to open `/board` at the Unfinished group, again to fold it; the one thing that needs you: work someone handed off and nobody has picked up |
+| `modBOARD` | in green, opens the `/board` pane, like typing `/board`; click it again to close the pane |
+| `Sonnet 5.5   low` | the session's model and effort. Click either to switch to the next one |
 
 The 5-hour limit and the context are in the `/board` pane, where both bars turn yellow at 70% and red at 90%. On a narrow window the line shortens and drops parts from the right;
 the alert is the last to go. With nothing waiting or in progress, it
@@ -264,41 +268,54 @@ disappears.
 ### The `/board` pane
 
 ```
+ modBOARD · claude 1               13 waiting · 3 active
+
  ▾ In progress · 3
-   T-004  Add a test script           you
-   T-007  Write the README            backend
-   T-006  Add a LICENSE file          codex stopped responding
- ▾ Stopped partway · 1
-   T-005  Ghost task                  frontend · see its note
+
+   T-004  Add a test script                          you
+   T-007  Write the README                       backend
+   T-006  Add a LICENSE file                codex 1 · idle
+
+ ▾ Unfinished · 1
+
+   T-005  Ghost task                            frontend
+          · layout done
+          · saving isn't wired yet
+
  ▸ Not started · 12
-   3 done
 
- ▸ TASKS.md · 6 open   P0 · 2
+ ▸ Done · 3
 
- context       ▓▓▓▓▓▓▓░░░  72%   compact
+ ───────────────────────────────────────────────────────
 
- 5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
+ ▸ To do · 6 open   P0
+
+ ───────────────────────────────────────────────────────
+
+ ▾ Limits
+
+   context       ▓▓▓▓▓▓▓░░░  72%   compact
+
+   5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
 
 - **The headings say what's happening; each row says who.** Your own tasks
   are bold.
-- **Yellow rows need you**: an agent that stopped responding (its claim is
-  about to run out), or work stopped partway that nobody has picked up.
+- **Yellow rows need you**: an agent gone idle (`codex 1 · idle`: no note or
+  heartbeat for most of its lease), or work stopped partway that nobody has
+  picked up.
 - **Each heading is a button.** Click it to open or close the group. In
-  progress and Stopped partway start open, because they need you; Not
-  started starts closed, so the board fits on screen. Opened, it shows eight
-  tasks, then "N more".
-- **The compact button is always there**, beside the context bar. Before
+  progress and Unfinished start open, because they need you; Not
+  started starts closed, so the board fits on screen. Opened, it shows every
+  task.
+- **The bars sit under Limits**, a heading that folds like the others.
+  Folded, it keeps the figures, `▸ Limits · context 72% · 5-hour 64%`, in
+  the bars' colours, so a limit running out still shows.
+- **The compact button is always there** while Limits is open, beside the context bar. Before
   Claude's first reply the bar shows Claude Code's own estimate; after it,
   the measured fill.
 - **If the pane is shorter than the board**, scroll its body with the mouse
   wheel.
-
-The pane's buttons also answer to keys:
-
-| Key | Does |
-|---|---|
-| `i`, `s`, `n` | open or close In progress, Stopped partway, Not started |
 
 ---
 
@@ -329,11 +346,12 @@ Say `TASKS.md` reads:
 The pane shows one line:
 
 ```
- ▸ TASKS.md · 5 open   P0 · 2
+ ▸ To do · 5 open   P0
 ```
 
-Click the file name to see what's left. Checked-off items stay
-in the file and out of the pane.
+Click `To do` to see what's left. Opened, a dim line under it names the
+file it read (`from TASKS.md`). Checked-off items stay in the file and out
+of the pane.
 
 ### Priorities
 
@@ -342,14 +360,18 @@ the effort button turns through levels. It starts on the most urgent. Each
 press shows the next tier, then `all`, then round again:
 
 ```
- ▾ TASKS.md · 5 open   P0 · 2         ▾ TASKS.md · 5 open   P1 · 1
+ ▾ To do · 5 open   P0               ▾ To do · 5 open   P1
 
- Fix the signup crash                  Empty states for the inbox
- Rate-limit the login API
+   from TASKS.md                     from TASKS.md
+
+   · Fix the signup crash            · Empty states for the inbox
+   · Rate-limit the login API
 ```
 
 ```
- ▾ TASKS.md · 5 open   all
+ ▾ To do · 5 open   all
+
+   from TASKS.md
 
  P0  Fix the signup crash
  P0  Rate-limit the login API
@@ -403,17 +425,15 @@ board add "Fix the signup crash" --accept "signing up with a new email lands on 
 ## 7. Adding Codex or any other agent
 
 Anything with a shell can share the board: Codex, OpenCode, a script, you.
-Give each session its own name, and put the protocol in its instructions
+Codex needs no name: the board names each Codex thread by when it joined,
+`codex 1`, then `codex 2`. Anything else gives each session its own name
+(`export BOARD_AGENT=opencode`). Then put the protocol in its instructions
 (`AGENTS.md`):
-
-```bash
-export BOARD_AGENT=codex
-```
 
 > Use the `board` CLI to coordinate. Claim a task before working on it
 > (`board claim T-001`). Note progress (`board note T-001 "..."`). If you stop
 > without finishing, release it with a handoff (`board release T-001
-> --handoff "done X, left Y, see Z"`). Finish with `board done T-001 --note
+> --handoff "done X; left Y; see Z"`). Finish with `board done T-001 --note
 > "how you verified it"`. Never touch a task another agent holds.
 
 A CLI agent has no automatic heartbeat. Its notes renew its lease, or it can
