@@ -55,8 +55,9 @@ git clone https://github.com/Magithar/agent-board.git
 cd agent-board && npm link        # puts `board` on your PATH
 ```
 
-Or, inside a project: `npm install --save-dev github:Magithar/agent-board`,
-then `npx board ...`.
+Or from npm, inside a project: `npm install --save-dev @magithar/agent-board`,
+then `npx board ...`. To try it without installing:
+`npx -p @magithar/agent-board board list`.
 
 ### Claude Code
 
@@ -350,7 +351,7 @@ as a test suite:
 
 ```js
 // my-block.test.mjs, run with: node --test
-import { storeContract } from 'agent-board/lib/contract.mjs'
+import { storeContract } from '@magithar/agent-board/lib/contract.mjs'
 import { createStore } from './my-block.mjs'
 
 storeContract('my block', () => createStore({ /* test settings */ }, { dir: '/tmp/board-test' }))
@@ -373,7 +374,7 @@ The CLI refuses a block that won't load or is missing a method, and says
 which (exit 2).
 
 **4. Share it (optional).** Publish it as a package whose entry exports
-`createStore` (through `exports` or `main`), with `agent-board` as a
+`createStore` (through `exports` or `main`), with `@magithar/agent-board` as a
 dev dependency for the contract tests. Anyone can then
 `npm install agent-board-my-block` in their project and name it in
 `config.json`. A package is found the way Node finds any package: in the

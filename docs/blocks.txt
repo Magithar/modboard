@@ -49,7 +49,7 @@
                 └─── a version moved: retry (max 50) ───┘
 
         check a block:   storeContract('my block', () => createStore(config, { dir }))
-                         from agent-board/lib/contract.mjs
+                         from @magithar/agent-board/lib/contract.mjs
 
 
   STORAGE BLOCKS:  WHY THE VERSIONS   (agents A and B claim T-001 at the same moment)
