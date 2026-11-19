@@ -47,10 +47,12 @@ function Ranked(c: Ctx, i: Item) {
   )
 }
 
+// One item, a grey dot before it, as a handoff's points have.
 function Row(c: Ctx, i: Item, indent: number) {
   const { Box, Text } = c.ui
   return (
     <Box paddingLeft={indent + i.depth * 2}>
+      <Text dimColor>· </Text>
       <Text wrap="truncate">{i.text}</Text>
     </Box>
   )
@@ -59,7 +61,7 @@ function Row(c: Ctx, i: Item, indent: number) {
 // The project's own task file, beside the board, reduced to what is left to
 // do. Closed, one line: the file and how much is open, and, when the file has
 // priorities, a second button that turns through them like the effort block:
-// "P0 · 3", "P1 · 5", …, "all", and round again. Pressing it shows that tier.
+// "P0", "P1", …, "all", and round again: the rows say how many. Pressing it shows that tier.
 // Open, a single tier is just its work; "all" is every priority in order,
 // each row with its own; a file without priorities keeps its own order
 // under its headings. Open, it shows every open item, read again from the
@@ -74,22 +76,21 @@ export const taskfile: Block = {
     const left = openItems(c.taskfile.items)
     const ranked = tiers(left).length > 0
     const tier = currentTier(left, c.taskfileTier)
-    const name = file.split('/').pop()
     const head = (
       <Box gap={3}>
-        <Button
-          key="taskfile"
-          plain
-          label={`${c.taskfileOpen ? '▾' : '▸'} ${name} · ${left.length ? `${left.length} open` : 'all done'}`}
-          onPress={c.act.toggleTaskfile}
-        />
+        {/* Only the name is the button; the count beside it is grey text, so
+            the hover highlight covers what you click and nothing else. */}
+        <Box>
+          <Button key="taskfile" plain onPress={c.act.toggleTaskfile}>
+            <Text bold>{`${c.taskfileOpen ? '▾' : '▸'} To do`}</Text>
+          </Button>
+          <Text dimColor>{` · ${left.length ? `${left.length} open` : 'all done'}`}</Text>
+        </Box>
         {ranked && (
-          <Button
-            key="tier"
-            plain
-            label={tier === 'all' ? 'all' : `P${tier} · ${left.filter(i => i.priority === tier).length}`}
-            onPress={c.act.nextTier}
-          />
+          // Bold, like compact: it reads as a button, not a label.
+          <Button key="tier" plain onPress={c.act.nextTier}>
+            <Text bold>{tier === 'all' ? 'all' : `P${tier}`}</Text>
+          </Button>
         )}
       </Box>
     )
@@ -101,7 +102,7 @@ export const taskfile: Block = {
     let body
     if (ranked && tier === 'all') body = shown.map(i => Ranked(c, i))
     // One tier: the button names it, so the rows are only the work.
-    else if (ranked) body = shown.map(i => Row(c, i, 0))
+    else if (ranked) body = shown.map(i => Row(c, i, 2))
     else
       body = [...new Set(shown.map(i => i.section))].map(s => (
         <Box flexDirection="column" marginTop={1}>
@@ -112,6 +113,10 @@ export const taskfile: Block = {
     return (
       <Box flexDirection="column">
         {head}
+        {/* The heading says what it is; open, this says where it came from. */}
+        <Box marginTop={1} paddingLeft={2}>
+          <Text dimColor>{`from ${file}`}</Text>
+        </Box>
         {ranked ? (
           <Box flexDirection="column" marginTop={1}>
             {body}

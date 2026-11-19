@@ -8,6 +8,7 @@ export const context: Block = {
     u.context === undefined
       ? null
       : [words(Text, `context ${Math.round(u.context)}%`, { dimColor: true }), words(Text, `ctx ${Math.round(u.context)}%`, { dimColor: true })],
+  brief: ({ usage: u }) => (u.context === undefined ? [] : [{ name: 'context', percent: u.context }]),
   pane: ({ ui: { Text }, usage: u }) => {
     const parts = [
       u.context !== undefined && `context ${Math.round(u.context)}% full`,

@@ -23,7 +23,7 @@ export type Ctx = {
   groupsOpen: Record<string, boolean>
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void> }
 }
 
 // One way a block can draw in the band, and how many columns it takes.
@@ -39,10 +39,10 @@ export type Block = {
   name: string
   band?: (c: Ctx) => BandForm[] | null
   pane?: (c: Ctx) => any
+  // A bar block's figures for the Limits heading when it is folded:
+  // "context 72%". Each comes with its percent, which colours it.
+  brief?: (c: Ctx) => { name: string; percent: number }[]
 }
-
-// How many rows a long list shows in the pane before the rest become a count.
-export const SHOWN = 8
 
 // A run of text that never wraps, and its width.
 export function words(Text: any, text: string, props: Record<string, unknown> = {}): BandForm {

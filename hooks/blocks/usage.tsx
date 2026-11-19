@@ -3,6 +3,8 @@ import { Bar, CELLS, barWidth } from './meter'
 
 const LABEL: Record<string, string> = { five_hour: '5-hour limit', spend_limit: 'spend limit' }
 const SHORT: Record<string, string> = { five_hour: '5h', spend_limit: 'spend' }
+// The name in the folded Limits heading: short, but still words.
+const BRIEF: Record<string, string> = { five_hour: '5-hour', spend_limit: 'spend' }
 const label = (kind: string) => LABEL[kind] ?? kind
 const pad = (n: number) => String(n).padStart(2, '0')
 const when = (iso: string, now: number) => {
@@ -35,6 +37,7 @@ export const usage: Block = {
     })
     return [form(label(top.kind), CELLS), form(SHORT[top.kind] ?? label(top.kind), 5)]
   },
+  brief: ({ usage: u }) => shown(u).map(l => ({ name: BRIEF[l.kind] ?? l.kind, percent: l.percentUsed })),
   pane: ({ ui, usage: u, now }) => {
     const { Box, Text } = ui
     const limits = shown(u)

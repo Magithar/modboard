@@ -22,6 +22,7 @@ export const compact: Block = {
     })
     return [press('context', CELLS, true), press('ctx', 5, false)]
   },
+  brief: ({ usage: u }) => (u.context === undefined ? [] : [{ name: 'context', percent: u.context }]),
   pane: ({ ui, usage: u, act }) => {
     const { Box, Button, Text } = ui
     return (
