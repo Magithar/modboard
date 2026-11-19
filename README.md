@@ -25,9 +25,9 @@
 
 ![Three live Claude Code sessions share one board: frontend and backend race for T-001, frontend hands T-003 off partway, backend picks it up, and the viewer's /board pane follows along](docs/board-live.gif)
 
-Three real Claude Code sessions, recorded live at real speed. Two idle
-stretches are cut: the wait before the sessions start, and four seconds while
-one session wrapped up.
+Three real Claude Code sessions, recorded live at real speed. Only idle
+stretches are cut: the wait before the sessions start, and two short pauses
+while they wrote their final summaries.
 `frontend` and `backend` are each told to work the board, and `viewer` has
 `/board` open. Both go for T-001. `frontend` wins, and `backend` is refused
 and takes T-002. `frontend` writes part of T-003, then hands it off. The band
