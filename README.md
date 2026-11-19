@@ -214,7 +214,7 @@ off by default. With nothing waiting or in progress, the line disappears.
 
  3 done
 
- ▸ task.md · 4 open
+ ▸ TASKS.md · 4 open   P0 · 2
 
  ◕  72%  compact
 
@@ -234,7 +234,7 @@ as comma-separated lists, in order:
 |---|---|---|---|
 | `summary` | ✓ | | what's waiting and in progress, and the one thing that needs you |
 | `tasks` | | ✓ | in progress, then work stopped partway, then not started (up to eight), then a count of done |
-| `taskfile` | | ✓ | the project's `task.md`: how much is open; click it (or press `t`) to see what's left |
+| `taskfile` | | ✓ | the project's `task.md`: how much is open; click it (or press `t`) to see what's left, and turn its priority (`p`) |
 | `usage` | ✓ | ✓ | the 5-hour limit as a ring that fills: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |
 | `compact` | ✓ | ✓ | the context window as the same ring; click it (or press `c`) to run `/compact`. In the band from half full |
 | `model` | ✓ | ✓ | the session's model; click it to switch to the next one. Off by default |
@@ -245,30 +245,54 @@ as comma-separated lists, in order:
 
 The defaults are `band: summary,usage,compact` and `pane: tasks,taskfile,compact,usage`.
 
-**task.md.** If the checkout has a `task.md` (or `tasks.md`, `todo.md`, in
-any case) at its root, the pane shows one quiet line: the file and how much
-of it is open. Click it (or press `t`) to see what's left, in the file's
-order under its headings:
+**task.md.** If the checkout has a `task.md`, `tasks.md` or `todo.md` (in
+any case) at its root or in `docs/`, the pane shows one quiet line: the
+file and how much of it is open. Click it (or press `t`) to see what's left.
+
+When the file has priorities, a second button turns through them, the way
+the effort button turns through levels. Each press (or `p`) steps to the next
+priority the file has, then to `all`, then round to the most urgent again,
+and shows that tier. It starts on the most urgent:
 
 ```
- ▾ task.md · 14 open
+ ▾ TASKS.md · 14 open   P0 · 3
 
- Sprint
-   Write the parser
-   Add tests
-   Fix login bug
-
- Later
-   Ship it
-   Add metrics
-   6 more
+ Build local ledger
+ Wire news discovery
+ Fix silent capture
 ```
 
-Only what's left is shown, up to eight items, then a count of the rest.
-Checked-off items stay in the file and out of the pane. `board taskfile`
-prints the whole file. The list is there to read. Nothing in it is claimed
-or added to the board, and the board never writes the file. To work an item
-through the board, `board add` it. With no such file, the line doesn't appear.
+`all` shows every priority in order, each named once, where it starts:
+
+```
+ ▾ TASKS.md · 14 open   all
+
+ P0  Build local ledger
+     Wire news discovery
+     Fix silent capture
+ P1  Supabase sync
+     Agent integration
+ –   Thumbnail-only mode
+     8 more
+```
+
+Priority is read wherever your file keeps it:
+
+- **a heading**: `## P0 — foundation` or `## Sync (P1)`, for everything under it
+- **an item**: `- [ ] P2 Benchmarks`, which wins over its heading
+- **a table**: a Priority column beside a Task column, one item per row
+
+Within a priority the file's own order is kept. Items with none appear under
+`all`, last, after a dash. A tier the file doesn't have is skipped. Without priorities, the list keeps the file's order
+under its headings. Only what's left is shown, up to eight items, then a
+count of the rest. Checked-off and struck-through (`~~old~~`) items, or a
+table row whose status is done, stay in the file and out of the pane. Once a
+file checks anything off, its plain bullets count as notes, not tasks.
+
+`board taskfile` prints the whole file. The list is there to read. Nothing in
+it is claimed or added to the board, and the board never writes the file. To
+work an item through the board, `board add` it. With no such file, the line
+doesn't appear.
 
 Click `model` or `effort` to switch: each click runs Claude Code's own
 `/model` or `/effort`, the same as typing the command. (In the `/board` pane

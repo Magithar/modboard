@@ -161,17 +161,60 @@ test('taskfile reads the project task.md without touching the board', () => {
   assert.deepEqual(b.json(['taskfile'], env), { file: null, items: [] })
   fs.writeFileSync(
     path.join(project, 'TASK.md'),
-    '# Sprint\n\nSome prose.\n\n- [ ] Write the parser\n- [x] Sketch the pane\n  - [ ] nested step\n\n## Later\n\n1. plain item\n\n```\n- not an item\n```\n',
+    '# Sprint\n\nSome prose.\n\n- [ ] Write the parser\n- [x] Sketch the pane\n  - [ ] nested step\n- a note, not a task\n\n```\n- [ ] not an item\n```\n',
   )
   const read = b.json(['taskfile'], env)
   assert.equal(read.file, 'TASK.md')
+  // Once a file checks things off, its plain bullets are notes and left out.
   assert.deepEqual(read.items, [
-    { text: 'Write the parser', done: false, section: 'Sprint', depth: 0 },
-    { text: 'Sketch the pane', done: true, section: 'Sprint', depth: 0 },
-    { text: 'nested step', done: false, section: 'Sprint', depth: 1 },
-    { text: 'plain item', done: null, section: 'Later', depth: 0 },
+    { text: 'Write the parser', done: false, section: 'Sprint', depth: 0, priority: null },
+    { text: 'Sketch the pane', done: true, section: 'Sprint', depth: 0, priority: null },
+    { text: 'nested step', done: false, section: 'Sprint', depth: 1, priority: null },
   ])
-  assert.match(b.run(['taskfile'], env).out, /^TASK\.md\n\[ \] Write the parser\n\[x\] Sketch the pane\n  \[ \] nested step\n- plain item/)
+  assert.match(b.run(['taskfile'], env).out, /^TASK\.md\n\[ \] Write the parser\n\[x\] Sketch the pane\n  \[ \] nested step\n$/)
   // Nothing was added to the board, and no board was made.
   assert.equal(fs.existsSync(b.env.BOARD_DIR), false)
+})
+
+test('taskfile reads priority from headings, items and tables, and looks in docs/', () => {
+  const b = fresh()
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'project-'))
+  fs.mkdirSync(path.join(project, 'docs'))
+  fs.writeFileSync(
+    path.join(project, 'docs', 'TASKS.md'),
+    [
+      '## ✅ P0 — foundation COMPLETE',
+      '- [ ] **Fix** the `ledger`',
+      '- [ ] P2 Benchmarks, its own priority',
+      '### Detail',
+      '- [ ] still under P0',
+      '## Sync (P1)',
+      '- [ ] [Supabase](https://supabase.com) project',
+      '- [ ] ~~Old plan~~ superseded',
+      '## Later',
+      '- [ ] no priority here',
+      '',
+      '| ID | Priority | Task | Status |',
+      '| --- | --- | --- | --- |',
+      '| A-1 | P0 | Table task | todo |',
+      '| A-2 | P1 | Finished row | done |',
+      '| A-3 | | No priority row | ✅ |',
+    ].join('\n'),
+  )
+  const read = b.json(['taskfile'], { BOARD_TASKFILE_DIR: project })
+  assert.equal(read.file, path.join('docs', 'TASKS.md'))
+  assert.deepEqual(
+    read.items.map(i => [i.text, i.done, i.priority, i.section]),
+    [
+      ['Fix the ledger', false, 0, 'P0 — foundation'],
+      ['Benchmarks, its own priority', false, 2, 'P0 — foundation'],
+      ['still under P0', false, 0, 'Detail'],
+      ['Supabase project', false, 1, 'Sync (P1)'],
+      ['Old plan superseded', true, 1, 'Sync (P1)'],
+      ['no priority here', false, null, 'Later'],
+      ['Table task', false, 0, 'Later'],
+      ['Finished row', true, 1, 'Later'],
+      ['No priority row', true, null, 'Later'],
+    ],
+  )
 })

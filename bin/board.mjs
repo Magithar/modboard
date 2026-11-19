@@ -98,7 +98,7 @@ const SAY = {
   agents: list => (list.length ? list.map(a => `${a.name}  last seen ${hhmm(a.lastSeen)}`).join('\n') : '(no live agents)'),
   taskfile: r =>
     r.file
-      ? [r.file, ...r.items.map(i => `${'  '.repeat(i.depth)}${i.done === null ? '-' : i.done ? '[x]' : '[ ]'} ${i.text}`)].join('\n')
+      ? [r.file, ...r.items.map(i => `${'  '.repeat(i.depth)}${i.done === null ? '-' : i.done ? '[x]' : '[ ]'} ${i.priority === null ? '' : `P${i.priority} `}${i.text}`)].join('\n')
       : '(no task.md here)',
   doctor: r =>
     [`storage block: ${r.block}`, ...(r.tasks !== undefined ? [`${r.tasks} ${r.tasks === 1 ? 'task' : 'tasks'}, ${r.events ?? '?'} events`] : []), r.ok ? 'ok: the ledger and the state agree' : 'problems:', ...r.problems.map(p => `- ${p}`)].join('\n'),

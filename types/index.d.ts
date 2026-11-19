@@ -8,11 +8,11 @@ export type Task = {
   notes: { at: string; by: string; text: string }[]
 }
 
-// A project's task.md, read for display (lib/taskfile.mjs). `done` is null
-// for a plain bullet with no checkbox.
+// A project's task file, read for display (lib/taskfile.mjs). `done` is null
+// for a plain bullet with no checkbox; `priority` is 0 for P0, null for none.
 export type TaskFile = {
   file: string | null
-  items: { text: string; done: boolean | null; section: string; depth: number }[]
+  items: { text: string; done: boolean | null; section: string; depth: number; priority: number | null }[]
 }
 
 export type Agent = { name: string; lastSeen: string }
@@ -25,6 +25,6 @@ export type Usage = {
 
 declare module 'claude-code' {
   interface PluginState {
-    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean }
+    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string }
   }
 }

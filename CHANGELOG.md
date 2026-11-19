@@ -24,6 +24,17 @@ modboard was called agent-board until 0.5.0.
 - Task rows only say who ("backend", "you"); the heading says what. "Needs
   picking up" is now "Stopped partway".
 - The weekly limit is no longer shown on the board; the 5-hour limit stays.
+- The task file's priorities: P0–P9 read from headings (`## P0 — …`,
+  `## Sync (P1)`), from items (`- [ ] P2 …`) and from tables with a
+  Priority column. A priority button then turns through the tiers the file
+  has, like the effort button: `P0 · 3`, `P1 · 5`, …, `all`, and round
+  again (or press `p`), showing one tier at a time. It starts on the most
+  urgent. `all` lists every priority in order, each named once where it
+  starts, with unprioritised items last, after a dash.
+- Task files are also found in `docs/`, tables with a task and a status or
+  priority column are read, struck-through items count as done, markdown
+  marks are taken off for display, and once a file checks anything off its
+  plain bullets are left out as notes.
 - `board taskfile` prints that file's items; `--json` gives them as data. It
   reads no board and never writes one.
 

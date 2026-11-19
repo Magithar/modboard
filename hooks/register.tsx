@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Agent, Task, TaskFile } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
+import { nextTier, openItems } from './blocks/taskfile'
 
 // The mod is an adapter: every board read and write goes through bin/board.mjs,
 // the same CLI Codex or a human runs, so it works whatever storage block holds
@@ -27,6 +28,7 @@ const effort = atom({ plugin: 'modboard', key: 'effort' } as const, '')
 const custom = atom({ plugin: 'modboard', key: 'custom' } as const, {} as Record<string, string>)
 const taskfile = atom({ plugin: 'modboard', key: 'taskfile' } as const, { file: null, items: [] } as TaskFile)
 const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, false)
+const taskfileTier = atom({ plugin: 'modboard', key: 'taskfileTier' } as const, '')
 
 let session = ''
 let lastBeat = 0
@@ -222,6 +224,14 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     toggleTaskfile: async () => {
       await update($, taskfileOpen, open => !open)
     },
+    // Turn to the next priority the file has, wrapping through "all", and
+    // show it: like effort, one press, one step.
+    nextTier: async () => {
+      const items = openItems((await read($, taskfile)).items)
+      const to = nextTier(items, await read($, taskfileTier))
+      await update($, taskfileTier, () => to)
+      await update($, taskfileOpen, () => true)
+    },
   }
 }
 
@@ -239,6 +249,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     custom: await read($, custom),
     taskfile: await read($, taskfile),
     taskfileOpen: await read($, taskfileOpen),
+    taskfileTier: await read($, taskfileTier),
     act,
   }
 }

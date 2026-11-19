@@ -303,9 +303,9 @@ test('the band and pane settings pick blocks and their order', { options: { band
 const TASKFILE: TaskFile = {
   file: 'task.md',
   items: [
-    { text: 'Write the parser', done: false, section: 'Sprint', depth: 0 },
-    { text: 'Sketch the pane', done: true, section: 'Sprint', depth: 0 },
-    { text: 'Ship it', done: false, section: 'Later', depth: 0 },
+    { text: 'Write the parser', done: false, section: 'Sprint', depth: 0, priority: null },
+    { text: 'Sketch the pane', done: true, section: 'Sprint', depth: 0, priority: null },
+    { text: 'Ship it', done: false, section: 'Later', depth: 0, priority: null },
   ],
 }
 
@@ -330,7 +330,7 @@ test('the task.md button says what is left, and shows only that when pressed', a
 })
 
 test('a long task.md shows the first eight open items, then a count of the rest', async ($, on) => {
-  const items = Array.from({ length: 20 }, (_, n) => ({ text: `item ${n + 1}`, done: n % 4 === 3, section: n < 10 ? 'Sprint' : 'Later', depth: 0 }))
+  const items = Array.from({ length: 20 }, (_, n) => ({ text: `item ${n + 1}`, done: n % 4 === 3, section: n < 10 ? 'Sprint' : 'Later', depth: 0, priority: null }))
   host(on, [], { taskfile: { file: 'task.md', items } })
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
@@ -342,7 +342,7 @@ test('a long task.md shows the first eight open items, then a count of the rest'
 })
 
 test('a task.md with everything checked off says so', async ($, on) => {
-  host(on, [], { taskfile: { file: 'task.md', items: [{ text: 'a', done: true, section: '', depth: 0 }] } })
+  host(on, [], { taskfile: { file: 'task.md', items: [{ text: 'a', done: true, section: '', depth: 0, priority: null }] } })
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   expect((await ui.find({ key: 'taskfile' }))?.props.label).toBe('▸ task.md · all done')
@@ -360,6 +360,53 @@ test('a long backlog shows eight not started, then a count; what needs you is ne
   expect(shown).toContain('4 more')
   // The state is in the heading, not a mark on every row.
   expect(shown.some((t: string) => t === '◐' || t === '○')).toBe(false)
+})
+
+const ITEM = (text: string, priority: number | null, done = false) => ({ text, done, section: 'x', depth: 0, priority })
+const RANKED: TaskFile = {
+  file: 'docs/TASKS.md',
+  items: [ITEM('later one', 2), ITEM('urgent one', 0), ITEM('no priority', null), ITEM('next one', 1), ITEM('urgent two', 0), ITEM('urgent done', 0, true)],
+}
+const work = async (ui: any) => (await texts(ui)).filter((t: string) => /one|two|priority|^P\d$|^–?$/.test(t))
+
+test('the priority button starts on the most urgent tier and shows only its work', async ($, on) => {
+  host(on, [], { taskfile: RANKED })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect((await ui.find({ key: 'taskfile' }))?.props.label).toBe('▸ TASKS.md · 5 open')
+  expect((await ui.find({ key: 'tier' }))?.props.label).toBe('P0 · 2')
+  await ui.press({ key: 'taskfile' })
+  // The button names the tier, so the rows are only the work.
+  expect(await work(ui)).toEqual(['urgent one', 'urgent two'])
+  // With priorities, the headings step aside.
+  expect(await texts(ui)).not.toContain('x')
+})
+
+test('the priority button turns through each tier the file has, then all, then round again', async ($, on) => {
+  host(on, [], { taskfile: RANKED })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  // Pressing it opens a closed list on the next tier.
+  await ui.press({ key: 'tier' })
+  expect((await ui.find({ key: 'taskfile' }))?.props.label).toBe('▾ TASKS.md · 5 open')
+  expect((await ui.find({ key: 'tier' }))?.props.label).toBe('P1 · 1')
+  expect(await work(ui)).toEqual(['next one'])
+  await ui.press({ key: 'tier' })
+  expect((await ui.find({ key: 'tier' }))?.props.label).toBe('P2 · 1')
+  expect(await work(ui)).toEqual(['later one'])
+  await ui.press({ key: 'tier' })
+  expect((await ui.find({ key: 'tier' }))?.props.label).toBe('all')
+  // All: most urgent first, each priority named once; none last, after a dash.
+  expect(await work(ui)).toEqual(['P0', 'urgent one', '', 'urgent two', 'P1', 'next one', 'P2', 'later one', '–', 'no priority'])
+  await ui.press({ key: 'tier' })
+  expect((await ui.find({ key: 'tier' }))?.props.label).toBe('P0 · 2')
+})
+
+test('a task file without priorities has no priority button', async ($, on) => {
+  host(on, [], { taskfile: TASKFILE })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await ui.find({ key: 'tier' })).toBeUndefined()
 })
 
 test('with no task.md the pane shows no button for it', async ($, on) => {

@@ -16,9 +16,12 @@ export type Ctx = {
   // The project's task.md, and whether its list is open in the pane.
   taskfile: TaskFile
   taskfileOpen: boolean
+  // The priority the task file's list is turned to: "0" for P0, "all", or ""
+  // for the most urgent there is (see taskfile.tsx).
+  taskfileTier: string
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; compact: () => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; compact: () => Promise<void> }
 }
 
 // One way a block can draw in the band, and how many columns it takes.
