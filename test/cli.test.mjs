@@ -11,6 +11,9 @@ const BOARD = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin
 function fresh() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'board-'))
   const env = { ...process.env, BOARD_DIR: path.join(dir, '.modboard') }
+  // Run from inside Codex or a named session, the tests would inherit its name.
+  delete env.BOARD_AGENT
+  delete env.CODEX_THREAD_ID
   const run = (args, extra = {}) => {
     try {
       return { code: 0, out: execFileSync('node', [BOARD, ...args], { env: { ...env, ...extra }, encoding: 'utf8', stdio: 'pipe' }) }
@@ -217,4 +220,19 @@ test('taskfile reads priority from headings, items and tables, and looks in docs
       ['No priority row', true, null, 'Later'],
     ],
   )
+})
+
+test('a Codex thread is named "codex 1" by when it joined, and keeps its name', () => {
+  const b = fresh()
+  b.run(['add', 'one'])
+  b.run(['add', 'two'])
+  assert.equal(b.run(['claim', 'T-001'], { CODEX_THREAD_ID: 'thread-a' }).code, 0)
+  assert.equal(b.run(['claim', 'T-002'], { CODEX_THREAD_ID: 'thread-b' }).code, 0)
+  assert.equal(b.json(['show', 'T-001']).claim.owner, 'codex 1')
+  assert.equal(b.json(['show', 'T-002']).claim.owner, 'codex 2')
+  assert.equal(b.run(['whoami'], { CODEX_THREAD_ID: 'thread-a' }).out.trim(), 'you are codex 1')
+  // Codex sends no presence ping, so silence never ends its claim; only the lease does.
+  assert.equal(b.json(['show', 'T-001'], { BOARD_PRESENCE_MS: '1' }).claim.owner, 'codex 1')
+  // Outside Codex, with no name, it still asks who you are.
+  assert.equal(b.run(['claim', 'T-001']).code, 2)
 })

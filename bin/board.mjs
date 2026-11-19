@@ -60,10 +60,15 @@ function parseArgs(argv) {
 
 const text = v => (typeof v === 'string' ? v : undefined)
 
-function actorOf(flags) {
+// Who is asking: --as, else BOARD_AGENT, else a Codex thread (Codex marks every
+// shell it runs with CODEX_THREAD_ID), named "codex 1", "codex 2" by when it
+// joined. Codex sends no presence ping, so only its leases end its claims.
+async function actorOf(board, flags) {
   const a = text(flags.as) ?? process.env.BOARD_AGENT
-  if (!a) throw new BoardError(2, 'who are you? pass --as <agent> or set BOARD_AGENT')
-  return a
+  if (a) return a
+  const thread = process.env.CODEX_THREAD_ID
+  if (thread) return (await board.join('codex', thread, { presence: false })).name
+  throw new BoardError(2, 'who are you? pass --as <agent> or set BOARD_AGENT')
 }
 
 const SYMBOL = { todo: '○', claimed: '◐', done: '●' }
@@ -95,6 +100,8 @@ const SAY = {
   done: t => `done ${line(t)}\n${t.notes.at(-1).text}`,
   'release-all': r => `released ${ids(r.released)}`,
   register: r => `you are ${r.name}`,
+  join: r => `you are ${r.name}`,
+  whoami: r => `you are ${r.name}`,
   agents: list => (list.length ? list.map(a => `${a.name}  last seen ${hhmm(a.lastSeen)}`).join('\n') : '(no live agents)'),
   taskfile: r =>
     r.file
@@ -114,28 +121,36 @@ const commands = {
     const t = await board.show(id)
     return flags.json ? t : describe(t)
   },
-  add(board, [title], flags) {
+  async add(board, [title], flags) {
     if (!title) throw new BoardError(2, 'usage: board add "<title>" [--desc "..."] [--accept "how to tell it is done"]')
-    return board.add(text(flags.as) ?? process.env.BOARD_AGENT ?? 'human', {
+    const by = text(flags.as) ?? process.env.BOARD_AGENT ?? (process.env.CODEX_THREAD_ID ? await actorOf(board, flags) : 'human')
+    return board.add(by, {
       title,
       description: text(flags.desc),
       accept: text(flags.accept),
     })
   },
-  claim: (board, [id], flags) => board.claim(id, actorOf(flags)),
-  heartbeat: (board, _, flags) => board.heartbeat(actorOf(flags)),
-  note(board, [id, note], flags) {
+  claim: async (board, [id], flags) => board.claim(id, await actorOf(board, flags)),
+  heartbeat: async (board, _, flags) => board.heartbeat(await actorOf(board, flags)),
+  async note(board, [id, note], flags) {
     if (!note) throw new BoardError(2, 'usage: board note <id> "<text>"')
-    return board.note(id, actorOf(flags), note)
+    return board.note(id, await actorOf(board, flags), note)
   },
-  release: (board, [id], flags) => board.release(id, actorOf(flags), text(flags.handoff)),
-  done: (board, [id], flags) => board.done(id, actorOf(flags), text(flags.note)),
-  'release-all': (board, _, flags) => board.releaseAll(actorOf(flags), { handoff: text(flags.handoff), session: text(flags.session) }),
+  release: async (board, [id], flags) => board.release(id, await actorOf(board, flags), text(flags.handoff)),
+  done: async (board, [id], flags) => board.done(id, await actorOf(board, flags), text(flags.note)),
+  'release-all': async (board, _, flags) => board.releaseAll(await actorOf(board, flags), { handoff: text(flags.handoff), session: text(flags.session) }),
   register(board, [name], flags) {
     const session = text(flags.session)
     if (!name || !session) throw new BoardError(2, 'usage: board register <name> --session <id>')
     return board.register(name, session)
   },
+  // A name from what the session runs and when it joined: "claude 1".
+  join(board, [kind], flags) {
+    const session = text(flags.session)
+    if (!kind || !session) throw new BoardError(2, 'usage: board join <claude|codex|...> --session <id>')
+    return board.join(kind, session)
+  },
+  whoami: async (board, _, flags) => ({ name: await actorOf(board, flags) }),
   agents: board => board.agents(),
   // Everything a display needs, in one call: every task and the live agents.
   view: async board => ({ tasks: await board.list({ all: true }), agents: await board.agents() }),
