@@ -23,6 +23,17 @@
 
 ## See it in action
 
+![Three live Claude Code sessions share one board: frontend and backend race for T-001, frontend hands T-003 off partway, backend picks it up, and the viewer's /board pane follows along](docs/board-live.gif)
+
+Three real Claude Code sessions, recorded live at real speed (49 seconds).
+`frontend` and `backend` are each told to work the board, and `viewer` has
+`/board` open. Both go for T-001. `frontend` wins, and `backend` is refused
+and takes T-002. `frontend` writes part of T-003, then hands it off. The band
+above its prompt says "T-003 was stopped partway, pick it up". `backend` reads
+the handoff, finishes T-003, and the pane ends on "3 done".
+
+The same story through the CLI, as a plain transcript:
+
 ![A real run: two agents add tasks, one loses a claim race, one hands work off, the other finishes with a verified note and picks the handoff up](docs/demo.png)
 
 A real run of the CLI, unedited: `frontend` and `backend` share one board.
@@ -498,7 +509,8 @@ agent-board/
 └── docs/
     ├── system.txt  .png     # how it fits together
     ├── blocks.txt  .png     # how blocks work
-    ├── demo.txt    .png     # a real run
+    ├── demo.txt    .png     # a real run of the CLI
+    ├── board-live.gif       # a live recording of three Claude sessions
     └── render.mjs           # rebuilds every image from its .txt
 ```
 
