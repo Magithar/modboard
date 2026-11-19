@@ -446,148 +446,24 @@ Show a command's output with no code, or write a block of your own: see
 
 ## Make your own block
 
-modboard is built from blocks, and you can add your own. There are two kinds:
+modboard is built from blocks, and you can add your own. Pick the row that
+matches what you want:
 
-| Kind | What it does | How many | Where you choose it |
-|---|---|---|---|
-| **Storage block** (an adapter) | holds the board: a folder, a database, a server | one per board | `.modboard/config.json` |
-| **Display block** | draws part of the board inside a Claude session | many, in order | the plugin's `band` and `pane` settings |
+| I want to… | Make | You write |
+|---|---|---|
+| show a command's output (CI status, git branch…) | [a command block](#a-display-block-from-a-command-no-code) | one line of settings, no code |
+| show something from the board, or react to a click | [a display block in code](#a-display-block-in-code) | one `.tsx` file |
+| keep the board somewhere else (a database, a server) | [a storage block](#a-storage-block-an-adapter) | one `.mjs` file |
 
 ![How blocks work: the three ways to make your own, how a storage block (an adapter) is found, what the engine asks of it, where display blocks come from and how the band fits them on one line](docs/blocks.png)
 
 The diagram's source is plain text, [`docs/blocks.txt`](docs/blocks.txt).
 
-### A storage block (an adapter)
-
-Write one when the board should live somewhere other than a local folder, for
-example so agents on different machines can share it. The engine keeps every
-rule (claims, leases, handoffs). A block only stores records and refuses writes
-that are out of date, so it never needs to know what a task is.
-
-#### How an adapter works
-
-Every record carries a version, and every write says which version it expects.
-Say agents A and B both claim T-001 at the same moment:
-
-1. Both read the board with `snapshot()`. T-001 is at version 3, and nobody
-   holds it.
-2. Both decide the claim is fine, and both send `commit`: "claim T-001, only if
-   it is still at version 3".
-3. A's commit lands first. The adapter sees version 3, writes the claim, and
-   T-001 moves to version 4.
-4. B's commit finds version 4, not 3, so the adapter writes nothing and answers
-   `{ ok: false, conflict: 'T-001' }`.
-5. The engine reads again for B, sees that A holds T-001, and refuses B:
-   "T-001 is already claimed by A" (exit 6). The ledger records B's attempt as
-   `claim-rejected`.
-
-Three things follow from this:
-
-- **The engine decides; the adapter keeps versions honest.** Claims, leases,
-  handoffs and names are all rules in the engine. An adapter for a new backend
-  never has to reimplement them.
-- **The check and the write must be one step.** A transaction, a conditional
-  write or a lock. If an adapter checks the version and then writes in two
-  separate steps, A and B can both pass the check, and two agents end up
-  holding one task. The contract tests below race ten claims to catch this.
-- **The ledger makes it checkable.** Each commit appends its events with the
-  writes. If a crash ever leaves the two out of step, `verify()` says so, and
-  `board doctor` reports it.
-
-#### 1. Write the module
-
-One file that exports `createStore(config, { dir })`. `config` is everything in
-`.modboard/config.json`, so your block's own settings (a URL, a table name) go
-there too. `dir` is the `.modboard/` folder. It returns five methods, all of
-which may be async:
-
-```js
-// my-block.mjs
-export function createStore(config, { dir }) {
-  return {
-    // The store's clock, in ms. Leases are timed by it, so every machine
-    // agrees. A database should answer with its own time.
-    now: () => Date.now(),
-
-    // Every record, each with the version it stands at:
-    //   { tasks: { 'T-001': { ...task, version: 3 } },
-    //     agents: { frontend: { ...agent, version: 1 } } }
-    snapshot: async () => { /* read everything */ },
-
-    // writes: [{ kind: 'task' | 'agent', key, value, expect }]
-    // events: ledger entries to append
-    // Apply every write and append every event, or nothing at all, and only
-    // if each record still stands at `expect` (0 means it must not exist).
-    // An applied record's version becomes expect + 1. A null value deletes.
-    // Answer { ok: true }, or { ok: false, conflict: key } to have the
-    // engine read again and retry.
-    commit: async ({ writes, events }) => { /* one transaction */ },
-
-    // Ledger events with seq > since, in order. Give each appended event the
-    // next seq and an `at` time.
-    events: async (since = 0) => { /* ... */ },
-
-    // Does the ledger agree with the state? This is what `board doctor` reports.
-    verify: async () => ({ ok: true, problems: [] }),
-  }
-}
-```
-
-`commit` is the only hard part: it must be all-or-none, and checking the
-versions and writing must happen as one step (a database transaction, a
-conditional write, a lock).
-
-- [`examples/store-memory.mjs`](examples/store-memory.mjs) is a complete,
-  working block in about 20 lines to copy from.
-- [`lib/store-file.mjs`](lib/store-file.mjs) is the built-in one.
-
-#### 2. Test it against the contract
-
-The engine relies on a few rules and nothing else: one winner when many agents
-claim one task, distinct ids when they add at once, stale writes refused, one
-live session per name. They ship as a test suite:
-
-```js
-// my-block.test.mjs, run with: node --test
-import { storeContract } from 'modboard/lib/contract.mjs'
-import { createStore } from './my-block.mjs'
-
-storeContract('my block', () => createStore({ /* test settings */ }, { dir: '/tmp/board-test' }))
-```
-
-Each run should start from an empty board, so give each `createStore` call a
-fresh table or folder.
-
-#### 3. Point a board at it
-
-In `.modboard/config.json`, name it in one of three ways. Everything besides
-`store` is passed to your block.
-
-| `config.json` | Uses |
-|---|---|
-| `{ "store": "file" }` | the built-in default |
-| `{ "store": "./stores/my-block.mjs", "url": "..." }` | a block file, relative to `.modboard/` |
-| `{ "store": "modboard-my-block", "url": "..." }` | a block published as a package |
-
-Then check it: `board add "first task"`, `board view`, and `board doctor`. The
-CLI refuses a block that won't load or is missing a method, and says which
-(exit 2).
-
-#### 4. Share it (optional)
-
-Publish it as a package whose entry exports `createStore` (through `exports` or
-`main`), with `modboard` as a dev dependency for the contract tests. Anyone can
-then `npm install modboard-my-block` in their project and name it in
-`config.json`.
-
-A package is found the way Node finds any package: in the `node_modules` of the
-project that holds the board, or a folder above it.
-
 ### A display block from a command (no code)
 
-The quickest way to show something of your own. The `blocks` setting (in
-`/config`) maps a block name to a shell command. Every 30 seconds the command
-runs, and the block shows the first line it prints, cut to 60 characters:
+The quickest way. Two steps, both in the plugin's settings (`/config`):
+
+**1. Name a command** in the `blocks` setting:
 
 ```json
 {
@@ -596,9 +472,17 @@ runs, and the block shows the first line it prints, cut to 60 characters:
 }
 ```
 
-Then name them in `band` or `pane` like a built-in block
-(`band: summary,ci,usage`). In the band a command block shows as `ci success`,
-or just `success` when the line is short.
+**2. Add the name** to `band` or `pane`, like a built-in block:
+
+```
+band: summary,ci,usage
+```
+
+That's it. Every 30 seconds the command runs, and the block shows the first
+line it prints, cut to 60 characters. In the band it reads `ci success`, or
+just `success` when the line is short.
+
+Good to know:
 
 - Names are lowercase letters, digits and dashes, up to 16 characters, and
   can't reuse a built-in block's name. A bad entry is skipped, with a toast
@@ -609,58 +493,181 @@ or just `success` when the line is short.
 
 ### A display block in code
 
-For a block that reads the board itself, or reacts to a click. Each built-in
-block is its own file in [`hooks/blocks/`](hooks/blocks/), and yours is a file
-of the same shape:
+For a block that reads the board itself, or reacts to a click. Claude Code mods
+can't load code at runtime, so this lives in your copy of the mod: fork this
+repo (or send a pull request if others would want it).
+
+**1. Write the block** as a file in [`hooks/blocks/`](hooks/blocks/). This one
+shows how many tasks are yours:
 
 ```tsx
-// hooks/blocks/mine.tsx: how many tasks are mine
+// hooks/blocks/mine.tsx
 import { words, type Block } from './types'
 
 export const mine: Block = {
   name: 'mine',
-  // The band: forms widest first. The band takes the widest that fits,
-  // and leaves the block out when even the last one doesn't.
+
+  // In the band: a list of forms, widest first. The band uses the widest
+  // that fits, and drops the block when none do. null = show nothing.
   band: ({ ui: { Text }, tasks, who }) => {
     const n = tasks.filter(t => t.claim?.owner === who).length
-    if (!n) return null // nothing to say: the block takes no room
+    if (!n) return null
     return [words(Text, `${n} mine`), words(Text, `${n}`)]
   },
-  // The pane: one part of /board, or null.
+
+  // In the /board pane: one part of it, or null.
   pane: ({ ui: { Text }, tasks, who }) => (
     <Text>{tasks.filter(t => t.claim?.owner === who).length} tasks are mine</Text>
   ),
 }
 ```
 
-Every block gets the same context (see [`types.tsx`](hooks/blocks/types.tsx)):
+A block can have `band`, `pane`, or both.
+
+**2. Register it** in [`hooks/blocks/index.ts`](hooks/blocks/index.ts):
+
+```ts
+import { mine } from './mine'
+
+export const BLOCKS: Block[] = [summary, board, /* … */, mine]
+```
+
+**3. Turn it on** by adding `mine` to the `band` or `pane` setting.
+
+**4. Test it** with `claude plugin test .`.
+
+What a block gets (the full shape is in [`types.tsx`](hooks/blocks/types.tsx)):
 
 - the tasks, the live agents, and who this session is
 - plan usage and context fill, the model and effort, the time, the width
-- your command blocks' output
-- the project's task file (and whether its list is open, and which priority
-  it's turned to)
+- your command blocks' output, and the project's task file
 - `act`, for what a click can do: switch the model or effort, run `/compact`,
   open the task file or turn its priority
 
-A block may draw in the band, the pane or both.
-
-Two rules keep the display calm, and a new block should follow them:
+Two rules keep the display calm:
 
 - **Colour only when something needs the person** (theme `warning` and
   `error`).
 - **No word or mark that the heading or the order already says.**
 
-The `meter.tsx` bar is there for anything that fills up: the context and the
-5-hour limit both use it.
+For anything that fills up, reuse the bar in `meter.tsx`, as the context and
+5-hour limit blocks do.
 
-Then list it in [`index.ts`](hooks/blocks/index.ts) (an import, and its name in
-`BLOCKS`), name it in the `band` or `pane` setting, and run
-`claude plugin test .`.
+### A storage block (an adapter)
 
-Claude Code mods can't load code at runtime, so a code block lives in your copy
-of the mod: fork this repo, or send it as a pull request if others would want
-it.
+Only needed when the board should live somewhere other than a local folder,
+for example so agents on different machines can share it.
+
+You don't reimplement claims, leases or handoffs: the engine keeps every rule.
+Your block just **stores records, each with a version number, and refuses a
+write when the version has moved on.**
+
+**1. Write the module.** One file exporting `createStore(config, { dir })`,
+which returns five methods (any of them may be async):
+
+| Method | What it does |
+|---|---|
+| `now()` | the store's clock in ms; leases are timed by it |
+| `snapshot()` | every task and agent, each with its version |
+| `commit({ writes, events })` | apply all the writes and log the events, or none, and only if each record is still at the version the write expects |
+| `events(since)` | the ledger events after `since`, in order |
+| `verify()` | does the ledger agree with the state? (`board doctor` shows this) |
+
+`config` is everything in `.modboard/config.json`, so your own settings (a URL,
+a table name) go there. `dir` is the `.modboard/` folder.
+
+```js
+// my-block.mjs
+export function createStore(config, { dir }) {
+  return {
+    // A database should answer with its own time, so every machine agrees.
+    now: () => Date.now(),
+
+    // { tasks:  { 'T-001': { ...task,  version: 3 } },
+    //   agents: { frontend: { ...agent, version: 1 } } }
+    snapshot: async () => { /* read everything */ },
+
+    // writes: [{ kind: 'task' | 'agent', key, value, expect }]
+    //   expect 0 = the record must not exist yet; value null = delete it.
+    //   An applied record's version becomes expect + 1.
+    // Answer { ok: true }, or { ok: false, conflict: key } and the engine
+    // reads again and retries.
+    commit: async ({ writes, events }) => { /* one transaction */ },
+
+    // Give each appended event the next `seq` and an `at` time.
+    events: async (since = 0) => { /* ... */ },
+
+    verify: async () => ({ ok: true, problems: [] }),
+  }
+}
+```
+
+> [!IMPORTANT]
+> `commit` is the only hard part. Checking the versions and writing must be
+> **one step**: a database transaction, a conditional write, or a lock. If you
+> check, then write, two agents can both pass the check and both hold one task.
+
+Copy from [`examples/store-memory.mjs`](examples/store-memory.mjs), a short,
+complete block, or [`lib/store-file.mjs`](lib/store-file.mjs), the built-in
+one.
+
+**2. Test it against the contract.** The suite races claims, adds at once,
+sends stale writes and reuses names, and fails if your block lets any of them
+through:
+
+```js
+// my-block.test.mjs, run with: node --test
+import { storeContract } from 'modboard/lib/contract.mjs'
+import { createStore } from './my-block.mjs'
+
+storeContract('my block', () => createStore({ /* test settings */ }, { dir: '/tmp/board-test' }))
+```
+
+Give each `createStore` call a fresh table or folder, so each run starts empty.
+
+**3. Point a board at it** in `.modboard/config.json`. Everything besides
+`store` is passed to your block:
+
+| `config.json` | Uses |
+|---|---|
+| `{ "store": "file" }` | the built-in default |
+| `{ "store": "./stores/my-block.mjs", "url": "..." }` | a block file, relative to `.modboard/` |
+| `{ "store": "modboard-my-block", "url": "..." }` | a block published as a package |
+
+**4. Check it:** `board add "first task"`, `board view`, `board doctor`. The CLI
+refuses a block that won't load or is missing a method, and says which
+(exit 2).
+
+**5. Share it (optional).** Publish a package whose entry exports `createStore`
+(through `exports` or `main`), with `modboard` as a dev dependency for the
+contract tests. Others `npm install modboard-my-block` and name it in
+`config.json`. It's found the way Node finds any package: in `node_modules` of
+the project that holds the board, or a folder above it.
+
+<details>
+<summary><b>Why the version check matters: two agents claim one task</b></summary>
+
+<br/>
+
+Say agents A and B both claim T-001 at the same moment:
+
+1. Both read the board with `snapshot()`. T-001 is at version 3, and nobody
+   holds it.
+2. Both send `commit`: "claim T-001, only if it is still at version 3".
+3. A's commit lands first. The block sees version 3, writes the claim, and
+   T-001 moves to version 4.
+4. B's commit finds version 4, not 3, so the block writes nothing and answers
+   `{ ok: false, conflict: 'T-001' }`.
+5. The engine reads again for B, sees that A holds T-001, and refuses B:
+   "T-001 is already claimed by A" (exit 6). The ledger records B's attempt as
+   `claim-rejected`.
+
+So the engine decides who wins, and the block only keeps the versions honest.
+Each commit also appends its ledger events with its writes; if a crash ever
+leaves the two out of step, `verify()` says so and `board doctor` reports it.
+
+</details>
+
 
 ---
 
