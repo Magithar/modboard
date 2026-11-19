@@ -716,8 +716,7 @@ modboard/
 │   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
 │   └── blocks/              # one file per display block, listed in index.ts
 ├── .claude-plugin/
-│   ├── plugin.json          # the mod's manifest and settings
-│   └── icon.png             # the plugin's icon
+│   └── plugin.json          # the mod's manifest and settings
 ├── test/                    # CLI and store contract tests (npm test)
 ├── tests/                   # mod tests (claude plugin test .)
 ├── CHANGELOG.md             # what changed in each version

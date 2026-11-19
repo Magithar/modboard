@@ -1,6 +1,6 @@
 {
   "name": "modboard",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "A task board several coding agents share, through one CLI",
   "type": "module",
   "bin": { "board": "bin/board.mjs" },
@@ -11,7 +11,7 @@
     "./examples/store-memory.mjs": "./examples/store-memory.mjs",
     "./package.json": "./package.json"
   },
-  "files": ["bin/", "lib/", "examples/", "hooks/", "types/", ".claude-plugin/plugin.json", ".claude-plugin/icon.png", "tsconfig.json", "README.md", "CHANGELOG.md", "ROADMAP.md", "LICENSE"],
+  "files": ["bin/", "lib/", "examples/", "hooks/", "types/", ".claude-plugin/plugin.json", "tsconfig.json", "README.md", "CHANGELOG.md", "ROADMAP.md", "LICENSE"],
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:mod": "claude plugin test .",
