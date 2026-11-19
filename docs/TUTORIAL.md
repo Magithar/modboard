@@ -247,55 +247,59 @@ thing: **yellow or red, look here.**
 ### The line above the prompt
 
 ```
-2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64% 5-hour limit   ◕ 72% compact
+2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░  64%   context ▓▓▓▓▓▓▓░░░  72% compact   model Sonnet 5.5   effort low
 ```
 
 | Part | Says |
 |---|---|
 | `2 tasks waiting · 1 in progress` | the board at a glance |
 | `T-005 was stopped partway, pick it up` | the one thing that needs you: work someone handed off, or an agent that stopped responding |
-| `◑ 64% 5-hour limit` | your plan usage, shown once it's past half |
-| `◕ 72% compact` | how full the context is, shown once it's past half. Click it to run `/compact` |
+| `5-hour limit ▓▓▓▓▓▓░░░░ 64%` | your plan usage, shown once it's past half |
+| `context ▓▓▓▓▓▓▓░░░ 72% compact` | how full the context is. Click it to compact the conversation |
+| `model Sonnet 5.5   effort low` | the session's model and effort. Click either to switch to the next one |
 
-The rings fill in quarters, `○ ◔ ◑ ◕ ●`, and turn yellow at 70% and red at
-90%. On a narrow window the line shortens and drops parts from the right;
+Both bars turn yellow at 70% and red at 90%. On a narrow window the line shortens and drops parts from the right;
 the alert is the last to go. With nothing waiting or in progress, it
 disappears.
 
 ### The `/board` pane
 
 ```
- In progress
- T-004  Add a test script           you
- T-007  Write the README            backend
- T-006  Add a LICENSE file          codex stopped responding
-
- Stopped partway
- T-005  Ghost task                  frontend · see its note
-
- Not started
- T-008  Add dark mode
-
- 3 done
+ ▾ In progress · 3
+   T-004  Add a test script           you
+   T-007  Write the README            backend
+   T-006  Add a LICENSE file          codex stopped responding
+ ▾ Stopped partway · 1
+   T-005  Ghost task                  frontend · see its note
+ ▸ Not started · 12
+   3 done
 
  ▸ TASKS.md · 6 open   P0 · 2
 
- ◕  72%  compact
+ context       ▓▓▓▓▓▓▓░░░  72%   [ compact ]
 
- ◑  64%  5-hour limit · resets 12:00
+ 5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
 
 - **The headings say what's happening; each row says who.** Your own tasks
   are bold.
 - **Yellow rows need you**: an agent that stopped responding (its claim is
   about to run out), or work stopped partway that nobody has picked up.
-- **"Not started" shows eight tasks**, then "N more". What's in progress or
-  stopped partway is always shown in full.
+- **Each heading is a button.** Click it to open or close the group. In
+  progress and Stopped partway start open, because they need you; Not
+  started starts closed, so the board fits on screen. Opened, it shows eight
+  tasks, then "N more".
+- **The compact button is always there**, beside the context bar. Before
+  Claude's first reply the bar shows Claude Code's own estimate; after it,
+  the measured fill.
+- **If the pane is shorter than the board**, scroll its body with the mouse
+  wheel.
 
 The pane's buttons also answer to keys:
 
 | Key | Does |
 |---|---|
+| `i`, `s`, `n` | open or close In progress, Stopped partway, Not started |
 | `t` | open or close your task file's list |
 | `p` | turn the task file to its next priority |
 | `c` | run `/compact` |
@@ -436,14 +440,14 @@ Two settings list the display's blocks, in order:
 
 | Setting | Default | Also available |
 |---|---|---|
-| Band blocks (the line) | `summary,usage,compact` | `model`, `effort`, `clock`, `context` |
+| Band blocks (the line) | `summary,usage,compact,model,effort` | `clock`, `context` |
 | Pane blocks (`/board`) | `tasks,taskfile,compact,usage` | `agents`, `model`, `effort`, `clock`, `context` |
 
 The band's order is its order of importance: when the line is short, the
-last blocks go first. `model` and `effort` are off by default because Claude
-Code already shows both; add them if you want one-click switching. They step
-through the **Models to switch between** and **Effort levels to switch
-between** settings.
+last blocks go first, so model and effort are the first to drop. Clicking
+them steps through the **Models to switch between** and **Effort levels to
+switch between** settings. Leave them out of the band if you'd rather not
+see them; Claude Code shows both in its own header too.
 
 ### Your own blocks, no code
 

@@ -1,33 +1,43 @@
 import type { Block } from './types'
-import { Meter, meterText } from './meter'
+import { Bar, CELLS, barParts, barWidth } from './meter'
 
-// The context window, as the board's ring, and a button that compacts it
-// through Claude Code's own /compact, as if you had typed it. The ring is its
-// own label. In the band it appears once the window is half full; in the pane
-// it is always there, lined up with usage.
+// The context window as a bar, like the 5-hour limit's, and a button that
+// compacts the conversation (Claude Code's own compaction, the call /compact
+// makes). The fill is Claude Code's local estimate until the first reply,
+// then each reply's measurement. In the band, the whole part is the button;
+// in the pane, a framed [ compact ] beside the bar (or `c`), always there,
+// with an empty bar if no figure has come yet. The bar takes colour from 70%.
 export const compact: Block = {
   name: 'compact',
   band: ({ ui, usage: u, act }) => {
-    if (u.context === undefined || u.context < 50) return null
+    if (u.context === undefined) return null
     const { Button, Text } = ui
-    const text = meterText(u.context)
-    const press = (withWord: boolean) => ({
+    const press = (name: string, cells: number, withWord: boolean) => ({
       tree: (
         <Button key="compact" plain onPress={act.compact}>
-          {[...Meter(ui, u.context!), ...(withWord ? [<Text dimColor> compact</Text>] : [])]}
+          {[<Text dimColor>{`${name} `}</Text>, ...barParts(ui, u.context!, cells), ...(withWord ? [<Text dimColor> compact</Text>] : [])]}
         </Button>
       ),
-      width: text.length + (withWord ? 8 : 0),
+      width: name.length + 1 + barWidth(cells) + (withWord ? 8 : 0),
     })
-    return [press(true), press(false)]
+    return [press('context', CELLS, true), press('ctx', 5, false)]
   },
   pane: ({ ui, usage: u, act }) => {
-    if (u.context === undefined) return null
-    const { Box, Button } = ui
+    const { Box, Button, Text } = ui
     return (
       <Box>
-        {Meter(ui, u.context, true)}
-        <Box marginLeft={2}>
+        <Box width={14}>
+          <Text dimColor>context</Text>
+        </Box>
+        {u.context === undefined ? (
+          <Box flexShrink={0}>
+            <Text dimColor>{'░'.repeat(CELLS)}</Text>
+            <Text dimColor>{'    –'}</Text>
+          </Box>
+        ) : (
+          Bar(ui, u.context)
+        )}
+        <Box marginLeft={3}>
           <Button key="compact" hotkey="c" label="compact" onPress={act.compact} />
         </Box>
       </Box>

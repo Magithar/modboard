@@ -176,7 +176,7 @@ The display shows only what needs you. Everything else waits until you ask.
 **One line above the prompt**, always visible while there's work on the board:
 
 ```
-2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64% 5-hour limit   ◕ 72% compact
+2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░  64%   context ▓▓▓▓▓▓▓░░░  72% compact   model Sonnet 5.5   effort low
 ```
 
 The line never wraps, and stays clear of Claude Code's own `[-]` control at
@@ -185,8 +185,11 @@ last ones drop off. The first block (the summary) keeps its full form longest,
 and the alert outlasts the counts:
 
 ```
-112 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64% 5-hour limit   ◕ 72% compact
-100 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   ◑ 64%   ◕ 72%
+180 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░  64%   context ▓▓▓▓▓▓▓░░░  72% compact   model Sonnet 5.5   effort low
+140 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%   ctx ▓▓▓▓░  72%   Sonnet 5.5   low
+124 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%   ctx ▓▓▓▓░  72%   Sonnet 5.5
+112 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%   ctx ▓▓▓▓░  72%
+100 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%
  80 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up
  64 cols   2 waiting · 1 active   T-005 was stopped partway, pick it up
  42 cols   2 waiting · 1 active   T-005 needs you
@@ -195,39 +198,38 @@ and the alert outlasts the counts:
 
 The alert names the one thing that needs you: a task someone stopped partway
 that nobody has picked up, or an agent that stopped responding (its claim is
-about to run out). Usage and context share one ring that fills
-(○ ◔ ◑ ◕ ●), and each appears only once it passes half. It's plain with room
-left, yellow from 70% and red from 90%. Clicking the context ring runs
-`/compact`. The model and effort switches are there if you want them (add
-`model,effort` to the band), but Claude Code already shows both, so they're
-off by default. With nothing waiting or in progress, the line disappears.
+about to run out). The 5-hour limit is a bar, shown once it passes half.
+The context is a bar of its own, and clicking it compacts the
+conversation, as `/compact` does. Both are plain with room left, yellow from 70% and red from
+90%. Click the model or effort to switch to the next one. With nothing
+waiting or in progress, the line disappears.
 
 **`/board`** opens the full pane:
 
 ```
- In progress
- T-004  Add a test script           you
- T-007  Write the README            backend
- T-006  Add a LICENSE file          codex stopped responding
-
- Stopped partway
- T-005  Ghost task                  frontend · see its note
-
- Not started
- T-008  Add dark mode
-
- 3 done
+ ▾ In progress · 3
+   T-004  Add a test script           you
+   T-007  Write the README            backend
+   T-006  Add a LICENSE file          codex stopped responding
+ ▾ Stopped partway · 1
+   T-005  Ghost task                  frontend · see its note
+ ▸ Not started · 12
+   3 done
 
  ▸ TASKS.md · 4 open   P0 · 2
 
- ◕  72%  compact
+ context       ▓▓▓▓▓▓▓░░░  72%   [ compact ]
 
- ◑  64%  5-hour limit · resets 12:00
+ 5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
 
-The pane shows what needs you in full and keeps the rest short. Headings
-are quiet, and say what's happening, so a row only names who: no marks, no
-repeated phrases. Past eight tasks, "Not started" ends in a count ("4 more").
+The pane shows what needs you and keeps the rest one click away. Each group's
+heading is a button with its count: In progress and Stopped partway start
+open, because they need you, and Not started starts closed, so the whole
+board fits without scrolling. Click a heading (or press `i`, `s`, `n`) to
+open or close it. The heading says what's happening, so a row only names
+who: no marks, no repeated phrases. If the pane is shorter than the board,
+its body scrolls with the mouse wheel. Past eight tasks, "Not started" ends in a count ("4 more").
 What's in progress or stopped partway is never cut. Colour appears only when
 something asks for you: a warning, or a limit past 70%.
 
@@ -237,17 +239,17 @@ as comma-separated lists, in order:
 | Block | Band | Pane | Shows |
 |---|---|---|---|
 | `summary` | ✓ | | what's waiting and in progress, and the one thing that needs you |
-| `tasks` | | ✓ | in progress, then work stopped partway, then not started (up to eight), then a count of done |
+| `tasks` | | ✓ | in progress, stopped partway and not started, each a heading you click (or `i`, `s`, `n`) to open or close; not started shows up to eight; then a count of done |
 | `taskfile` | | ✓ | the project's `task.md`: how much is open; click it (or press `t`) to see what's left, and turn its priority (`p`) |
-| `usage` | ✓ | ✓ | the 5-hour limit as a ring that fills: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |
-| `compact` | ✓ | ✓ | the context window as the same ring; click it (or press `c`) to run `/compact`. In the band from half full |
-| `model` | ✓ | ✓ | the session's model; click it to switch to the next one. Off by default |
-| `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest. Off by default |
+| `usage` | ✓ | ✓ | the 5-hour limit as a bar: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |
+| `compact` | ✓ | ✓ | the context window as a bar, like the 5-hour limit's, and a button that compacts the conversation (or press `c`). Always in the pane; in the band once Claude Code reports the context |
+| `model` | ✓ | ✓ | the session's model; click it to switch to the next one. |
+| `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest. |
 | `clock` | ✓ | ✓ | the time |
 | `context` | ✓ | ✓ | context fill and the session's cost |
 | `agents` | | ✓ | who is live on the board |
 
-The defaults are `band: summary,usage,compact` and `pane: tasks,taskfile,compact,usage`.
+The defaults are `band: summary,usage,compact,model,effort` and `pane: tasks,taskfile,compact,usage`.
 
 **task.md.** If the checkout has a `task.md`, `tasks.md` or `todo.md` (in
 any case) at its root or in `docs/`, the pane shows one quiet line: the
@@ -502,7 +504,8 @@ block may draw in the band, the pane or both.
 Two rules keep the display calm, and a new block should follow them: colour
 only when something needs the person (theme `warning` and `error`), and no
 word or mark that the heading or the order already says. The `meter.tsx`
-ring is there for anything that fills up.
+bar is there for anything that fills up: the context and the 5-hour limit
+both use it.
 
 Then list it in [`index.ts`](hooks/blocks/index.ts) (an import, and its name
 in `BLOCKS`), name it in the `band` or `pane` setting, and run
@@ -536,7 +539,7 @@ items and priorities (headings, items, tables, `docs/`) without touching the
 board. `claude plugin test .` runs the mod tests (the pane's sections and
 alerts and the eight-row limit, the band and when it stays quiet, names and
 their fallback, the tools, the verification note, release on session end,
-usage and the context ring, the compact button, the task file's list and
+usage and the context bars, the compact button, the task file's list and
 its priority button's whole turn, and choosing blocks).
 
 The task file, priority and compact features were added after the live
@@ -573,7 +576,7 @@ modboard/
 │   ├── hooks.json
 │   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
 │   └── blocks/              # one file per display block, listed in index.ts;
-│                            # meter.tsx is the ring that usage and compact share
+│                            # meter.tsx is the bar that usage and compact share
 ├── types/index.d.ts
 ├── .claude-plugin/
 │   └── plugin.json          # the mod's manifest and settings

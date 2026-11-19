@@ -26,9 +26,18 @@ where they tell you something.
   urgent and shows one tier at a time. `all` lists every priority in order,
   each named once where it starts, with unprioritised items last, after a
   dash.
-- **A `compact` block**: the context window as a ring that fills
-  (○ ◔ ◑ ◕ ●), and clicking it (or pressing `c`) runs `/compact`. It's in the
-  pane by default, and in the band once the context is half full.
+- **A `compact` block**: the context window as a bar, like the 5-hour
+  limit's, and a button that compacts the conversation (or press `c`),
+  through Claude Code's own compaction, the call `/compact` makes. The bar
+  shows from the start: Claude Code's local estimate of the context until
+  the first reply, then each reply's measurement. It's always in the pane,
+  and in the band.
+- **Collapsible task groups.** In progress, Stopped partway and Not started
+  are each a heading you click (or press `i`, `s`, `n`) to open or close,
+  with its count: `▾ In progress · 3`. What needs you starts open; Not
+  started starts closed, so the whole board fits without scrolling.
+- **`/board` asks for a taller pane**, room for the whole board. Where the
+  surface gives less, the pane's body scrolls with the mouse wheel.
 - **A tutorial**, [docs/TUTORIAL.md](docs/TUTORIAL.md): from install to two
   agents sharing a board, reading the display, your task.md and its
   priorities, other agents, settings, and what to do when something looks
@@ -38,20 +47,20 @@ where they tell you something.
 
 ### Changed
 
-- **Defaults.** The band is now `summary,usage,compact`, and the pane
-  `tasks,taskfile,compact,usage`. Model and effort are still blocks you can
-  add to the band; Claude Code already shows both.
-- **One ring for "how full".** Usage is drawn with the same ring as the
-  context instead of a bar, and the two line up in the pane.
+- **Defaults.** The band is now `summary,usage,compact,model,effort`
+  (compact joins, before model and effort, which drop first on a narrow
+  line), and the pane `tasks,taskfile,compact,usage`.
+- **The 5-hour limit keeps its bar**, now plain with room left instead of
+  green.
 - **Colour only when something needs you**: yellow from 70%, red from 90%.
   With room left, usage and context stay plain (usage used to be green).
 - **The weekly limit is left off the board.** The 5-hour limit stays;
   `/usage` has the rest.
-- **A quieter pane.** Headings are dimmed. Rows lose their ◐/○ mark, since
-  the heading says the state, and name only who ("backend", "you"), since
-  the heading says what. "Needs picking up" is now "Stopped partway".
-  "Not started" shows eight tasks, then "N more"; what's in progress or
-  stopped partway is never cut.
+- **A quieter pane.** Rows lose their ◐/○ mark, since the heading says the
+  state, and name only who ("backend", "you"), since the heading says what.
+  "Needs picking up" is now "Stopped partway". Opened, "Not started" shows
+  eight tasks, then "N more"; what's in progress or stopped partway is
+  never cut.
 - **The clock** in the pane is dimmed instead of bold.
 
 ### Reading task files

@@ -22,7 +22,7 @@ function Row(c: Ctx, t: Task) {
   // The group's heading already says the task's state; the row needs no mark.
   return (
     <Box>
-      <Box width={7}>
+      <Box width={7} flexShrink={0}>
         <Text dimColor>{t.id}</Text>
       </Box>
       <Box flexGrow={1} flexShrink={1}>
@@ -41,18 +41,41 @@ function Row(c: Ctx, t: Task) {
   )
 }
 
-// A heading, quiet so the tasks lead, then its rows. With a `limit`, rows
-// past it become one count.
-function Group(c: Ctx, title: string, list: Task[], limit = Infinity) {
-  const { Box, Text } = c.ui
+// The groups, each a heading that opens and closes like the task file's.
+// What needs you starts open; what nobody has started starts closed, one line
+// with its count, so the pane fits on screen.
+export const GROUPS = {
+  'in-progress': { title: 'In progress', hotkey: 'i', open: true },
+  partway: { title: 'Stopped partway', hotkey: 's', open: true },
+  'not-started': { title: 'Not started', hotkey: 'n', open: false },
+} as const
+export type GroupName = keyof typeof GROUPS
+
+// Whether a group is open: as the person last left it, else its default.
+export const groupOpen = (chosen: Record<string, boolean>, name: GroupName) => chosen[name] ?? GROUPS[name].open
+
+// A heading that is a button ("▾ In progress · 2"), then, open, its rows. With
+// a `limit`, rows past it become one count.
+function Group(c: Ctx, name: GroupName, list: Task[], limit = Infinity) {
+  const { Box, Button, Text } = c.ui
   if (!list.length) return null
+  const open = groupOpen(c.groupsOpen, name)
   return (
     <Box flexDirection="column">
-      <Text dimColor>{title}</Text>
-      {list.slice(0, limit).map(t => Row(c, t))}
-      {list.length > limit && (
-        <Box paddingLeft={7}>
-          <Text dimColor>{`${list.length - limit} more`}</Text>
+      <Button
+        key={`group-${name}`}
+        hotkey={GROUPS[name].hotkey}
+        label={`${open ? '▾' : '▸'} ${GROUPS[name].title} · ${list.length}`}
+        onPress={() => c.act.toggleGroup(name)}
+      />
+      {open && (
+        <Box flexDirection="column" paddingLeft={2}>
+          {list.slice(0, limit).map(t => Row(c, t))}
+          {list.length > limit && (
+            <Box paddingLeft={7}>
+              <Text dimColor>{`${list.length - limit} more`}</Text>
+            </Box>
+          )}
         </Box>
       )}
     </Box>
@@ -70,11 +93,15 @@ export const tasks: Block = {
     const todo = c.tasks.filter(t => t.status === 'todo')
     const done = c.tasks.filter(t => t.status === 'done').length
     return (
-      <Box flexDirection="column" gap={1}>
-        {Group(c, 'In progress', c.tasks.filter(t => t.status === 'claimed'))}
-        {Group(c, 'Stopped partway', todo.filter(handoffWaiting))}
-        {Group(c, 'Not started', todo.filter(t => !handoffWaiting(t)), SHOWN)}
-        {done > 0 && <Text dimColor>{`${done} done`}</Text>}
+      <Box flexDirection="column">
+        {Group(c, 'in-progress', c.tasks.filter(t => t.status === 'claimed'))}
+        {Group(c, 'partway', todo.filter(handoffWaiting))}
+        {Group(c, 'not-started', todo.filter(t => !handoffWaiting(t)), SHOWN)}
+        {done > 0 && (
+          <Box paddingLeft={2}>
+            <Text dimColor>{`${done} done`}</Text>
+          </Box>
+        )}
       </Box>
     )
   },

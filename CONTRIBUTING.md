@@ -81,8 +81,8 @@ through each kind.
 - **Show what's left, then a count.** Long lists stop at eight rows
   (`SHOWN` in `hooks/blocks/types.tsx`) and end in "N more". Work that needs
   the person is never cut.
-- **One look for one idea.** Anything that fills up uses the ring in
-  `hooks/blocks/meter.tsx`.
+- **One look for one idea.** Anything that fills up uses the bar in
+  `hooks/blocks/meter.tsx`: the context and the 5-hour limit both do.
 - **No new dependencies** in the CLI or engine.
 - **Commit messages** say what changed and why, in a short first line and,
   where it helps, a few lines below it.

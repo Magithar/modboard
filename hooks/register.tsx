@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Agent, Task, TaskFile } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
+import { groupOpen, type GroupName } from './blocks/tasks'
 import { nextTier, openItems } from './blocks/taskfile'
 
 // The mod is an adapter: every board read and write goes through bin/board.mjs,
@@ -29,6 +30,7 @@ const custom = atom({ plugin: 'modboard', key: 'custom' } as const, {} as Record
 const taskfile = atom({ plugin: 'modboard', key: 'taskfile' } as const, { file: null, items: [] } as TaskFile)
 const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, false)
 const taskfileTier = atom({ plugin: 'modboard', key: 'taskfileTier' } as const, '')
+const groupsOpen = atom({ plugin: 'modboard', key: 'groupsOpen' } as const, {} as Record<string, boolean>)
 
 let session = ''
 let lastBeat = 0
@@ -65,6 +67,18 @@ async function takeName($: EngineInterface, wanted: string | undefined) {
   return name
 }
 
+// The context window's fill before the session's first reply, when Claude Code
+// has not measured it yet: its own local estimate, as /context makes, with no
+// API call. Each reply's measurement (session.measure) replaces it.
+async function estimateContext($: EngineInterface) {
+  if ((await read($, usage)).context !== undefined) return
+  try {
+    const now = await $.session.usage({ breakdown: 'summary' })
+    const percent = now.context.percent ?? now.context.breakdown?.percentage
+    if (percent !== undefined) await update($, usage, u => ({ ...u, context: percent }))
+  } catch {}
+}
+
 // Whether any shown block reads task.md; when none does, it is never read.
 let readsTaskfile = false
 
@@ -77,11 +91,11 @@ async function refresh($: EngineInterface) {
   }
   if (readsTaskfile) {
     const file = await cli($, ['taskfile', '--json'])
-    let read: TaskFile | undefined
+    let parsed: TaskFile | undefined
     try {
-      read = file.ok ? (JSON.parse(file.text) as TaskFile) : undefined
+      parsed = file.ok ? (JSON.parse(file.text) as TaskFile) : undefined
     } catch {}
-    if (read) await update($, taskfile, () => read!)
+    if (parsed) await update($, taskfile, () => parsed!)
   }
 }
 
@@ -218,8 +232,13 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       await $.command.run({ command: 'effort', args: to }).catch(() => $.ui.toast(`board: could not set effort to ${to}`))
       await update($, effort, () => to)
     },
+    // The same call /compact makes. Claude Code refuses it while a turn runs.
     compact: async () => {
-      await $.command.run({ command: 'compact' }).catch(() => $.ui.toast('board: could not compact the conversation'))
+      $.ui.toast('board: compacting the conversation…')
+      await $.session.compact().catch(() => $.ui.toast("board: can't compact while Claude is working; press again when it's idle"))
+    },
+    toggleGroup: async (name: string) => {
+      await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
     },
     toggleTaskfile: async () => {
       await update($, taskfileOpen, open => !open)
@@ -250,6 +269,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     taskfile: await read($, taskfile),
     taskfileOpen: await read($, taskfileOpen),
     taskfileTier: await read($, taskfileTier),
+    groupsOpen: await read($, groupsOpen),
     act,
   }
 }
@@ -257,7 +277,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
 export const register: Register = (on, options) => {
   const { commands, problems } = parseCommandBlocks(options.blocks, BLOCKS.map(b => b.name))
   const all = [...BLOCKS, ...Object.keys(commands).map(commandBlock)]
-  const band = pick(all, options.band, 'summary,usage,compact').filter(b => b.band)
+  const band = pick(all, options.band, 'summary,usage,compact,model,effort').filter(b => b.band)
   const pane = pick(all, options.pane, 'tasks,taskfile,compact,usage').filter(b => b.pane)
   readsTaskfile = [...band, ...pane].some(b => b.name === 'taskfile')
   const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
@@ -289,6 +309,7 @@ export const register: Register = (on, options) => {
         isDeferred: false,
       })
     await $.command.register({ name: 'board', description: 'Open the modboard pane' })
+    await estimateContext($)
 
     await refresh($)
     $.clock.every(POLL_MS, () => refresh($).catch(() => {}))
@@ -354,7 +375,10 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'board' }, async $ => {
     await refresh($)
-    const opened = await $.ui.open({ id: PANE, title: 'modboard' })
+    await estimateContext($)
+    // Ask for room for the whole board; the surface may give less, and the
+    // pane's body scrolls with the wheel when it does.
+    const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
     if (opened.isPlaced) return { text: 'Board pane opened.' }
     const list = (await read($, tasks)).filter(t => t.status !== 'done')
     return { text: list.map(t => `${SYMBOL[t.status]} ${t.id}  ${t.title}${t.claim ? `  ${t.claim.owner}` : ''}`).join('\n') || '(no open tasks)' }

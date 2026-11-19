@@ -20,7 +20,7 @@
       "type": "string",
       "title": "Band blocks",
       "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, usage, compact, model, effort, clock, context, or your own from Your own blocks.",
-      "default": "summary,usage,compact"
+      "default": "summary,usage,compact,model,effort"
     },
     "pane": {
       "type": "string",
