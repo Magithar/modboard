@@ -14,11 +14,11 @@ const COLS = 100
 // Each part: [text, class]. Dim is the terminal's dim, ok green, warn yellow.
 const parts = [
   [['2 waiting', 'dim'], [' · ', 'dim'], ['1 active', 'ok']],
-  [['T-005 stopped partway', 'warn']],
-  [['model ', 'dim'], ['Sonnet 5.5', 'bold']],
-  [['effort ', 'dim'], ['low', 'bold']],
+  [[' T-005 ', 'box']],
+  [['Sonnet 5.5', 'bold']],
+  [['low', 'bold']],
 ]
-const end = [['full board', 'bold']]
+const end = [['modBOARD', 'okbold']]
 const len = p => p.reduce((n, [t]) => n + [...t].length, 0)
 const span = p => p.map(([t, c]) => `<span class="${c}">${t}</span>`).join('')
 const left = parts.map(span).join('   ')
@@ -33,7 +33,7 @@ body{margin:0;background:#141414}
 .wrap{padding:24px 26px;display:inline-block}
 pre{margin:0;background:#0c0c0c;border:1px solid #2a2a2a;border-radius:10px;padding:18px 22px;
 font:13px/1.35 Menlo,"SF Mono",monospace;color:#dcdcdc}
-.dim{color:#8a8a8a} .ok{color:#4ec27a} .warn{color:#e5b94e} .bold{color:#f2f2f2;font-weight:700}
+.dim{color:#8a8a8a} .ok{color:#4ec27a} .okbold{color:#4ec27a;font-weight:700} .box{background:#e5b94e;color:#0c0c0c;font-weight:700} .warn{color:#e5b94e} .bold{color:#f2f2f2;font-weight:700}
 .rule{color:#3a3a3a} .prompt{color:#f2f2f2}
 </style></head><body><div class="wrap"><pre>${line}
 

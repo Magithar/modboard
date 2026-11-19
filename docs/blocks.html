@@ -88,10 +88,10 @@
         built in                        your own, no code                 your own, in code
         hooks/blocks/*.tsx              the blocks setting, as JSON:      a file of the same shape
         listed in index.ts              {"ci": "gh run list ..."}         in hooks/blocks/, listed
-        summary · tasks · taskfile      every 30 s: sh -c the command,    in index.ts, in your copy
-        usage · compact · model         show its first line (60 chars)    of the mod: a fork or a PR
-        effort · clock · context
-        agents
+        summary · board · tasks         every 30 s: sh -c the command,    in index.ts, in your copy
+        taskfile · usage · compact      show its first line (60 chars)    of the mod: a fork or a PR
+        model · effort · clock
+        context · agents
             <span class="d">│</span>                               <span class="d">│</span>                                 <span class="d">│</span>
             <span class="d">└</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┼</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">─</span><span class="d">┘</span>
                                             <span class="d">▼</span>
@@ -105,8 +105,10 @@
           band?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> its forms, widest first      tasks · agents · who you are
                          [ { tree, width }, ... ]     usage · context · model · effort · the time
                          or null: nothing to say      your command blocks' output · the task file
-          pane?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> one part of the pane         the width · act: nextModel · nextEffort
-                         or null }                    compact · toggleTaskfile · nextTier
+          pane?(ctx) <span class="d">─</span><span class="d">─</span><span class="d">▶</span> one part of the pane         the width · which groups are open
+                         or null                      act: nextModel · nextEffort · compact
+          brief?(ctx) <span class="d">─</span><span class="d">▶</span> a bar's figures, for the     toggleTaskfile · nextTier · toggleGroup
+                         folded Limits heading }      showGroup · openBoard
 
 
 <span class="h">  DISPLAY BLOCKS</span><span class="d">:  HOW THE BAND FITS ONE LINE</span>
@@ -119,13 +121,11 @@
         4  still too long?  narrow the first block (the summary); its alert outlasts its counts
         5  never wraps; with nothing to say, the line disappears
 
-        94 cols   2 waiting · 1 active   T-005 stopped partway   model Sonnet 5.5   effort low   full board
-        80 cols   2 waiting · 1 active   T-005 stopped partway   Sonnet 5.5   low   full board
-        74 cols   2 waiting · 1 active   T-005 stopped partway   Sonnet 5.5   full board
-        62 cols   2 waiting · 1 active   T-005 stopped partway   full board
-        50 cols   2 waiting · 1 active   T-005 stopped partway
-        42 cols   2 waiting · 1 active   T-005 partway
-        20 cols   T-005 partway
+        66 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   low   modBOARD
+        60 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   modBOARD
+        48 cols   2 waiting · 1 active   [T-005]   modBOARD
+        36 cols   2 waiting · 1 active   [T-005]
+        20 cols   [T-005]
 
         the pane has room to spare: each block's part, stacked in the pane setting's order
 </pre></div></body></html>

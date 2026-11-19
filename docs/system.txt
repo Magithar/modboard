@@ -3,11 +3,12 @@
   ┌─────────────────────────────────────────┐      ┌─────────────────────────────────────────┐
   │ Claude Code session  (the mod)          │      │ Codex · OpenCode · a shell · a person   │
   │                                         │      │                                         │
-  │ tools   board_list  board_show          │      │ board claim T-001 --as codex            │
+  │ tools   board_list  board_show          │      │ board claim T-001                       │
   │         board_add   board_claim         │      │ board note · release · done             │
   │         board_note  board_release       │      │                                         │
   │         board_done                      │      │                                         │
-  │ name    BOARD_AGENT, else claude:<id>   │      │ name    BOARD_AGENT, or --as            │
+  │ name    claude 1, claude 2 … or         │      │ name    codex 1 … by its thread, or     │
+  │         BOARD_AGENT                     │      │         BOARD_AGENT, or --as            │
   │ alive   heartbeat on tool calls,        │      │ alive   board heartbeat, or a note      │
   │         presence ping every 60 s        │      │                                         │
   │ ends    releases all, with a handoff    │      │                                         │
@@ -48,8 +49,8 @@
                  ┌───────────────────┴────────────────────┐
                  ▼                                        ▼
         band above the prompt                    /board pane
-        summary · usage · compact                tasks · taskfile · compact · usage
-        model · effort · clock · context         agents · model · effort · clock · context
+        summary · model · effort · modBOARD      tasks · taskfile · compact · usage
+        usage · compact · clock · context        agents · model · effort · clock · context
         + your own blocks                        + your own blocks
 
 
@@ -65,5 +66,5 @@
           │ or session silent 3 min     │   │  release --handoff,
           └─────────────────────────────┘   │  or its session ends
                                             ▼
-                                          ○ Stopped partway ───── claim ────▶ ◐ In progress
+                                          ○ Unfinished ───────── claim ────▶ ◐ In progress
                                                                               (the next agent reads the handoff first)
