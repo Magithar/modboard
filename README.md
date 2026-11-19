@@ -2,10 +2,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
-  <a href="https://www.npmjs.com/package/modboard"><img src="https://img.shields.io/npm/v/modboard" alt="npm version"/></a>
-  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node 18 or newer"/>
+  <img src="https://img.shields.io/github/v/release/Magithar/modboard?include_prereleases&label=release" alt="Release"/>
   <a href="https://www.npmjs.com/package/modboard"><img src="https://img.shields.io/npm/dt/modboard" alt="npm downloads"/></a>
-  <img src="https://img.shields.io/badge/dependencies-0-brightgreen.svg" alt="No dependencies"/>
   <img src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-d97757.svg" alt="Claude Code 2.1.295 or newer"/>
 </p>
 
