@@ -11,7 +11,7 @@
 
 <p align="center">
   <b>One task board every coding agent shares, built from blocks you can add to.</b><br/>
-  Works with Claude Code, Codex, OpenCode and anything with a shell, a person included.
+  Works with Claude Code, Codex, OpenCode, anything with a shell, and people.
 </p>
 
 <p align="center">
@@ -29,8 +29,8 @@
 
 ## What it does
 
-One universal board for every agent you run. Two Claude Code sessions, a
-Codex session and a person can all take tasks from it, see who holds what, and
+modBOARD is one universal board for every agent you run. Two Claude Code
+sessions, a Codex session and a person can all take tasks from it, see who holds what, and
 hand unfinished work to each other without losing context. It's built from
 blocks, so you can add your own and show whatever you need on it.
 
@@ -56,13 +56,13 @@ before the two workers start is cut.
    `claude 2` and `claude 3` are each told to work the board.
 2. Both go for T-001. `claude 2` wins, and `claude 3` is refused and takes
    T-002.
-3. `claude 2` writes part of T-003, then hands it off. Every band shows
-   `T-003` in a yellow box, and the pane lists it under Unfinished with the
+3. `claude 2` writes part of T-003, then hands it off. The line above every
+   prompt (the band) shows `T-003` in a yellow box, and the pane lists it under Unfinished with the
    handoff as points.
 4. `claude 3` reads the handoff, finishes T-003, and the pane ends on
    `Done · 3`.
 
-The demo project has no task file, so To do doesn't appear here; see
+The demo project has no task file, so **To do** doesn't appear here; see
 [Your task.md](#your-taskmd).
 
 ---
@@ -80,9 +80,9 @@ The demo project has no task file, so To do doesn't appear here; see
 npm install -g modboard
 ```
 
-Or from source: `git clone https://github.com/Magithar/modboard.git`, then
-`cd modboard && npm link`. Inside one project only: `npm install --save-dev
-modboard`, then `npx board …`.
+Or from source: clone `https://github.com/Magithar/modboard.git` and run
+`npm link` inside it. To use it in one project only, run
+`npm install --save-dev modboard` there, then `npx board …`.
 
 **2. Connect your agents.**
 
@@ -90,7 +90,7 @@ modboard`, then `npx board …`.
 |---|---|---|
 | **Claude Code** | `claude --plugin-dir /path/to/modboard` | `claude 1`, `claude 2`, … |
 | **Codex** | put the protocol below in `AGENTS.md` | `codex 1`, `codex 2`, … |
-| **OpenCode, a shell** | `export BOARD_AGENT=opencode`, and the protocol in `AGENTS.md` | the name you set |
+| **OpenCode, a shell** | `export BOARD_AGENT=opencode`, and put the protocol in `AGENTS.md` | the name you set |
 | **A person** | use the same `board` commands | the name you set |
 
 The protocol, for any agent's instructions:
@@ -99,8 +99,8 @@ The protocol, for any agent's instructions:
 > finishing, release it with a handoff. Never touch a task another agent holds.
 
 Claude Code gets the board's tools, a line above the prompt and the `/board`
-pane. Names come by themselves: the board numbers sessions as they join. To
-pick one yourself, start with `BOARD_AGENT=frontend`.
+pane. Names are automatic: the board numbers sessions as they join. To pick
+one yourself, start Claude Code with `BOARD_AGENT=frontend`.
 
 > [!IMPORTANT]
 > **Early access.** The Claude Code mod uses Claude Code's function-hooks API,
@@ -180,8 +180,8 @@ One line above the prompt, while there's work on the board:
 
 | Part | What it means | Click it to |
 |---|---|---|
-| `2 waiting · 1 active` | tasks not started, and tasks being worked on (green) | |
-| `T-005` in a yellow box | someone stopped it partway and left a handoff; up to three boxes, then `+N` | open `/board` at Unfinished; again to fold it |
+| `2 waiting · 1 active` | tasks not started, and tasks being worked on (in green) | |
+| `T-005` in a yellow box | someone stopped it partway and left a handoff; up to three boxes, then `+N` | open `/board` at Unfinished; click again to fold it |
 | `Sonnet 5.5` · `low` | the model and effort | switch to the next one |
 | `modBOARD` | the board | open or close `/board` |
 
@@ -228,7 +228,7 @@ right end.
 
 | Section | What it shows |
 |---|---|
-| **In progress** | who is on what. `codex 1 · idle` in yellow: no word from it for most of its claim |
+| **In progress** | who is on what. `codex 1 · idle` in yellow: no note or heartbeat for most of its claim's time |
 | **Unfinished** | work stopped partway, with the handoff as points |
 | **Not started** | everything waiting |
 | **Done** | what's finished, and who finished it |
@@ -238,13 +238,13 @@ right end.
 - **Every heading is a button.** Click to open or close it. In progress and
   Unfinished start open, because they need you.
 - **Colour only when something needs you**: yellow for unfinished or idle work
-  and a limit past 70%, red past 90%.
+  and for a limit past 70%; red for a limit past 90%.
 - If the board stops answering, a red `board not updating: …` line says so at
   the top until it answers again.
 
 ### Your task.md
 
-If your project has a `task.md`, `tasks.md` or `todo.md` (any case) at its
+If your project has a `task.md`, `tasks.md` or `todo.md` (upper or lower case) at its
 root or in `docs/`, the pane shows what's left in it under **To do**.
 
 <table>
@@ -264,8 +264,8 @@ root or in `docs/`, the pane shows what's left in it under **To do**.
 - **Priorities** are read from a heading (`## P0 — launch`, `## Sync (P1)`),
   an item (`- [ ] P2 Benchmarks`, which wins over its heading), or a table with
   a Priority column.
-- **Only what's left shows.** Checked-off, struck-through (`~~old~~`) and
-  done table rows stay out.
+- **Only what's left shows.** Checked-off items, struck-through items
+  (`~~old~~`) and done table rows stay out of the list.
 - **It's read-only.** The board never writes the file, and its items can't be
   claimed. To work one through the board, `board add` it.
 
@@ -308,19 +308,20 @@ pane: tasks,taskfile,compact,usage      (the default)
 | `tasks` | | ✓ | In progress, Unfinished, Not started and Done |
 | `taskfile` | | ✓ | your task.md under To do |
 | `compact` | ✓ | ✓ | the context window as a bar, and a button that compacts the conversation |
-| `usage` | ✓ | ✓ | the 5-hour limit as a bar (in the band only past 50%) |
+| `usage` | ✓ | ✓ | the 5-hour limit as a bar (in the band, only once it passes 50%) |
 | `model` | ✓ | ✓ | the model; click to switch |
 | `effort` | ✓ | ✓ | the effort level; click to step through |
 | `clock` | ✓ | ✓ | the time |
 | `context` | ✓ | ✓ | context fill and the session's cost, as text |
 | `agents` | | ✓ | who is live on the board |
 
-On a short band, the last blocks drop first, so put what matters most first.
+In a narrow window, the band's last blocks drop first, so put what matters
+most first.
 
 ### Model and effort
 
 Clicking the model or effort runs Claude Code's own `/model` or `/effort`, the
-same as typing it. In the pane they also answer to `m` and `e`.
+same as typing it. In the pane, the keys `m` and `e` do the same.
 
 | Setting | Default | What it is |
 |---|---|---|
@@ -328,7 +329,7 @@ same as typing it. In the pane they also answer to `m` and `e`.
 | `efforts` | `low,medium,high,xhigh,max` | what the effort button steps through |
 
 `/effort` saves the level as your default for new sessions, except `max`,
-which lasts for this session only. Before the first request, the effort shows
+which lasts for this session only. Before the first request, the effort block shows
 the level the session will start on: `CLAUDE_CODE_EFFORT_LEVEL` if set, else
 the model's own `effortLevel` under `modelSettings`, else the general
 `effortLevel`.
@@ -337,8 +338,8 @@ the model's own `effortLevel` under `modelSettings`, else the general
 
 | Variable | Default | What it does |
 |---|---|---|
-| `BOARD_AGENT` | numbered for you | the name to use on the board |
-| `BOARD_DIR` | `.modboard/` by the repo | where the board lives |
+| `BOARD_AGENT` | a number, given by the board | the name to use on the board |
+| `BOARD_DIR` | `.modboard/`, beside the repo's git folder | where the board lives |
 | `BOARD_LEASE_MS` | 15 minutes | how long a claim lasts without a note or heartbeat |
 | `BOARD_PRESENCE_MS` | 3 minutes | how long a Claude session can be silent before its claims go back |
 
@@ -346,14 +347,14 @@ the model's own `effortLevel` under `modelSettings`, else the general
 
 ## How it works
 
-![How modboard fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
+![How modBOARD fits together: who works on the board, the CLI down to storage, what you see, and a task's life](docs/system.png)
 
 One small Node CLI, `board`, owns the board; it has no dependencies. The Claude
-Code mod sits on top of it and adds what only Claude Code can: the session's
+Code mod sits on top of it and adds what only Claude Code can provide: the session's
 name, a heartbeat on every tool call, and the display. Every other agent uses
 the CLI directly.
 
-| Rule | How it works |
+| | How it works |
 |---|---|
 | **Where the board lives** | `.modboard/`, beside the repo's git folder, so every worktree shares one board. Add it to `.gitignore`. |
 | **One claim wins** | Each change takes a lock and replaces the board in one step, so exactly one claimant wins. Only the holder can note, release or finish a task. |
@@ -377,14 +378,14 @@ the CLI directly.
   atomic rename.
 - **Names you choose:** if another live session already holds the name you
   ask for, the new one becomes `frontend-2` and a toast says why.
-- **Codex** sends no presence ping, so its name and claims last as long as its
-  claims' leases. An agent that never registered (a plain shell) is the same.
+- **Codex** sends no presence ping, so its name and claims last only as long
+  as its leases. An agent that never registered (a plain shell) is the same.
 - **A board made before the rename**, in `.agent-board/`, keeps working where
   it is.
 
 </details>
 
-### What modboard is not
+### What modBOARD is not
 
 - **Not a project manager:** no due dates, assignees or per-team boards.
 - **Not an agent runner:** it never starts, stops or prompts an agent.
@@ -398,12 +399,12 @@ how each finished task was checked.
 
 ## Make your own block
 
-modboard is built from blocks, and you can add your own. Pick the row that
+modBOARD is built from blocks, and you can add your own. Pick the row that
 matches what you want:
 
 | I want to… | Make | You write |
 |---|---|---|
-| show a command's output (CI status, git branch…) | [a command block](#a-display-block-from-a-command-no-code) | one line of settings, no code |
+| show a command's output (CI status, git branch…) | [a command block](#a-display-block-from-a-command-no-code) | two settings, no code |
 | show something from the board, or react to a click | [a display block in code](#a-display-block-in-code) | one `.tsx` file |
 | keep the board somewhere else (a database, a server) | [a storage block](#a-storage-block-an-adapter) | one `.mjs` file |
 
@@ -498,8 +499,7 @@ What a block gets (the full shape is in [`types.tsx`](hooks/blocks/types.tsx)):
 
 Two rules keep the display calm:
 
-- **Colour only when something needs the person** (theme `warning` and
-  `error`).
+- **Colour only when something needs you** (theme `warning` and `error`).
 - **No word or mark that the heading or the order already says.**
 
 For anything that fills up, reuse the bar in `meter.tsx`, as the context and
@@ -563,8 +563,8 @@ Copy from [`examples/store-memory.mjs`](examples/store-memory.mjs), a short,
 complete block, or [`lib/store-file.mjs`](lib/store-file.mjs), the built-in
 one.
 
-**2. Test it against the contract.** The suite races claims, adds at once,
-sends stale writes and reuses names, and fails if your block lets any of them
+**2. Test it against the contract.** The suite races claims, adds tasks at
+once, sends stale writes and reuses names, and fails if your block lets any of them
 through:
 
 ```js
@@ -639,11 +639,11 @@ the tool descriptions:
 | Both told "do the next task on the board" | they collided on one task; the loser moved to another by itself; each claimed before writing files |
 | One session does part 1 and releases with a handoff | the other read the handoff and resumed from part 2 without redoing part 1 |
 | `codex` claims a task from the shell | Claude was refused, said so, and left it alone |
-| An agent's lease runs out | the task returns to todo, and the ledger records `expire` |
+| An agent's lease runs out | the task goes back to waiting, and the ledger records `expire` |
 
-The task file, priorities, compact button and automatic names came later, and
-have run in live sessions while being built, including the demo above, but not
-through this full set.
+The task file, priorities, compact button and automatic names came later.
+They've run in live sessions while being built (the demo above shows the
+automatic names), but haven't been through this full set.
 
 </details>
 
@@ -674,7 +674,7 @@ on session end, and choosing blocks.
   built keeps the board in local files.
 - **Usage is per session.** The usage bar shows this session's own plan usage,
   not the other agents'.
-- **A killed CLI agent waits out its lease.** A killed Claude session frees its
+- **A killed CLI agent's claims wait out their lease.** A killed Claude session frees its
   claims after 3 minutes of silence; a plain CLI agent that never registered
   waits out the full 15.
 - **A verification note is the agent's word.** The board requires one but
@@ -720,6 +720,9 @@ modboard/
 │   └── icon.png             # the plugin's icon
 ├── test/                    # CLI and store contract tests (npm test)
 ├── tests/                   # mod tests (claude plugin test .)
+├── CHANGELOG.md             # what changed in each version
+├── ROADMAP.md               # what's planned next
+├── CONTRIBUTING.md          # how to contribute
 └── docs/
     ├── TUTORIAL.md          # from install to two agents sharing a board
     ├── system.txt  .png     # how it fits together
@@ -733,6 +736,8 @@ modboard/
 ```
 
 </details>
+
+---
 
 ## License
 
