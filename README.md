@@ -505,7 +505,8 @@ modboard/
 │   ├── blocks.txt  .png     # how blocks work
 │   ├── board-live.gif       # a live recording of three Claude sessions
 │   └── render.mjs           # rebuilds every image from its .txt
-└── CHANGELOG.md             # what changed in each version
+├── CHANGELOG.md             # what changed in each version
+└── CONTRIBUTING.md          # how to contribute
 ```
 
 Each diagram's source is plain text. After editing a `.txt`,
@@ -539,6 +540,9 @@ claude plugin validate .    # the mod's manifest and hooks
 
 Changing what the board shows? Run both test suites. Adding a storage block
 or a display block? Start at [Make your own block](#make-your-own-block).
+[CONTRIBUTING.md](CONTRIBUTING.md) has the full checklist, where each kind of
+change goes, and the style the project keeps. [CHANGELOG.md](CHANGELOG.md)
+lists what changed in each version.
 
 ---
 
