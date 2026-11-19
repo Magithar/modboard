@@ -17,7 +17,7 @@
     "test:mod": "claude plugin test .",
     "prepublishOnly": "npm test"
   },
-  "keywords": ["multi-agent", "task-board", "coordination", "claude-code", "codex"],
+  "keywords": ["modboard", "claude", "claude-code", "claude-code-plugin", "codex", "opencode", "llm-agents", "coding-agents", "multi-agent", "agent-coordination", "task-board", "kanban", "cli"],
   "repository": { "type": "git", "url": "git+https://github.com/Magithar/modboard.git" },
   "engines": { "node": ">=18" },
   "license": "MIT"
