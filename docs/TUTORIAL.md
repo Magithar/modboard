@@ -225,7 +225,7 @@ Tell both sessions to work the board. What you'll see:
   the other session is refused, says who holds it, and takes another.
 - **Work survives a stop.** If you stop `frontend` partway, or tell it to
   hand off, it releases with a handoff. The line above `backend`'s prompt
-  says *T-002 was stopped partway, pick it up*, and `backend` reads the
+  says *T-002 stopped partway*, and `backend` reads the
   handoff before resuming.
 - **A crashed session doesn't hold work hostage.** If a session is killed
   outright, its claims come back after its session has been silent for 3
@@ -247,18 +247,17 @@ thing: **yellow or red, look here.**
 ### The line above the prompt
 
 ```
-2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░  64%   context ▓▓▓▓▓▓▓░░░  72% compact   model Sonnet 5.5   effort low
+2 waiting · 1 active   T-005 stopped partway   model Sonnet 5.5   effort low   full board
 ```
 
 | Part | Says |
 |---|---|
-| `2 tasks waiting · 1 in progress` | the board at a glance |
-| `T-005 was stopped partway, pick it up` | the one thing that needs you: work someone handed off, or an agent that stopped responding |
-| `5-hour limit ▓▓▓▓▓▓░░░░ 64%` | your plan usage, shown once it's past half |
-| `context ▓▓▓▓▓▓▓░░░ 72% compact` | how full the context is. Click it to compact the conversation |
+| `2 waiting · 1 active` | the board at a glance; `active` is green |
+| `T-005 stopped partway` | in yellow, the one thing left unfinished: work someone handed off, or an agent that stopped responding |
+| `full board` | opens the `/board` pane, like typing `/board` |
 | `model Sonnet 5.5   effort low` | the session's model and effort. Click either to switch to the next one |
 
-Both bars turn yellow at 70% and red at 90%. On a narrow window the line shortens and drops parts from the right;
+The 5-hour limit and the context are in the `/board` pane, where both bars turn yellow at 70% and red at 90%. On a narrow window the line shortens and drops parts from the right;
 the alert is the last to go. With nothing waiting or in progress, it
 disappears.
 
@@ -276,7 +275,7 @@ disappears.
 
  ▸ TASKS.md · 6 open   P0 · 2
 
- context       ▓▓▓▓▓▓▓░░░  72%   [ compact ]
+ context       ▓▓▓▓▓▓▓░░░  72%   compact
 
  5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
@@ -300,9 +299,6 @@ The pane's buttons also answer to keys:
 | Key | Does |
 |---|---|
 | `i`, `s`, `n` | open or close In progress, Stopped partway, Not started |
-| `t` | open or close your task file's list |
-| `p` | turn the task file to its next priority |
-| `c` | run `/compact` |
 
 ---
 
@@ -336,14 +332,14 @@ The pane shows one line:
  ▸ TASKS.md · 5 open   P0 · 2
 ```
 
-Click the file name (or press `t`) to see what's left. Checked-off items stay
+Click the file name to see what's left. Checked-off items stay
 in the file and out of the pane.
 
 ### Priorities
 
 When the file has priorities, the second button turns through them, the way
 the effort button turns through levels. It starts on the most urgent. Each
-press (or `p`) shows the next tier, then `all`, then round again:
+press shows the next tier, then `all`, then round again:
 
 ```
  ▾ TASKS.md · 5 open   P0 · 2         ▾ TASKS.md · 5 open   P1 · 1
@@ -356,14 +352,14 @@ press (or `p`) shows the next tier, then `all`, then round again:
  ▾ TASKS.md · 5 open   all
 
  P0  Fix the signup crash
-     Rate-limit the login API
+ P0  Rate-limit the login API
  P1  Empty states for the inbox
  P2  Animate the sidebar
  –   Dark mode
 ```
 
-`all` names each priority once, where it starts. Items with no priority come
-last, after a dash.
+In `all`, every row shows its own priority, so each line is one task. Items
+with no priority come last, marked with a dash.
 
 Priority is read wherever your file keeps it:
 
@@ -440,7 +436,7 @@ Two settings list the display's blocks, in order:
 
 | Setting | Default | Also available |
 |---|---|---|
-| Band blocks (the line) | `summary,usage,compact,model,effort` | `clock`, `context` |
+| Band blocks (the line) | `summary,model,effort,board` | `usage`, `compact`, `clock`, `context` |
 | Pane blocks (`/board`) | `tasks,taskfile,compact,usage` | `agents`, `model`, `effort`, `clock`, `context` |
 
 The band's order is its order of importance: when the line is short, the

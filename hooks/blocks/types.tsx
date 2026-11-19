@@ -23,11 +23,12 @@ export type Ctx = {
   groupsOpen: Record<string, boolean>
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; compact: () => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void> }
 }
 
 // One way a block can draw in the band, and how many columns it takes.
-export type BandForm = { tree: any; width: number }
+// `end`: the part sits at the line's right end, by Claude Code's own control.
+export type BandForm = { tree: any; width: number; end?: boolean }
 
 // A block is one part of the board's display. It may draw in the band above
 // the prompt, in the /board pane, or both, and returns null when it has

@@ -4,6 +4,7 @@
 // command's output need no code: see command.tsx and the `blocks` setting.
 
 import { agents } from './agents'
+import { board } from './board'
 import { clock } from './clock'
 import { compact } from './compact'
 import { context } from './context'
@@ -15,6 +16,6 @@ import { tasks } from './tasks'
 import { usage } from './usage'
 import type { Block } from './types'
 
-export const BLOCKS: Block[] = [summary, tasks, taskfile, usage, compact, model, effort, clock, context, agents]
+export const BLOCKS: Block[] = [summary, board, tasks, taskfile, usage, compact, model, effort, clock, context, agents]
 
 export type { BandForm, Block, Ctx } from './types'

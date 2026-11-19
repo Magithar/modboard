@@ -13,8 +13,9 @@ where they tell you something.
 
 - **A `taskfile` block** in the `/board` pane. When the checkout has a
   `task.md`, `tasks.md` or `todo.md` (any case) at its root or in `docs/`,
-  one line says how much of it is open. Click it (or press `t`) to see
-  what's left: up to eight items, then a count of the rest. Checked-off
+  one line says how much of it is open. Click it to see
+  what's left: every open item, read again from the file on each click,
+  so what you just added shows. Checked-off
   items stay in the file and out of the pane. Nothing in it is claimed or
   written; to work an item through the board, `board add` it.
 - **Task file priorities.** P0–P9 are read from headings (`## P0 — …`,
@@ -22,12 +23,12 @@ where they tell you something.
   and from tables with a Priority column.
 - **A priority button** beside the task file, which turns through the tiers
   the file has the way the effort button turns through levels: `P0 · 3`,
-  `P1 · 5`, …, `all`, and round again (or press `p`). It starts on the most
+  `P1 · 5`, …, `all`, and round again. It starts on the most
   urgent and shows one tier at a time. `all` lists every priority in order,
-  each named once where it starts, with unprioritised items last, after a
-  dash.
+  each row with its own priority, with unprioritised items last, marked
+  with a dash.
 - **A `compact` block**: the context window as a bar, like the 5-hour
-  limit's, and a button that compacts the conversation (or press `c`),
+  limit's, and a button that compacts the conversation,
   through Claude Code's own compaction, the call `/compact` makes. The bar
   shows from the start: Claude Code's local estimate of the context until
   the first reply, then each reply's measurement. It's always in the pane,
@@ -47,9 +48,14 @@ where they tell you something.
 
 ### Changed
 
-- **Defaults.** The band is now `summary,usage,compact,model,effort`
-  (compact joins, before model and effort, which drop first on a narrow
-  line), and the pane `tasks,taskfile,compact,usage`.
+- **Defaults.** The band is now `summary,model,effort,board`: the 5-hour limit
+  and the context moved to the pane, which is `tasks,taskfile,compact,usage`.
+- **A shorter band.** It reads "2 waiting · 1 active   T-005 stopped
+  partway": `active` in green, what was left partway in yellow, with no
+  "pick it up".
+- **A `full board` button on the band** opens the `/board` pane: a plain
+  word, like the model's, at the line's right end by Claude Code's `[-]`.
+  On a short line, model and effort drop before it.
 - **The 5-hour limit keeps its bar**, now plain with room left instead of
   green.
 - **Colour only when something needs you**: yellow from 70%, red from 90%.

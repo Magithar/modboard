@@ -1,10 +1,8 @@
 import type { Block } from './types'
 import { goingQuiet, handoffWaiting } from './attention'
 
-const tasksWord = (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'}`
-
-// The band's main line: how much is waiting and in progress, and the one thing
-// that needs you. Plain words: the reader need not know the board's terms.
+// The band's main line: how much is waiting and active, and the one thing
+// that needs you. Short words: the reader need not know the board's terms.
 export const summary: Block = {
   name: 'summary',
   band: ({ ui: { Box, Text }, tasks, now }) => {
@@ -13,23 +11,25 @@ export const summary: Block = {
     if (!working && !open) return null
     const waiting = tasks.filter(handoffWaiting)
     const quiet = tasks.filter(t => goingQuiet(t, now))
-    const counts = [open && `${tasksWord(open)} waiting`, working && `${working} in progress`].filter(Boolean).join(' · ')
-    const short = [open && `${open} waiting`, working && `${working} active`].filter(Boolean).join(' · ')
+    // What is in progress is green, what was left partway yellow: one glance
+    // says what is moving and what is not finished.
     const alert = waiting.length
-      ? `${waiting[0]!.id} was stopped partway, pick it up${waiting.length > 1 ? ` (+${waiting.length - 1} more)` : ''}`
+      ? `${waiting[0]!.id} stopped partway${waiting.length > 1 ? ` +${waiting.length - 1}` : ''}`
       : quiet.length
         ? `${quiet[0]!.id}: ${quiet[0]!.claim!.owner} stopped responding`
         : ''
-    const shortAlert = waiting.length ? `${waiting[0]!.id} needs you` : quiet.length ? `${quiet[0]!.id} stopped` : ''
+    const shortAlert = waiting.length ? `${waiting[0]!.id} partway` : quiet.length ? `${quiet[0]!.id} stopped` : ''
+    const countParts = [
+      open ? <Text dimColor>{`${open} waiting`}</Text> : null,
+      open && working ? <Text dimColor> · </Text> : null,
+      working ? <Text color="success">{`${working} active`}</Text> : null,
+    ].filter(Boolean)
+    const countsWidth = (open ? `${open} waiting`.length : 0) + (open && working ? 3 : 0) + (working ? `${working} active`.length : 0)
     // The alert outlasts the counts: it is the one thing that needs you.
-    const form = (left: string, right: string) => ({
+    const form = (counts: boolean, right: string) => ({
       tree: (
         <Box gap={3}>
-          {left ? (
-            <Text dimColor wrap="truncate">
-              {left}
-            </Text>
-          ) : null}
+          {counts ? <Box flexShrink={0}>{countParts}</Box> : null}
           {right ? (
             <Text color="warning" wrap="truncate">
               {right}
@@ -37,10 +37,8 @@ export const summary: Block = {
           ) : null}
         </Box>
       ),
-      width: left.length + right.length + (left && right ? 3 : 0),
+      width: (counts ? countsWidth : 0) + right.length + (counts && right ? 3 : 0),
     })
-    return alert
-      ? [form(counts, alert), form(short, alert), form(short, shortAlert), form('', shortAlert)]
-      : [form(counts, ''), form(short, '')]
+    return alert ? [form(true, alert), form(true, shortAlert), form(false, shortAlert)] : [form(true, '')]
   },
 }

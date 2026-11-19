@@ -5,7 +5,7 @@ import { Bar, CELLS, barParts, barWidth } from './meter'
 // compacts the conversation (Claude Code's own compaction, the call /compact
 // makes). The fill is Claude Code's local estimate until the first reply,
 // then each reply's measurement. In the band, the whole part is the button;
-// in the pane, a framed [ compact ] beside the bar (or `c`), always there,
+// in the pane, the word compact beside the bar, a button like the model's, always there,
 // with an empty bar if no figure has come yet. The bar takes colour from 70%.
 export const compact: Block = {
   name: 'compact',
@@ -38,7 +38,9 @@ export const compact: Block = {
           Bar(ui, u.context)
         )}
         <Box marginLeft={3}>
-          <Button key="compact" hotkey="c" label="compact" onPress={act.compact} />
+          <Button key="compact" plain onPress={act.compact}>
+            <Text bold>compact</Text>
+          </Button>
         </Box>
       </Box>
     )

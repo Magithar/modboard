@@ -219,6 +219,15 @@ function after(cycle: string[], current: string) {
 
 // Switch the way the person would, through Claude Code's own commands, so
 // everything else in the session sees the change.
+// Open the /board pane, fresh: the board and the task file read again first.
+// Ask for room for the whole board; the surface may give less, and the pane's
+// body scrolls with the wheel when it does.
+async function openBoard($: EngineInterface) {
+  await refresh($)
+  await estimateContext($)
+  return $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
+}
+
 function actions($: EngineInterface, cycles: { models: string[]; efforts: string[] }): Ctx['act'] {
   return {
     nextModel: async () => {
@@ -233,6 +242,9 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       await update($, effort, () => to)
     },
     // The same call /compact makes. Claude Code refuses it while a turn runs.
+    openBoard: async () => {
+      await openBoard($)
+    },
     compact: async () => {
       $.ui.toast('board: compacting the conversation…')
       await $.session.compact().catch(() => $.ui.toast("board: can't compact while Claude is working; press again when it's idle"))
@@ -240,12 +252,15 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     toggleGroup: async (name: string) => {
       await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
     },
+    // A press reads the file again first, so what was just added is there.
     toggleTaskfile: async () => {
+      await refresh($)
       await update($, taskfileOpen, open => !open)
     },
     // Turn to the next priority the file has, wrapping through "all", and
     // show it: like effort, one press, one step.
     nextTier: async () => {
+      await refresh($)
       const items = openItems((await read($, taskfile)).items)
       const to = nextTier(items, await read($, taskfileTier))
       await update($, taskfileTier, () => to)
@@ -277,7 +292,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
 export const register: Register = (on, options) => {
   const { commands, problems } = parseCommandBlocks(options.blocks, BLOCKS.map(b => b.name))
   const all = [...BLOCKS, ...Object.keys(commands).map(commandBlock)]
-  const band = pick(all, options.band, 'summary,usage,compact,model,effort').filter(b => b.band)
+  const band = pick(all, options.band, 'summary,model,effort,board').filter(b => b.band)
   const pane = pick(all, options.pane, 'tasks,taskfile,compact,usage').filter(b => b.pane)
   readsTaskfile = [...band, ...pane].some(b => b.name === 'taskfile')
   const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
@@ -374,11 +389,7 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'board' }, async $ => {
-    await refresh($)
-    await estimateContext($)
-    // Ask for room for the whole board; the surface may give less, and the
-    // pane's body scrolls with the wheel when it does.
-    const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
+    const opened = await openBoard($)
     if (opened.isPlaced) return { text: 'Board pane opened.' }
     const list = (await read($, tasks)).filter(t => t.status !== 'done')
     return { text: list.map(t => `${SYMBOL[t.status]} ${t.id}  ${t.title}${t.claim ? `  ${t.claim.owner}` : ''}`).join('\n') || '(no open tasks)' }
@@ -390,13 +401,27 @@ export const register: Register = (on, options) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const c = await context($, e.props.bodyColumns, { Box, Text, Button }, actions($, cycles))
     const offered = band.map(b => b.band!(c)).filter((forms): forms is BandForm[] => forms !== null && forms.length > 0)
-    const parts = fit(offered, e.props.bodyColumns - CONTROL)
+    // A part at the line's end is placed last but kept second only to the
+    // first block: on a short line, the parts between it and the first go first.
+    const ranked = offered.map((forms, at) => ({ forms, at })).sort((x, y) => (x.at === 0 ? -1 : y.at === 0 ? 1 : Number(!!y.forms[0]!.end) - Number(!!x.forms[0]!.end)))
+    const kept = fit(ranked.map(r => r.forms), e.props.bodyColumns - CONTROL)
+    const parts = kept.map((part, i) => ({ part, at: ranked[i]!.at })).sort((x, y) => x.at - y.at).map(r => r.part)
     if (!parts.length) return next(e)
+    // A part marked `end` takes the room left over and sits at its right edge.
+    // Claude Code keeps its [-] outside bodyColumns, so the line may run its
+    // full width: the end part then sits a space from the [-].
+    const ends = parts.some(part => part.end)
     return (
-      <Box gap={GAP} flexWrap="nowrap">
-        {parts.map(part => (
-          <Box flexShrink={0}>{part.tree}</Box>
-        ))}
+      <Box gap={GAP} flexWrap="nowrap" width={ends ? e.props.bodyColumns : undefined}>
+        {parts.map(part =>
+          part.end ? (
+            <Box flexGrow={1} flexShrink={0} justifyContent="flex-end">
+              {part.tree}
+            </Box>
+          ) : (
+            <Box flexShrink={0}>{part.tree}</Box>
+          ),
+        )}
       </Box>
     )
   })

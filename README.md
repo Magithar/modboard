@@ -30,7 +30,7 @@ while they wrote their final summaries.
 `frontend` and `backend` are each told to work the board, and `viewer` has
 `/board` open. Both go for T-001. `frontend` wins, and `backend` is refused
 and takes T-002. `frontend` writes part of T-003, then hands it off. The band
-above its prompt says "T-003 was stopped partway, pick it up". `backend` reads
+above its prompt says "T-003 stopped partway". `backend` reads
 the handoff, finishes T-003, and the pane ends on "3 done".
 
 What each part of the screen means: [what you see](#what-you-see).
@@ -176,8 +176,13 @@ The display shows only what needs you. Everything else waits until you ask.
 **One line above the prompt**, always visible while there's work on the board:
 
 ```
-2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░  64%   context ▓▓▓▓▓▓▓░░░  72% compact   model Sonnet 5.5   effort low
+2 waiting · 1 active   T-005 stopped partway   model Sonnet 5.5   effort low   full board
 ```
+
+`1 active` is green: work is moving. `T-005 stopped partway` is yellow:
+something was left unfinished. The 5-hour limit and the context live in the
+`/board` pane; add `usage` or `compact` to the band setting to bring them
+back to the line.
 
 The line never wraps, and stays clear of Claude Code's own `[-]` control at
 its right end. In a narrow window its parts shorten first, then the
@@ -185,15 +190,13 @@ last ones drop off. The first block (the summary) keeps its full form longest,
 and the alert outlasts the counts:
 
 ```
-180 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5-hour limit ▓▓▓▓▓▓░░░░  64%   context ▓▓▓▓▓▓▓░░░  72% compact   model Sonnet 5.5   effort low
-140 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%   ctx ▓▓▓▓░  72%   Sonnet 5.5   low
-124 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%   ctx ▓▓▓▓░  72%   Sonnet 5.5
-112 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%   ctx ▓▓▓▓░  72%
-100 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up   5h ▓▓▓░░  64%
- 80 cols   2 tasks waiting · 1 in progress   T-005 was stopped partway, pick it up
- 64 cols   2 waiting · 1 active   T-005 was stopped partway, pick it up
- 42 cols   2 waiting · 1 active   T-005 needs you
- 20 cols   T-005 needs you
+ 94 cols   2 waiting · 1 active   T-005 stopped partway   model Sonnet 5.5   effort low   full board
+ 80 cols   2 waiting · 1 active   T-005 stopped partway   Sonnet 5.5   low   full board
+ 74 cols   2 waiting · 1 active   T-005 stopped partway   Sonnet 5.5   full board
+ 62 cols   2 waiting · 1 active   T-005 stopped partway   full board
+ 50 cols   2 waiting · 1 active   T-005 stopped partway
+ 42 cols   2 waiting · 1 active   T-005 partway
+ 20 cols   T-005 partway
 ```
 
 The alert names the one thing that needs you: a task someone stopped partway
@@ -218,7 +221,7 @@ waiting or in progress, the line disappears.
 
  ▸ TASKS.md · 4 open   P0 · 2
 
- context       ▓▓▓▓▓▓▓░░░  72%   [ compact ]
+ context       ▓▓▓▓▓▓▓░░░  72%   compact
 
  5-hour limit  ▓▓▓▓▓▓░░░░  64%   resets 12:00
 ```
@@ -238,48 +241,48 @@ as comma-separated lists, in order:
 
 | Block | Band | Pane | Shows |
 |---|---|---|---|
-| `summary` | ✓ | | what's waiting and in progress, and the one thing that needs you |
+| `summary` | ✓ | | what's waiting and active (green), and the one thing left partway (yellow) |
+| `board` | ✓ | | `full board`, a plain button that opens the `/board` pane. It sits at the line's right end, by Claude Code's `[-]`, and on a short line outlasts everything but the summary |
 | `tasks` | | ✓ | in progress, stopped partway and not started, each a heading you click (or `i`, `s`, `n`) to open or close; not started shows up to eight; then a count of done |
-| `taskfile` | | ✓ | the project's `task.md`: how much is open; click it (or press `t`) to see what's left, and turn its priority (`p`) |
+| `taskfile` | | ✓ | the project's `task.md`: how much is open; click it to see what's left, and click its priority to turn it |
 | `usage` | ✓ | ✓ | the 5-hour limit as a bar: in the band past 50%, in the pane with its reset. The weekly limit is left out (`/usage` has it) |
-| `compact` | ✓ | ✓ | the context window as a bar, like the 5-hour limit's, and a button that compacts the conversation (or press `c`). Always in the pane; in the band once Claude Code reports the context |
+| `compact` | ✓ | ✓ | the context window as a bar, like the 5-hour limit's, and a button that compacts the conversation. Always in the pane; in the band once Claude Code reports the context |
 | `model` | ✓ | ✓ | the session's model; click it to switch to the next one. |
 | `effort` | ✓ | ✓ | the effort level; click it to step to the next one, wrapping from the highest to the lowest. |
 | `clock` | ✓ | ✓ | the time |
 | `context` | ✓ | ✓ | context fill and the session's cost |
 | `agents` | | ✓ | who is live on the board |
 
-The defaults are `band: summary,usage,compact,model,effort` and `pane: tasks,taskfile,compact,usage`.
+The defaults are `band: summary,model,effort,board` and `pane: tasks,taskfile,compact,usage`.
 
 **task.md.** If the checkout has a `task.md`, `tasks.md` or `todo.md` (in
 any case) at its root or in `docs/`, the pane shows one quiet line: the
-file and how much of it is open. Click it (or press `t`) to see what's left.
+file and how much of it is open. Click it to see what's left.
 
 When the file has priorities, a second button turns through them, the way
-the effort button turns through levels. Each press (or `p`) steps to the next
+the effort button turns through levels. Each press steps to the next
 priority the file has, then to `all`, then round to the most urgent again,
 and shows that tier. It starts on the most urgent:
 
 ```
- ▾ TASKS.md · 14 open   P0 · 3
+ ▾ TASKS.md · 6 open   P0 · 3
 
  Build local ledger
  Wire news discovery
  Fix silent capture
 ```
 
-`all` shows every priority in order, each named once, where it starts:
+`all` shows every open item, most urgent first, each row with its own priority:
 
 ```
- ▾ TASKS.md · 14 open   all
+ ▾ TASKS.md · 6 open   all
 
  P0  Build local ledger
-     Wire news discovery
-     Fix silent capture
+ P0  Wire news discovery
+ P0  Fix silent capture
  P1  Supabase sync
-     Agent integration
+ P1  Agent integration
  –   Thumbnail-only mode
-     8 more
 ```
 
 Priority is read wherever your file keeps it:
@@ -289,9 +292,9 @@ Priority is read wherever your file keeps it:
 - **a table**: a Priority column beside a Task column, one item per row
 
 Within a priority the file's own order is kept. Items with none appear under
-`all`, last, after a dash. A tier the file doesn't have is skipped. Without priorities, the list keeps the file's order
-under its headings. Only what's left is shown, up to eight items, then a
-count of the rest. Checked-off and struck-through (`~~old~~`) items, or a
+`all`, last, marked with a dash. A tier the file doesn't have is skipped. Without priorities, the list keeps the file's order
+under its headings. Only what's left is shown, every open item, and each
+click reads the file again, so what you just added is there. Checked-off and struck-through (`~~old~~`) items, or a
 table row whose status is done, stay in the file and out of the pane. Once a
 file checks anything off, its plain bullets count as notes, not tasks.
 

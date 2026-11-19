@@ -156,7 +156,10 @@ test('the band says in plain words what is waiting, and the one thing that needs
   host(on, [handedOff('T-005', 'frontend'), task('T-001', 'claimed', 'codex'), task('T-002', 'todo')])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
-  expect(await texts(ui)).toEqual(['2 tasks waiting · 1 in progress', 'T-005 was stopped partway, pick it up'])
+  expect(await texts(ui)).toEqual(['2 waiting', ' · ', '1 active', 'T-005 stopped partway'])
+  // Active is green; what was left partway is yellow.
+  expect((await ui.find({ type: 'Text', text: '1 active' }))?.props.color).toBe('success')
+  expect((await ui.find({ type: 'Text', text: 'T-005 stopped partway' }))?.props.color).toBe('warning')
 })
 
 test('the band names a claim going quiet when no handoff waits', QUIET, async ($, on) => {
@@ -367,7 +370,7 @@ test('the task.md button says what is left, and shows only that when pressed', B
   expect(await texts(ui)).not.toContain('Write the parser')
 })
 
-test('a long task.md shows the first eight open items, then a count of the rest', BOARD_ONLY, async ($, on) => {
+test('a long task.md shows every open item when open, with no count of the rest', BOARD_ONLY, async ($, on) => {
   const items = Array.from({ length: 20 }, (_, n) => ({ text: `item ${n + 1}`, done: n % 4 === 3, section: n < 10 ? 'Sprint' : 'Later', depth: 0, priority: null }))
   host(on, [], { taskfile: { file: 'task.md', items } })
   await $.session.start(START)
@@ -375,8 +378,34 @@ test('a long task.md shows the first eight open items, then a count of the rest'
   expect(await label(ui, 'taskfile')).toBe('▸ task.md · 15 open')
   await ui.press({ key: 'taskfile' })
   const shown = (await texts(ui)).filter((t: string) => t.startsWith('item '))
-  expect(shown).toEqual(['item 1', 'item 2', 'item 3', 'item 5', 'item 6', 'item 7', 'item 9', 'item 10'])
-  expect(await texts(ui)).toContain('7 more')
+  expect(shown).toHaveLength(15)
+  expect((await texts(ui)).some((t: string) => / more$/.test(t))).toBe(false)
+})
+
+test('all shows every open item in a file with priorities, with no count of the rest', BOARD_ONLY, async ($, on) => {
+  const items = Array.from({ length: 12 }, (_, n) => ({ text: `item ${n + 1}`, done: false, section: '', depth: 0, priority: n < 6 ? 0 : 1 }))
+  host(on, [], { taskfile: { file: 'TASKS.md', items } })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await ui.press({ key: 'taskfile' })
+  await ui.press({ key: 'tier' })
+  await ui.press({ key: 'tier' })
+  expect(await label(ui, 'tier')).toBe('all')
+  const shown = await texts(ui)
+  expect(shown.filter((t: string) => t.startsWith('item '))).toHaveLength(12)
+  expect(shown.some((t: string) => / more$/.test(t))).toBe(false)
+})
+
+test('a press on the task file reads it again, so what was just added shows', BOARD_ONLY, async ($, on) => {
+  const file = { file: 'TASKS.md', items: [{ text: 'first', done: false, section: '', depth: 0, priority: 0 }] }
+  host(on, [], { taskfile: file })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await label(ui, 'tier')).toBe('P0 · 1')
+  file.items.push({ text: 'added later', done: false, section: '', depth: 0, priority: 0 })
+  await ui.press({ key: 'taskfile' })
+  expect(await label(ui, 'taskfile')).toBe('▾ TASKS.md · 2 open')
+  expect(await texts(ui)).toEqual(expect.arrayContaining(['first', 'added later']))
 })
 
 test('a task.md with everything checked off says so', async ($, on) => {
@@ -435,8 +464,8 @@ test('the priority button turns through each tier the file has, then all, then r
   expect(await work(ui)).toEqual(['later one'])
   await ui.press({ key: 'tier' })
   expect(await label(ui, 'tier')).toBe('all')
-  // All: most urgent first, each priority named once; none last, after a dash.
-  expect(await work(ui)).toEqual(['P0', 'urgent one', '', 'urgent two', 'P1', 'next one', 'P2', 'later one', '–', 'no priority'])
+  // All: most urgent first, every row with its priority; none last, with a dash.
+  expect(await work(ui)).toEqual(['P0', 'urgent one', 'P0', 'urgent two', 'P1', 'next one', 'P2', 'later one', '–', 'no priority'])
   await ui.press({ key: 'tier' })
   expect(await label(ui, 'tier')).toBe('P0 · 2')
 })
@@ -472,7 +501,7 @@ test('one task reads as one task', QUIET, async ($, on) => {
   host(on, [task('T-001', 'todo')])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
-  expect(await texts(ui)).toEqual(['1 task waiting'])
+  expect(await texts(ui)).toEqual(['1 waiting'])
 })
 
 test('the model block shows the model and switches to the next one when pressed', FULL, async ($, on) => {
@@ -550,15 +579,40 @@ async function bandAt($: any, columns: number) {
   return shown
 }
 
-test('the band defaults to what needs you, then compact, model and effort', async ($, on) => {
+test('the band defaults to the tasks, model and effort, then a full board button; usage and context stay in the pane', async ($, on) => {
   host(on, [task('T-001', 'todo')], { effort: 'low' })
   on('session.measure', (_$, e: any) => ({ changed: e.changed }))
   await $.session.start(START)
   await $.session.measure({ ...measure(64), context: { window: 200000, percent: 72 } } as any)
   const shown = await bandAt($, 140)
-  expect(shown).toEqual(['1 task waiting', '5-hour limit', '▓▓▓▓▓▓', '░░░░', '  64%', 'context ', '▓▓▓▓▓▓▓', '░░░', '  72%', ' compact', 'model ', 'Sonnet 5.5', 'effort ', 'low'])
+  expect(shown).toEqual(['1 waiting', 'model ', 'Sonnet 5.5', 'effort ', 'low', 'full board'])
 })
 
+
+test('full board on the band opens the board pane', { options: { band: 'summary,board' } } as any, async ($, on) => {
+  host(on, [task('T-001', 'todo')])
+  const opened: any[] = []
+  on('ui.open', (_$, e: any) => {
+    opened.push(e)
+    return { value: { isPlaced: true } }
+  })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  expect(await texts(band)).toContain('full board')
+  // No brackets: a word, like the model's.
+  expect((await band.find({ key: 'board' }))?.props.plain).toBe(true)
+  await band.press({ key: 'board' })
+  expect(opened.map(e => e.id)).toEqual(['modboard'])
+})
+
+test('full board sits last but outlasts model and effort on a short line', { options: { band: 'summary,model,effort,board' } } as any, async ($, on) => {
+  host(on, [task('T-001', 'todo')], { effort: 'low' })
+  await $.session.start(START)
+  expect((await bandAt($, 120)).at(-1)).toBe('full board')
+  const short = await bandAt($, 34)
+  expect(short).toContain('full board')
+  expect(short).not.toContain('low')
+})
 
 test('the band never wraps: it narrows its parts, then leaves the last ones out', FULL, async ($, on) => {
   host(on, [task('T-001', 'todo'), task('T-002', 'todo')], { effort: 'low' })
@@ -567,28 +621,28 @@ test('the band never wraps: it narrows its parts, then leaves the last ones out'
   await $.session.measure(measure(64) as any)
 
   const wide = await bandAt($, 124)
-  expect(wide).toEqual(expect.arrayContaining(['2 tasks waiting', '5-hour limit', 'model ', 'Sonnet 5.5', 'effort ', 'low']))
+  expect(wide).toEqual(expect.arrayContaining(['2 waiting', '5-hour limit', 'model ', 'Sonnet 5.5', 'effort ', 'low']))
 
   const medium = await bandAt($, 64)
-  expect(medium).toEqual(expect.arrayContaining(['2 tasks waiting', 'Sonnet 5.5', 'low']))
+  expect(medium).toEqual(expect.arrayContaining(['2 waiting', 'Sonnet 5.5', 'low']))
   expect(medium).not.toContain('model ')
   expect(medium).not.toContain('effort ')
 
   const narrow = await bandAt($, 38)
-  expect(narrow).toContain('2 tasks waiting')
+  expect(narrow).toContain('2 waiting')
   expect(narrow).toContain('5h')
   expect(narrow).not.toContain('5-hour limit')
   expect(narrow).not.toContain('Sonnet 5.5')
 
   const tiny = await bandAt($, 20)
-  expect(tiny).toEqual(['2 tasks waiting'])
+  expect(tiny).toEqual(['2 waiting'])
 })
 
 test('when the line is short, the alert outlasts the counts', async ($, on) => {
   host(on, [handedOff('T-005', 'frontend'), task('T-002', 'todo')])
   await $.session.start(START)
-  expect(await bandAt($, 34)).toEqual(['2 waiting', 'T-005 needs you'])
-  expect(await bandAt($, 20)).toEqual(['T-005 needs you'])
+  expect(await bandAt($, 30)).toEqual(['2 waiting', 'T-005 partway'])
+  expect(await bandAt($, 20)).toEqual(['T-005 partway'])
 })
 
 test('at every width, what the band draws fits the line', FULL, async ($, on) => {
@@ -622,7 +676,7 @@ test('a command block shows its first line in the band and the pane; a failing o
   await $.session.start(START)
   expect(calls).toContainEqual(['sh', '-c', 'echo passing'])
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
-  expect(await texts(band)).toEqual(['1 task waiting', 'ci passing'])
+  expect(await texts(band)).toEqual(['1 waiting', 'ci passing'])
   await band.unmount()
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const shown = await texts(pane)
