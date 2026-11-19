@@ -1,4 +1,6 @@
-<h1 align="center">modboard</h1>
+<h1 align="center">
+  <img src="docs/logo.png" alt="modBOARD" width="460"/>
+</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
@@ -604,7 +606,8 @@ modboard/
 │                            # meter.tsx is the bar that usage and compact share
 ├── types/index.d.ts
 ├── .claude-plugin/
-│   └── plugin.json          # the mod's manifest and settings
+│   ├── plugin.json          # the mod's manifest and settings
+│   └── icon.png             # the plugin's icon, the logo's mark
 ├── test/                    # CLI and store contract tests (npm test)
 ├── tests/                   # mod tests (claude plugin test .)
 ├── docs/
@@ -613,6 +616,7 @@ modboard/
 │   ├── blocks.txt  .png     # how blocks work
 │   ├── band.mjs    .png     # the band image, drawn from the real blocks
 │   ├── board-live.gif       # a live recording of three Claude sessions
+│   ├── logo.png             # the modBOARD logo
 │   └── render.mjs           # rebuilds every image from its .txt
 ├── CHANGELOG.md             # what changed in each version
 ├── ROADMAP.md               # what's planned next
