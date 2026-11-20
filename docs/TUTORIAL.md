@@ -1,9 +1,11 @@
-# modboard tutorial
+# modBOARD tutorial
 
-This walks you from nothing to two agents sharing one board, in about
-fifteen minutes. You'll install the CLI, run a board by hand, open it in
-Claude Code, hand work from one session to another, and read your project's
-own task list on the board.
+modBOARD is one board for every agent and every person, and you decide
+what's on it. This walks you from nothing to two agents sharing one board, in
+about fifteen minutes. You'll install the CLI, run a board by hand, open it in
+Claude Code, hand work from one session to another, read your project's own
+task list on the board, and then choose what the board shows, including a
+block of your own.
 
 You need Node 18 or newer, git, and (for parts 3 onward) Claude Code
 2.1.295 or newer.
@@ -188,7 +190,9 @@ VERIFIED: ran the app, signed in at /login, landed on /home
 ## 3. Open the board in Claude Code
 
 The Claude Code mod gives a session the board's tools, a line above the
-prompt, and a `/board` pane. Start a session with the mod:
+prompt, and a `/board` pane. The line and the pane are both made of blocks you
+can change later ([part 8](#8-making-the-board-yours)). Start a session with
+the mod:
 
 ```bash
 cd ~/code/my-app
@@ -222,7 +226,8 @@ claude --plugin-dir /path/to/modboard
 ```
 
 This one is `claude 2`. Each session's `/board` pane names it at the top
-(`modBOARD · claude 2`), so you can tell the terminals apart. Tell both sessions to work the board. What you'll see:
+(`modBOARD · claude 2`), so you can tell the terminals apart. Tell both
+sessions to work the board. What you'll see:
 
 - **They never do the same task.** If both go for T-002, one claim wins;
   the other session is refused, says who holds it, and takes another.
@@ -245,8 +250,9 @@ with a handoff note saying it ended.
 
 ## 5. Reading the board
 
-The display shows what needs you, and is quiet otherwise. Colour means one
-thing: **yellow or red, look here.**
+This part shows the default blocks. With them, the display shows what needs
+you and is quiet otherwise. Colour means one thing: **yellow or red, look
+here.**
 
 ### The line above the prompt
 
@@ -261,9 +267,10 @@ thing: **yellow or red, look here.**
 | `modBOARD` | in green, opens the `/board` pane, like typing `/board`; click it again to close the pane |
 | `Sonnet 5.5   low` | the session's model and effort. Click either to switch to the next one |
 
-The 5-hour limit and the context are in the `/board` pane, where both bars turn yellow at 70% and red at 90%. On a narrow window the line shortens and drops parts from the right;
-the alert is the last to go. With nothing waiting or in progress, it
-disappears.
+The 5-hour limit and the context are in the `/board` pane, where both bars
+turn yellow at 70% and red at 90%. In a narrow window the line shortens and
+drops parts from the right; the yellow boxes are the last to go. With nothing
+waiting or in progress, it disappears.
 
 ### The `/board` pane
 
@@ -334,8 +341,8 @@ disappears.
 
 ## 6. Your task.md on the board
 
-If your repository keeps a task list in a markdown file, the pane shows it
-beside the board. It's found when it's called `task.md`, `tasks.md` or
+If your repository keeps a task list in a markdown file, the `taskfile`
+block shows it in the pane, beside the board's own tasks. It's found when it's called `task.md`, `tasks.md` or
 `todo.md` (any capitals), at the repo's root or in `docs/`.
 
 Say `TASKS.md` reads:
@@ -474,7 +481,10 @@ agent, 7 name in use.
 
 ## 8. Making the board yours
 
-In Claude Code, the mod's settings are under `/config`.
+The board is built from blocks: the task groups, your task file, the model,
+the limits. Everything you've seen so far is the default set. You decide which
+blocks show, in what order, and you can add your own. In Claude Code, the
+mod's settings are under `/config`.
 
 ### Choose what shows
 
@@ -497,12 +507,24 @@ see them; Claude Code shows both in its own header too.
 command runs, and the block shows the first line it prints:
 
 ```json
-{"ci": "gh run list -L1 --json conclusion -q '.[0].conclusion'"}
+{
+  "ci": "gh run list -L1 --json conclusion -q '.[0].conclusion'",
+  "branch": "git branch --show-current"
+}
 ```
 
-Then add `ci` to the band or pane setting. This setting lives in your user
-config, never the project's, so opening someone else's repo can't make your
-session run its commands.
+Then add the names to the band or pane setting, like a built-in block:
+
+```
+summary,ci,branch,model,effort,board
+```
+
+The band now reads `ci success` and `branch main` beside the work. A name is
+lowercase letters, digits and dashes, up to 16 characters, and can't be a
+built-in block's name. A command that fails or prints nothing shows nothing.
+
+This setting lives in your user config, never the project's, so opening
+someone else's repo can't make your session run its commands.
 
 For blocks in code, or a storage block that keeps the board somewhere other
 than a folder, see [Make your own block](../README.md#make-your-own-block).
@@ -520,6 +542,8 @@ than a folder, see [Make your own block](../README.md#make-your-own-block).
 | a session named `frontend-2` | `frontend` is live in another session | give each session its own name |
 | no task file line in the pane | no `task.md`, `tasks.md` or `todo.md` at the root or in `docs/` | check the name and place |
 | no priority button | the task file has no `P0`–`P9` | add priorities to headings or items |
+| a block of your own shows nothing | its command failed or printed nothing | run the command in a shell from the repo |
+| a toast says a block was skipped | its name is invalid or a built-in's | rename it in **Your own blocks** |
 | the board seems out of step | | `board doctor` checks the ledger against the state |
 
 `board where` prints which folder holds the board. `board doctor` should end
