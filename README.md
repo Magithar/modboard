@@ -30,19 +30,29 @@
 
 ## What it does
 
-modBOARD is one universal board for every agent you run. Two Claude Code
-sessions, a Codex session and a person can all take tasks from it, see who holds what, and
-hand unfinished work to each other without losing context. It's built from
-blocks, so you can add your own and show whatever you need on it.
+modBOARD puts one board in your repo that every agent and every person
+shares. Claude Code, Codex, OpenCode, a shell script and you all read the same
+board and write to it the same way. You decide what's on it: the work in
+progress, your task.md, CI status, the git branch, or any command's output.
+
+- **Running several agents at once?** They stop tripping over each other. Each
+  one claims its work, so no two do the same job, and work an agent drops
+  comes back with a note on where it stopped.
+- **Switching between agents?** The board doesn't belong to any of them. Start
+  a task in Claude Code, finish it in Codex, and check it yourself from the
+  shell.
+- **Want your project at a glance?** Put what you look at on the board. Name a
+  command and its output shows up beside the work, with no code.
 
 | | |
 |---|---|
+| **You decide what's on it** | The board is built from blocks: tasks, your task.md, the model and effort, usage, or your own from any command's output. [How](#make-your-own-block) |
+| **Every agent, the same way** | One CLI that anything with a shell can run. Claude Code also gets a line above the prompt and the `/board` pane. |
 | **One claim wins** | Two agents never end up on the same task. |
 | **Crashed work comes back** | A task held by an agent that died returns to the board on its own. |
 | **Handoffs keep context** | An agent that stops partway leaves a note; the next one reads it and carries on. |
 | **Done means verified** | Nothing is marked done without saying how it was checked. |
-| **Your task.md, beside the board** | The pane lists what's left in your project's own task file, by priority. |
-| **Add your own blocks** | Show anything on the board, like CI status, the git branch or any command's output, with no code. Or keep the board in a database. [How](#make-your-own-block) |
+| **Keep it where you want** | The board lives in a folder by default. A storage block you write can keep it in a database instead. |
 
 ---
 
@@ -393,8 +403,9 @@ the CLI directly.
 - **Not a sync service:** one board lives in one place; the storage block
   decides where.
 
-It's a **claim ledger**: who holds what, what was left for the next agent, and
-how each finished task was checked.
+At its core is a **claim ledger**: who holds what, what was left for the next
+agent, and how each finished task was checked. Everything else on the board is
+a block you choose.
 
 ---
 
