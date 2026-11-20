@@ -3,6 +3,7 @@
 </h1>
 
 <p align="center">
+  <a href="https://github.com/Magithar/modboard/actions/workflows/ci.yml"><img src="https://github.com/Magithar/modboard/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
   <img src="https://img.shields.io/github/v/release/Magithar/modboard?include_prereleases&label=release" alt="Release"/>
   <a href="https://www.npmjs.com/package/modboard"><img src="https://img.shields.io/npm/dt/modboard" alt="npm downloads"/></a>
@@ -149,7 +150,7 @@ board taskfile                            # the project's task.md, read only
 
 | Exit code | Meaning |
 |---|---|
-| 2 | usage |
+| 2 | usage, or a flag the command doesn't take (the error names the ones it does) |
 | 3 | board busy |
 | 4 | no such task |
 | 5 | not yours |
@@ -648,6 +649,28 @@ automatic names), but haven't been through this full set.
 </details>
 
 <details>
+<summary><b>Tested live with Codex</b></summary>
+
+<br/>
+
+This ran on 2026-11-20 with Codex CLI 0.155.1 in its default
+`workspace-write` sandbox, an `AGENTS.md` holding only the protocol above,
+and a board of two tasks, one already held by `alice`. Codex was told only
+"Do every task on the board that you can."
+
+| Test | Result |
+|---|---|
+| Learning the CLI | ran `board` for its usage, then `board list` |
+| Its name | `board whoami` answered `codex 1`, from `CODEX_THREAD_ID`, with nothing set |
+| Claim before work | claimed the open task, then wrote the file |
+| Done means verified | its first `done` without `--note` was refused; it checked the file and finished with a note |
+| A task another agent holds | "claimed by alice, so I left it untouched" |
+| The sandbox | wrote `.modboard/` without trouble |
+| The ledger | `board doctor`: the ledger and the state agree |
+
+</details>
+
+<details>
 <summary><b>Automated tests</b></summary>
 
 <br/>
@@ -655,7 +678,8 @@ automatic names), but haven't been through this full set.
 **`npm test`** runs the CLI tests and the store contract:
 
 - a 20-way claim race, ownership, handoffs, lease expiry, heartbeats,
-  rejected-claim logging, verified done, release-all, automatic names
+  rejected-claim logging, verified done, release-all, automatic names,
+  refused flags
 - the store contract against the file block and an in-memory block
   (concurrent claims and adds, stale writes, names)
 - that the CLI loads a block named in `config.json` and refuses a broken one
@@ -665,6 +689,10 @@ automatic names), but haven't been through this full set.
 line, the pane's groups and what folds, handoff points, the task file and its
 priority button, the Limits heading, the error line, names, the tools, release
 on session end, and choosing blocks.
+
+**CI** runs both on every push to `main` and every pull request: `npm test`
+on Node 18, 20 and 22, and the mod's tests and `claude plugin validate .`
+with the latest Claude Code.
 
 </details>
 

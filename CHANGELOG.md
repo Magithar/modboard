@@ -13,6 +13,22 @@ modboard was called agent-board until 0.5.0.
   that wrote `--description` saved its task with no description. Found by a
   live run with Codex.
 
+### Tested
+
+- **A live run with real Codex** (Codex CLI 0.155.1), where before a shell
+  stood in for it. Told only to do what it could, it took the name `codex 1`
+  by itself, claimed before writing, finished with a verification note after
+  `done` without one was refused, and left a task another agent held alone.
+  The README's Testing section has the results.
+- **CI on GitHub Actions.** Every push to `main` and every pull request runs
+  `npm test` on Node 18, 20 and 22, and `claude plugin validate .` and
+  `claude plugin test .` with the latest Claude Code.
+
+### Docs
+
+- The README has a CI badge, the Codex run, and exit code 2 now covers a
+  flag the command doesn't take.
+
 ## 0.6.0 — 2026-11-20
 
 Sessions name themselves, the board shows your project's own task file with
