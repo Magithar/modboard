@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// board — an agent-neutral task board. Any agent (Claude, Codex, a human)
+// board — an agent-neutral shared board. Any agent (Claude, Codex, a human)
 // coordinates through this one CLI; nothing else writes the board.
 //
 // The board lives in <repo>/.modboard/, beside the git *common* dir so
