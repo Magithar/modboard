@@ -1,7 +1,7 @@
 {
   "name": "modboard",
   "version": "0.6.1",
-  "description": "A task board several agents share: Claude tools, a live pane and lease heartbeats over an agent-neutral CLI",
+  "description": "One task board your agents share: claim tasks, hand off unfinished work, and see the board with /board",
   "author": {
     "name": "Magithar",
     "url": "https://github.com/Magithar"
