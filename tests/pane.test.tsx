@@ -27,7 +27,8 @@ function host(
     modelEffort,
     taskfile = { file: null, items: [] },
     broken = { now: false },
-  }: { agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
+    home,
+  }: { home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -53,7 +54,7 @@ function host(
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('clock.now', () => ({ value: NOW }))
   on('session.id', () => ({ value: 'aaaa1111-2222-3333-4444-555566667777' }))
-  on('env.get', (_$, e: any) => ({ value: e.name === 'BOARD_AGENT' ? agent : e.name === 'CLAUDE_CODE_EFFORT_LEVEL' ? envEffort : undefined }))
+  on('env.get', (_$, e: any) => ({ value: e.name === 'HOME' ? home : e.name === 'BOARD_AGENT' ? agent : e.name === 'CLAUDE_CODE_EFFORT_LEVEL' ? envEffort : undefined }))
   // The effortLevel setting, which /effort saves: where a session starts.
   on('settings.read', () => ({ value: { ...(effort === undefined ? {} : { effortLevel: effort }), ...(modelEffort ? { modelSettings: { 'claude-sonnet-5-5': { effortLevel: modelEffort } } } : {}) } }))
   on('process.run', (_$, e: any) => {
@@ -188,27 +189,66 @@ test('a handoff written with semicolons shows one point a line', async ($, on) =
   await ui.unmount()
 })
 
-test('a handoff shows where the work is and the last check that passed', async ($, on) => {
-  const where = { worktree: '/repo/wt-login', branch: 'login', commit: 'a1b2c3d', dirty: true }
+const WHERE = { worktree: '/Users/me/code/app-login', branch: 'login', commit: 'a1b2c3d', dirty: true }
+const checked = (where: object) => ({ at: '', by: 'claude 1', text: 'CHECKED: npm test', check: { cmd: 'npm test', ran: true }, where })
+
+test('under a handoff, where the work is, its path from ~, and the last check that passed', async ($, on) => {
   host(on, [
-    {
-      ...task('T-005', 'todo'),
-      notes: [
-        { at: '', by: 'claude 1', text: 'CHECKED: npm test', check: { cmd: 'npm test', ran: true }, where: { ...where, dirty: false } },
-        { at: '', by: 'claude 1', text: 'HANDOFF: form done; api left', where },
-      ],
-    },
-    { ...task('T-006', 'todo'), notes: [{ at: '', by: 'codex 1', text: 'HANDOFF: started', where: { ...where, dirty: false } }] },
-  ])
+    { ...task('T-005', 'todo'), notes: [checked({ ...WHERE, dirty: false }), { at: '', by: 'claude 1', text: 'HANDOFF: form done; api left', where: WHERE }] },
+    { ...task('T-006', 'todo'), notes: [checked({ ...WHERE, commit: '0ld0ld0' }), { at: '', by: 'codex 1', text: 'HANDOFF: started', where: { ...WHERE, dirty: false } }] },
+    { ...task('T-007', 'todo'), notes: [{ at: '', by: 'codex 1', text: 'HANDOFF: outside git' }] },
+  ], { home: '/Users/me' })
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
   const shown = await texts(ui)
-  expect(shown).toContain('in login @ a1b2c3d, uncommitted changes · /repo/wt-login')
-  // Checked before the work that was left uncommitted, so it says so.
-  expect(shown).toContain('✓ npm test passed at a1b2c3d (before later changes)')
-  // With no check recorded, there is no check line.
-  expect(shown).toContain('in login @ a1b2c3d · /repo/wt-login')
-  expect(shown.filter((t: string) => t.startsWith('✓'))).toHaveLength(1)
+  for (const label of ['where', 'path', 'check']) expect(shown).toContain(label)
+  expect(shown).toContain('login @ a1b2c3d, uncommitted changes')
+  expect(shown).toContain('~/code/app-login')
+  expect(shown).toContain('copy cd')
+  // Checked before the work left uncommitted; then, checked at an older commit.
+  expect(shown).toContain('npm test passed at a1b2c3d, before uncommitted changes')
+  expect(shown).toContain('npm test passed at 0ld0ld0 (before later changes)')
+  // The full path waits for a hover; a handoff made outside git has no facts.
+  expect((await ui.find({ type: 'Text', text: '/Users/me/code/app-login' }))?.props.wrap).toBe('wrap')
+  expect(shown.filter((t: string) => t === 'where')).toHaveLength(2)
+  await ui.unmount()
+})
+
+test('copy cd puts a cd to the worktree on the clipboard, and says so for a moment', async ($, on) => {
+  host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done', where: { ...WHERE, worktree: "/w/it's here" } }] }])
+  const copies: string[] = []
+  on('ui.copy', (_$, e: any) => {
+    copies.push(e.text)
+    return { value: { isCopied: true } }
+  })
+  // The moment ✓ copied shows lasts until the test lets it pass.
+  let pass = () => {}
+  on('clock.sleep', () => new Promise(resolve => (pass = () => resolve({ value: undefined }))) as any)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  const pressed = ui.press({ key: 'copy-T-005' })
+  await new Promise(resolve => setTimeout(resolve, 20))
+  expect(copies).toEqual([`cd '/w/it'\\''s here'`])
+  expect(await texts(ui)).toContain('✓ copied')
+  pass()
+  await pressed
+  expect(await texts(ui)).toContain('copy cd')
+  await ui.unmount()
+})
+
+test('where the surface cannot copy, a toast gives the path', async ($, on) => {
+  host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done', where: WHERE }] }])
+  on('ui.copy', () => ({ value: { isCopied: false, reason: 'remote' } }))
+  const toasts: string[] = []
+  on('ui.toast', (_$, e: any) => {
+    toasts.push(e.text ?? e.message ?? String(e))
+    return { value: undefined }
+  })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  await ui.press({ key: 'copy-T-005' })
+  expect(toasts.some(t => t.includes("couldn't copy; the worktree is /Users/me/code/app-login"))).toBe(true)
+  expect(await texts(ui)).toContain('copy cd')
   await ui.unmount()
 })
 

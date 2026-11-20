@@ -21,9 +21,13 @@ export type Ctx = {
   taskfileTier: string
   // Which task groups the person opened or closed, by name (see tasks.tsx).
   groupsOpen: Record<string, boolean>
+  // The person's home directory, so a path reads ~/code/app; and the task whose
+  // worktree path was just copied, for a moment, so its row says so.
+  home: string
+  copied: string
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void> }
 }
 
 // One way a block can draw in the band, and how many columns it takes.

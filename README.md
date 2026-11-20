@@ -255,7 +255,7 @@ right end.
 | Section | What it shows |
 |---|---|
 | **In progress** | who is on what. `codex 1 · idle` in yellow: no note or heartbeat for most of its claim's time |
-| **Unfinished** | work stopped partway, with the handoff as points, where the work is (branch, commit, worktree) and the last check that passed |
+| **Unfinished** | work stopped partway: the handoff as points, then `where` (branch and commit), `path` (the worktree; `copy cd` puts a `cd` to it on the clipboard) and `check` (the last check that passed) |
 | **Not started** | everything waiting |
 | **Done** | what's finished, and who finished it |
 | **To do** | what's left in [your task.md](#your-taskmd) |

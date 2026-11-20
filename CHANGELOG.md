@@ -18,8 +18,13 @@ agent can pick it up quickly.
   records it only if it passes, with where it ran. A failed check exits 8 and
   records nothing. `--passed` records a check you already ran yourself.
   Claude Code gets a `board_check` tool for this.
-- **The pane shows the last check that passed** under a handoff, and says
-  when it ran before later changes.
+- **The pane shows them under a handoff**, apart from its points, as three
+  rows lined up like the Limits rows: `where` (branch and commit), `path`
+  (the worktree, from `~`, cut from the start so its own folder shows) and
+  `check` (the last check that passed, and whether it ran before later
+  changes). Hover the path for all of it; `copy cd` puts `cd '<path>'` on
+  the clipboard and says `✓ copied` for a moment, or, where the surface
+  can't copy, gives the path in a toast.
 
 ## 0.6.3 — 2026-11-20
 

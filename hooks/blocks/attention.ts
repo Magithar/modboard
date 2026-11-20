@@ -16,7 +16,9 @@ export const goingQuiet = (t: Task, now: number) =>
 // The last check that passed on a task, if any agent recorded one.
 export const lastCheck = (t: Task): Note | undefined => [...t.notes].reverse().find(n => n.check)
 
-// "login @ a1b2c3d, uncommitted changes · /repo/wt-login": the branch first, so
-// a narrow pane cuts the path, not the branch.
+// "a1b2c3d, uncommitted changes"; "login @ a1b2c3d".
 export const commitOf = (w: Where) => `${w.commit || 'no commits'}${w.dirty ? ', uncommitted changes' : ''}`
-export const placeOf = (w: Where) => `${w.branch || 'detached'} @ ${commitOf(w)} · ${w.worktree}`
+export const branchOf = (w: Where) => `${w.branch || 'detached'} @ ${commitOf(w)}`
+
+// A path under the home directory reads from ~.
+export const tilde = (path: string, home: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path)

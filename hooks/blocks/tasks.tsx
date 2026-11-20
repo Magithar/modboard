@@ -1,6 +1,6 @@
-import type { Task } from '../../types'
+import type { Note, Task } from '../../types'
 import type { Block, Ctx } from './types'
-import { commitOf, goingQuiet, handedOffBy, handoffWaiting, lastCheck, placeOf } from './attention'
+import { branchOf, commitOf, goingQuiet, handedOffBy, handoffWaiting, lastCheck, tilde } from './attention'
 
 // Who a row is about. The group's heading says what they did ("In progress",
 // "Unfinished"), so the row only names them. Warnings are what needs you:
@@ -29,15 +29,6 @@ function Row(c: Ctx, t: Task) {
   const note = handoffWaiting(t) ? t.notes.at(-1)! : undefined
   const handoff = note ? note.text.replace(/^HANDOFF:\s*/, '') : ''
   const points = handoff.split(';').map(p => p.trim()).filter(Boolean)
-  // Then where the work sits, and the last check that passed, so the next agent
-  // can pick it up there and knows what was green. A check made at another
-  // commit than the handoff's says so.
-  const check = note ? lastCheck(t) : undefined
-  const earlier = check?.where && note?.where && (check.where.commit !== note.where.commit || check.where.dirty !== note.where.dirty)
-  const extra = [
-    ...(note?.where ? [`in ${placeOf(note.where)}`] : []),
-    ...(check ? [`✓ ${check.check!.cmd}${check.where ? ` passed at ${commitOf(check.where)}` : ' passed'}${earlier ? ' (before later changes)' : ''}`] : []),
-  ]
   // The group's heading already says the task's state; the row needs no mark.
   const row = (
     <Box>
@@ -69,13 +60,79 @@ function Row(c: Ctx, t: Task) {
           </Text>
         </Box>
       ))}
-      {extra.map(line => (
-        <Box paddingLeft={7}>
-          <Text dimColor wrap="truncate">
-            {line}
-          </Text>
+      {Facts(c, t, note!)}
+    </Box>
+  )
+}
+
+// A fact under a handoff: a grey label, then its value, lined up as the
+// Limits rows are.
+const LABEL = 7
+function Fact(c: Ctx, label: string, value: string) {
+  const { Box, Text } = c.ui
+  return (
+    <Box>
+      <Box width={LABEL} flexShrink={0}>
+        <Text dimColor>{label}</Text>
+      </Box>
+      <Box flexGrow={1} flexShrink={1}>
+        <Text dimColor wrap="truncate">
+          {value}
+        </Text>
+      </Box>
+    </Box>
+  )
+}
+
+// Under a handoff, apart from its points: where the work sits (the branch and
+// commit, then the worktree's path, which copies as a cd), and the last check
+// that passed. A check made before the handoff's commit, or before changes
+// left uncommitted, says so. Nothing to say, nothing drawn.
+function Facts(c: Ctx, t: Task, note: Note) {
+  const { Box, Button, Text } = c.ui
+  const where = note.where
+  const check = lastCheck(t)
+  if (!where && !check) return null
+  let passed = ''
+  if (check) {
+    const w = check.where
+    const later = w && where && w.commit !== where.commit
+    const since = w && where && !later && where.dirty && !w.dirty
+    passed = `${check.check!.cmd} passed${w ? ` at ${w.commit || 'no commits'}` : ''}${later ? ' (before later changes)' : since ? ', before uncommitted changes' : w?.dirty && !where ? ', uncommitted changes' : ''}`
+  }
+  const copied = c.copied === t.id
+  return (
+    <Box flexDirection="column" marginTop={1} paddingLeft={7}>
+      {where && Fact(c, 'where', branchOf(where))}
+      {where && (
+        // Hovered, the whole path shows under the row, so you see where the cd goes.
+        <Box key={`path-${t.id}`} flexDirection="column">
+          <Box>
+            <Box width={LABEL} flexShrink={0}>
+              <Text dimColor>path</Text>
+            </Box>
+            <Box flexGrow={1} flexShrink={1}>
+              {/* Cut from the start: the worktree's own folder is what tells them apart. */}
+              <Text dimColor wrap="truncate-start">
+                {tilde(where.worktree, c.home)}
+              </Text>
+            </Box>
+            <Box marginLeft={2} flexShrink={0}>
+              <Button key={`copy-${t.id}`} plain onPress={(press: { surface: string }) => c.act.copyPath(t.id, where.worktree, press.surface)}>
+                <Text color={copied ? 'success' : undefined} dimColor={!copied}>
+                  {copied ? '✓ copied' : c.width < 50 ? 'copy' : 'copy cd'}
+                </Text>
+              </Button>
+            </Box>
+          </Box>
+          <Box display="none" hover={{ display: 'flex' }} paddingLeft={LABEL}>
+            <Text dimColor wrap="wrap">
+              {where.worktree}
+            </Text>
+          </Box>
         </Box>
-      ))}
+      )}
+      {check && Fact(c, 'check', passed)}
     </Box>
   )
 }

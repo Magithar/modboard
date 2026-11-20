@@ -37,6 +37,11 @@ const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, 
 const paneOpen = atom({ plugin: 'modboard', key: 'paneOpen' } as const, false)
 const taskfileTier = atom({ plugin: 'modboard', key: 'taskfileTier' } as const, '')
 const groupsOpen = atom({ plugin: 'modboard', key: 'groupsOpen' } as const, {} as Record<string, boolean>)
+// The task whose worktree path was just copied, for a moment; and the home
+// directory, so a path reads ~/code/app.
+const copied = atom({ plugin: 'modboard', key: 'copied' } as const, '')
+const home = atom({ plugin: 'modboard', key: 'home' } as const, '')
+const COPIED_MS = 2_000
 // Why the last read of the board failed, or '' when it worked: the pane would
 // otherwise go on showing old tasks as if they were current.
 const boardError = atom({ plugin: 'modboard', key: 'boardError' } as const, '')
@@ -311,6 +316,15 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       $.ui.toast('board: compacting the conversation…')
       await $.session.compact().catch(() => $.ui.toast("board: can't compact while Claude is working; press again when it's idle"))
     },
+    // A worktree's path under a handoff: copies `cd '<path>'`, and the row says
+    // ✓ copied for a moment. Where the surface can't copy, a toast gives the path.
+    copyPath: async (id: string, path: string, surface: string) => {
+      const out = await $.ui.copy({ text: `cd '${path.replace(/'/g, `'\\''`)}'`, surface: surface as any }).catch(() => ({ isCopied: false }))
+      if (!out.isCopied) return void $.ui.toast(`board: couldn't copy; the worktree is ${path}`)
+      await update($, copied, () => id)
+      await $.clock.sleep(COPIED_MS)
+      await update($, copied, now => (now === id ? '' : now))
+    },
     toggleGroup: async (name: string) => {
       await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
     },
@@ -347,6 +361,8 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     taskfileOpen: await read($, taskfileOpen),
     taskfileTier: await read($, taskfileTier),
     groupsOpen: await read($, groupsOpen),
+    home: await read($, home),
+    copied: await read($, copied),
     act,
   }
 }
@@ -375,6 +391,8 @@ export const register: Register = (on, options) => {
     await update($, model, () => startModel)
     await update($, effort, () => startEffort)
     session = await $.session.id()
+    const homeDir = await $.env.get('HOME').catch(() => undefined)
+    if (homeDir) await update($, home, () => homeDir)
     const name = await takeName($, await $.env.get('BOARD_AGENT'))
     await update($, me, () => name)
 
