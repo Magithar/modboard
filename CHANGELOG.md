@@ -3,6 +3,29 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## 0.6.2 — 2026-11-20
+
+modBOARD is now described as what it is: one board for every agent and every
+person, where you decide what's on it. No code changed; the CLI and the mod
+work as in 0.6.1.
+
+### Docs
+
+- **A new tagline**: "One board for every agent and every person. You decide
+  what's on it." It replaces "one task board" in the README, the npm
+  description, the plugin description and the GitHub About text.
+- **The README leads with blocks.** "What it does" says who it's for (several
+  agents at once, switching between agents, your project at a glance), and its
+  table starts with choosing what's on the board. Quick start gains an
+  optional step 4, choosing your blocks, and What you see and Settings point
+  to making your own.
+- **The tutorial follows**: its intro ends with choosing what the board shows,
+  part 8 opens by explaining blocks and adds a `branch` block beside `ci`,
+  and When something looks wrong covers a block that shows nothing or is
+  skipped.
+- **Keywords**: `dashboard` and `configurable` replace `task-board` and
+  `kanban` on npm, in the plugin and on GitHub.
+
 ## 0.6.1 — 2026-11-20
 
 `board` refuses a flag it doesn't take instead of dropping it, found by
