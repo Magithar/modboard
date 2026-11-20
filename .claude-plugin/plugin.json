@@ -10,7 +10,8 @@
   "license": "MIT",
   "keywords": [
     "multi-agent",
-    "task-board",
+    "dashboard",
+    "configurable",
     "coordination",
     "codex"
   ],
