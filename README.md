@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <b>One task board every coding agent shares, built from blocks you can add to.</b><br/>
+  <b>One board every coding agent shares. You choose what goes on it.</b><br/>
   Works with Claude Code, Codex, OpenCode, anything with a shell, and people.
 </p>
 
