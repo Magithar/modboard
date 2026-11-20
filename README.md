@@ -140,6 +140,7 @@ board list                                # ○ todo  ◐ claimed  ● done
 board show T-001                          # description, notes, handoffs
 board claim T-001                         # exit 6 if another agent holds it
 board note T-001 "what changed"           # also renews your claim
+board check T-001 "npm test"              # runs it; records it only if it passes
 board release T-001 --handoff "done X; left Y; see Z"
 board done T-001 --note "ran X, saw Y"    # required: how you checked it
 board add "title" --desc "..." --accept "how to tell it is done"
@@ -147,6 +148,11 @@ board add "title" --desc "..." --accept "how to tell it is done"
 
 Each command answers in a line or two (`claimed T-001 … it's yours until
 14:05`). Add `--json` for the data instead.
+
+A handoff and a check record the worktree, branch and commit they were made
+in, and whether anything was uncommitted, so the next agent knows where the
+work is and what last passed there. `board check --passed` records a check you
+already ran yourself, without running it again.
 
 <details>
 <summary><b>More commands, exit codes and the Claude Code tools</b></summary>
@@ -171,9 +177,10 @@ board taskfile                            # the project's task.md, read only
 | 5 | not yours |
 | 6 | held by another agent |
 | 7 | name in use |
+| 8 | the check failed; nothing was recorded |
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
-`board_claim`, `board_note`, `board_release` and `board_done`. Any tool call
+`board_claim`, `board_note`, `board_check`, `board_release` and `board_done`. Any tool call
 renews the session's claims.
 
 The CLI and the tools use the board's precise terms (claim, release, handoff,
@@ -248,7 +255,7 @@ right end.
 | Section | What it shows |
 |---|---|
 | **In progress** | who is on what. `codex 1 · idle` in yellow: no note or heartbeat for most of its claim's time |
-| **Unfinished** | work stopped partway, with the handoff as points |
+| **Unfinished** | work stopped partway, with the handoff as points, where the work is (branch, commit, worktree) and the last check that passed |
 | **Not started** | everything waiting |
 | **Done** | what's finished, and who finished it |
 | **To do** | what's left in [your task.md](#your-taskmd) |

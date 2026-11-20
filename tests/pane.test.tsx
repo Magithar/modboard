@@ -188,6 +188,30 @@ test('a handoff written with semicolons shows one point a line', async ($, on) =
   await ui.unmount()
 })
 
+test('a handoff shows where the work is and the last check that passed', async ($, on) => {
+  const where = { worktree: '/repo/wt-login', branch: 'login', commit: 'a1b2c3d', dirty: true }
+  host(on, [
+    {
+      ...task('T-005', 'todo'),
+      notes: [
+        { at: '', by: 'claude 1', text: 'CHECKED: npm test', check: { cmd: 'npm test', ran: true }, where: { ...where, dirty: false } },
+        { at: '', by: 'claude 1', text: 'HANDOFF: form done; api left', where },
+      ],
+    },
+    { ...task('T-006', 'todo'), notes: [{ at: '', by: 'codex 1', text: 'HANDOFF: started', where: { ...where, dirty: false } }] },
+  ])
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  const shown = await texts(ui)
+  expect(shown).toContain('in login @ a1b2c3d, uncommitted changes · /repo/wt-login')
+  // Checked before the work that was left uncommitted, so it says so.
+  expect(shown).toContain('✓ npm test passed at a1b2c3d (before later changes)')
+  // With no check recorded, there is no check line.
+  expect(shown).toContain('in login @ a1b2c3d · /repo/wt-login')
+  expect(shown.filter((t: string) => t.startsWith('✓'))).toHaveLength(1)
+  await ui.unmount()
+})
+
 test('when the board cannot be read, the pane says so in red, until it can again', async ($, on) => {
   const broken = { now: false }
   host(on, [task('T-001', 'todo')], { broken })

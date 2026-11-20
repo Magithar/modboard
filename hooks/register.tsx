@@ -136,7 +136,9 @@ const TOOLS = [
   },
   {
     name: 'board_show',
-    description: 'Show one task with its acceptance criteria, notes and handoffs. Read this before resuming a task someone else released.',
+    description:
+      'Show one task with its acceptance criteria, notes and handoffs. Read this before resuming a task someone else released: ' +
+      'the handoff says which worktree, branch and commit the work is in, and the last check that passed.',
     schema: { id: { type: 'string' } },
     required: ['id'],
     args: (i: any) => ['show', i.id],
@@ -171,10 +173,21 @@ const TOOLS = [
   {
     name: 'board_release',
     description:
-      'Give up a task you hold without finishing it. Always write a handoff: what is done, what is left, where to look, each part separated by a semicolon ("done X; left Y; see Z") — the next agent starts from it.',
+      'Give up a task you hold without finishing it. Always write a handoff: what is done, what is left, where to look, each part separated by a semicolon ("done X; left Y; see Z") — the next agent starts from it. ' +
+      'The board records the worktree, branch and commit with it; record your last passing check with board_check first.',
     schema: { id: { type: 'string' }, handoff: { type: 'string' } },
     required: ['id', 'handoff'],
     args: (i: any) => ['release', i.id, '--handoff', i.handoff],
+  },
+  {
+    name: 'board_check',
+    description:
+      'Record a check that just passed on a task you hold: the command you ran (tests, build, lint) and saw succeed. ' +
+      'The board adds the worktree, branch and commit, so whoever picks the task up knows what was green and where. ' +
+      'Record only checks that passed.',
+    schema: { id: { type: 'string' }, command: { type: 'string' } },
+    required: ['id', 'command'],
+    args: (i: any) => ['check', i.id, i.command, '--passed'],
   },
   {
     name: 'board_done',

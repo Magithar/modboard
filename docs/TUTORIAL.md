@@ -123,8 +123,20 @@ you go:
 board note T-001 "form renders; sign-in call next"
 ```
 
+Before you stop, record the last check that passed. The board runs it in
+your checkout and records it only if it passes, with the commit it ran at:
+
+```bash
+board check T-001 "npm test"
+```
+
+```
+checked T-001: npm test passed at 4f2a9c1; yours until 12:03
+```
+
 If you stop before finishing, release the task with a **handoff**: what's
-done, what's left, where to look. The next agent starts from it.
+done, what's left, where to look. The board adds the worktree, branch and
+commit you're in. The next agent starts from it.
 
 ```bash
 board release T-001 --handoff "form done in src/login.tsx; sign-in call not wired yet, see api/auth.ts"
@@ -132,6 +144,7 @@ board release T-001 --handoff "form done in src/login.tsx; sign-in call not wire
 
 ```
 released T-001 with a handoff; it's back to todo
+the work is in /code/app-login · login @ 4f2a9c1, uncommitted changes
 ```
 
 ### Pick up someone's work
@@ -148,8 +161,14 @@ board show T-001
 Accept when: visiting /login shows a form that signs in
 
 - [2026-11-19T11:48] frontend: form renders; sign-in call next
+- [2026-11-19T11:48] frontend: CHECKED: npm test (run by the board, passed)
+    in /code/app-login · login @ 4f2a9c1
 - [2026-11-19T11:48] frontend: HANDOFF: form done in src/login.tsx; sign-in call not wired yet, see api/auth.ts
+    in /code/app-login · login @ 4f2a9c1, uncommitted changes
 ```
+
+Work in that worktree, on that branch. The tests passed at `4f2a9c1`, before
+the uncommitted changes, so run them again before you build on them.
 
 ### Done means verified
 

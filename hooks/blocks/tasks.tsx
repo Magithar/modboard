@@ -1,6 +1,6 @@
 import type { Task } from '../../types'
 import type { Block, Ctx } from './types'
-import { goingQuiet, handedOffBy, handoffWaiting } from './attention'
+import { commitOf, goingQuiet, handedOffBy, handoffWaiting, lastCheck, placeOf } from './attention'
 
 // Who a row is about. The group's heading says what they did ("In progress",
 // "Unfinished"), so the row only names them. Warnings are what needs you:
@@ -26,8 +26,18 @@ function Row(c: Ctx, t: Task) {
   const { text, warn } = status(t, c)
   // Work left partway shows its handoff under the title: what is done and what
   // is left, as the agent wrote it, one point a line where it used semicolons.
-  const handoff = handoffWaiting(t) ? t.notes.at(-1)!.text.replace(/^HANDOFF:\s*/, '') : ''
+  const note = handoffWaiting(t) ? t.notes.at(-1)! : undefined
+  const handoff = note ? note.text.replace(/^HANDOFF:\s*/, '') : ''
   const points = handoff.split(';').map(p => p.trim()).filter(Boolean)
+  // Then where the work sits, and the last check that passed, so the next agent
+  // can pick it up there and knows what was green. A check made at another
+  // commit than the handoff's says so.
+  const check = note ? lastCheck(t) : undefined
+  const earlier = check?.where && note?.where && (check.where.commit !== note.where.commit || check.where.dirty !== note.where.dirty)
+  const extra = [
+    ...(note?.where ? [`in ${placeOf(note.where)}`] : []),
+    ...(check ? [`✓ ${check.check!.cmd}${check.where ? ` passed at ${commitOf(check.where)}` : ' passed'}${earlier ? ' (before later changes)' : ''}`] : []),
+  ]
   // The group's heading already says the task's state; the row needs no mark.
   const row = (
     <Box>
@@ -56,6 +66,13 @@ function Row(c: Ctx, t: Task) {
         <Box paddingLeft={7}>
           <Text dimColor wrap="truncate">
             {points.length > 1 ? `· ${p}` : p}
+          </Text>
+        </Box>
+      ))}
+      {extra.map(line => (
+        <Box paddingLeft={7}>
+          <Text dimColor wrap="truncate">
+            {line}
           </Text>
         </Box>
       ))}

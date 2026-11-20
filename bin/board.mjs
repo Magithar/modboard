@@ -8,7 +8,7 @@
 // Which storage block holds it is named in .modboard/config.json (see
 // lib/load-store.mjs); the default is the built-in "file" block.
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -38,6 +38,31 @@ function projectDir() {
     return process.cwd()
   }
 }
+
+// Where the work is: the worktree this command runs in, its branch, the commit
+// it is at, and whether anything is uncommitted. Nothing outside a git repo.
+function whereNow() {
+  const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const or = (f, fallback) => {
+    try {
+      return f()
+    } catch {
+      return fallback
+    }
+  }
+  const worktree = or(() => git('rev-parse', '--show-toplevel'), '')
+  if (!worktree) return undefined
+  return {
+    worktree,
+    branch: or(() => git('symbolic-ref', '--short', '-q', 'HEAD'), ''),
+    commit: or(() => git('rev-parse', '--short', 'HEAD'), ''),
+    dirty: or(() => git('status', '--porcelain').length > 0, false),
+  }
+}
+
+// "/repo/wt-login · login @ a1b2c3d, uncommitted changes"
+const at = w => `${w.commit || 'no commits'}${w.dirty ? ', uncommitted changes' : ''}`
+const place = w => `${w.worktree}${w.branch ? ` · ${w.branch}` : ' · detached'} @ ${at(w)}`
 
 function inside(root) {
   const old = path.join(root, '.agent-board')
@@ -79,7 +104,10 @@ function describe(t) {
   if (t.description) out.push(t.description, '')
   if (t.accept) out.push(`Accept when: ${t.accept}`, '')
   if (t.claim) out.push(`claimed by ${t.claim.owner} until ${t.claim.expiresAt}`)
-  for (const n of t.notes) out.push(`- [${n.at.slice(0, 16)}] ${n.by}: ${n.text}`)
+  for (const n of t.notes) {
+    out.push(`- [${n.at.slice(0, 16)}] ${n.by}: ${n.text}${n.check ? (n.check.ran ? ' (run by the board, passed)' : ' (passed, as reported)') : ''}`)
+    if (n.where) out.push(`    in ${place(n.where)}`)
+  }
   return out.join('\n')
 }
 
@@ -96,7 +124,15 @@ const SAY = {
   claim: t => `claimed ${t.id}  ${t.title}\nit's yours until ${hhmm(t.claim.expiresAt)}; a note or heartbeat renews it`,
   heartbeat: r => `renewed ${ids(r.renewed)}`,
   note: t => `noted on ${t.id}; yours until ${hhmm(t.claim.expiresAt)}`,
-  release: t => `released ${t.id}${t.notes.at(-1)?.text.startsWith('HANDOFF:') ? ' with a handoff' : ''}; it's back to todo`,
+  release: t => {
+    const n = t.notes.at(-1)
+    const handoff = n?.text.startsWith('HANDOFF:')
+    return `released ${t.id}${handoff ? ' with a handoff' : ''}; it's back to todo${handoff && n.where ? `\nthe work is in ${place(n.where)}` : ''}`
+  },
+  check: t => {
+    const n = t.notes.at(-1)
+    return `checked ${t.id}: ${n.check.cmd} passed${n.where ? ` at ${at(n.where)}` : ''}; yours until ${hhmm(t.claim.expiresAt)}`
+  },
   done: t => `done ${line(t)}\n${t.notes.at(-1).text}`,
   'release-all': r => `released ${ids(r.released)}`,
   register: r => `you are ${r.name}`,
@@ -136,9 +172,26 @@ const commands = {
     if (!note) throw new BoardError(2, 'usage: board note <id> "<text>"')
     return board.note(id, await actorOf(board, flags), note)
   },
-  release: async (board, [id], flags) => board.release(id, await actorOf(board, flags), text(flags.handoff)),
+  release: async (board, [id], flags) => board.release(id, await actorOf(board, flags), text(flags.handoff), whereNow()),
+  // Run a check on a task you hold, in this checkout; record it only if it
+  // passes. --passed records a check you ran yourself, without running it.
+  async check(board, [id, cmd], flags) {
+    if (!id || !cmd) throw new BoardError(2, 'usage: board check <id> "<command>" [--passed]')
+    const actor = await actorOf(board, flags)
+    const t = await board.show(id)
+    if (t.status !== 'claimed' || t.claim.owner !== actor)
+      throw new BoardError(5, `${t.id} is not claimed by ${actor}${t.claim ? ` (owner: ${t.claim.owner})` : ''}`)
+    const ran = !flags.passed
+    if (ran) {
+      // Its output goes to stderr, so stdout stays the board's answer (and --json stays JSON).
+      const run = spawnSync(cmd, { shell: true, stdio: ['ignore', 2, 2] })
+      if (run.status !== 0)
+        throw new BoardError(8, `check failed: ${cmd} ${run.status === null ? `was stopped (${run.signal ?? run.error?.message})` : `exited ${run.status}`}; nothing recorded`)
+    }
+    return board.check(id, actor, { cmd, ran, where: whereNow() })
+  },
   done: async (board, [id], flags) => board.done(id, await actorOf(board, flags), text(flags.note)),
-  'release-all': async (board, _, flags) => board.releaseAll(await actorOf(board, flags), { handoff: text(flags.handoff), session: text(flags.session) }),
+  'release-all': async (board, _, flags) => board.releaseAll(await actorOf(board, flags), { handoff: text(flags.handoff), session: text(flags.session), where: whereNow() }),
   register(board, [name], flags) {
     const session = text(flags.session)
     if (!name || !session) throw new BoardError(2, 'usage: board register <name> --session <id>')
@@ -168,6 +221,7 @@ const FLAGS = {
   list: ['all'],
   add: ['desc', 'accept'],
   release: ['handoff'],
+  check: ['passed'],
   done: ['note'],
   'release-all': ['handoff', 'session'],
   register: ['session'],

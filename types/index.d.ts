@@ -5,8 +5,15 @@ export type Task = {
   accept?: string
   status: 'todo' | 'claimed' | 'done'
   claim: { owner: string; since: string; expiresAt: string } | null
-  notes: { at: string; by: string; text: string }[]
+  notes: Note[]
 }
+
+// Where work sits: the checkout a handoff or check was made in.
+export type Where = { worktree: string; branch: string; commit: string; dirty: boolean }
+
+// A handoff carries `where`; a check that passed carries `check` and `where`.
+// `ran` is true when the board ran the check itself, false when an agent reported it.
+export type Note = { at: string; by: string; text: string; where?: Where; check?: { cmd: string; ran: boolean } }
 
 // A project's task file, read for display (lib/taskfile.mjs). `done` is null
 // for a plain bullet with no checkbox; `priority` is 0 for P0, null for none.

@@ -3,6 +3,24 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+A handoff now says where the work is and what last passed there, so the next
+agent can pick it up quickly.
+
+### Added
+
+- **Handoffs record where the work is.** `release` and `release-all` save the
+  worktree, branch and commit, and whether anything is uncommitted. `board
+  show` prints them under the handoff, and the pane shows them under the task
+  in Unfinished.
+- **`board check <id> "<command>"`** runs a check in your checkout and
+  records it only if it passes, with where it ran. A failed check exits 8 and
+  records nothing. `--passed` records a check you already ran yourself.
+  Claude Code gets a `board_check` tool for this.
+- **The pane shows the last check that passed** under a handoff, and says
+  when it ran before later changes.
+
 ## 0.6.3 — 2026-11-20
 
 Two pane blocks get names that say what they show, so the pane setting no

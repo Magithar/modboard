@@ -14,15 +14,15 @@ function fresh() {
   // Run from inside Codex or a named session, the tests would inherit its name.
   delete env.BOARD_AGENT
   delete env.CODEX_THREAD_ID
-  const run = (args, extra = {}) => {
+  const run = (args, extra = {}, cwd = dir) => {
     try {
-      return { code: 0, out: execFileSync('node', [BOARD, ...args], { env: { ...env, ...extra }, encoding: 'utf8', stdio: 'pipe' }) }
+      return { code: 0, out: execFileSync('node', [BOARD, ...args], { env: { ...env, ...extra }, cwd, encoding: 'utf8', stdio: 'pipe' }) }
     } catch (err) {
       return { code: err.status, out: String(err.stderr) }
     }
   }
-  const json = (args, extra) => JSON.parse(run([...args, '--json'], extra).out)
-  return { env, run, json }
+  const json = (args, extra, cwd) => JSON.parse(run([...args, '--json'], extra, cwd).out)
+  return { dir, env, run, json }
 }
 
 test('exactly one of twenty simultaneous claims wins', async () => {
@@ -246,4 +246,62 @@ test('a flag the command does not take is refused, and nothing is saved', () => 
   // The flags every command takes still work everywhere, as the mod relies on.
   assert.equal(b.run(['add', 'right', '--desc', 'the details', '--as', 'alice']).code, 0)
   assert.equal(b.json(['show', 'T-001', '--as', 'alice']).description, 'the details')
+})
+
+// A git checkout on its own branch, with one commit, as an agent's worktree is.
+function checkout(b) {
+  const wt = path.join(b.dir, 'wt-login')
+  fs.mkdirSync(wt)
+  const git = (...args) => execFileSync('git', args, { cwd: wt, encoding: 'utf8', stdio: 'pipe' }).trim()
+  git('init', '-q', '-b', 'login')
+  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'start')
+  return { wt: fs.realpathSync(wt), commit: git('rev-parse', '--short', 'HEAD') }
+}
+
+test('a handoff records the worktree, branch and commit the work is in', () => {
+  const b = fresh()
+  const { wt, commit } = checkout(b)
+  b.run(['add', 'login form'])
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  fs.writeFileSync(path.join(wt, 'form.tsx'), '')
+  const said = b.run(['release', 'T-001', '--as', 'alice', '--handoff', 'form done; api left'], {}, wt)
+  assert.match(said.out, new RegExp(`the work is in ${wt} · login @ ${commit}, uncommitted changes`))
+  assert.deepEqual(b.json(['show', 'T-001']).notes.at(-1).where, { worktree: wt, branch: 'login', commit, dirty: true })
+  // Outside a git repo there is nowhere to record.
+  b.run(['claim', 'T-001', '--as', 'bob'])
+  b.run(['release', 'T-001', '--as', 'bob', '--handoff', 'nothing'])
+  assert.equal(b.json(['show', 'T-001']).notes.at(-1).where, undefined)
+})
+
+test('check runs the command and records it only when it passes, with where it ran', () => {
+  const b = fresh()
+  const { wt, commit } = checkout(b)
+  b.run(['add', 'login form'])
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  const failed = b.run(['check', 'T-001', 'exit 3', '--as', 'alice'], {}, wt)
+  assert.equal(failed.code, 8)
+  assert.match(failed.out, /check failed: exit 3 exited 3; nothing recorded/)
+  assert.equal(b.json(['show', 'T-001']).notes.length, 0)
+  // Its output goes to stderr; stdout stays the board's JSON.
+  const passed = b.json(['check', 'T-001', 'echo running; test -d .git', '--as', 'alice'], {}, wt)
+  assert.deepEqual(passed.notes.at(-1).check, { cmd: 'echo running; test -d .git', ran: true })
+  assert.deepEqual(passed.notes.at(-1).where, { worktree: wt, branch: 'login', commit, dirty: false })
+  // --passed records a check the agent ran itself, without running it.
+  const reported = b.json(['check', 'T-001', 'exit 1', '--passed', '--as', 'alice'], {}, wt)
+  assert.deepEqual(reported.notes.at(-1).check, { cmd: 'exit 1', ran: false })
+  // Only the holder can record a check, and nothing is run for anyone else.
+  const marker = path.join(b.dir, 'ran')
+  assert.equal(b.run(['check', 'T-001', `touch ${marker}`, '--as', 'mallory'], {}, wt).code, 5)
+  assert.equal(fs.existsSync(marker), false)
+  assert.match(b.run(['show', 'T-001']).out, /CHECKED: echo running; test -d \.git \(run by the board, passed\)\n {4}in .* · login @ /)
+  assert.equal(b.json(['doctor']).ok, true)
+})
+
+test('release-all records where the ending session worked', () => {
+  const b = fresh()
+  const { wt } = checkout(b)
+  b.run(['add', 'one'])
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  b.run(['release-all', '--as', 'alice'], {}, wt)
+  assert.equal(b.json(['show', 'T-001']).notes.at(-1).where.branch, 'login')
 })
