@@ -65,6 +65,15 @@ function Row(c: Ctx, t: Task) {
   )
 }
 
+// A button's text wraps rather than cut, so the path is cut here, from the
+// start, to what is left of the pane after the group, row and label indents
+// and the pane's own margin.
+const INDENT = 2 + 7 + 7 + 2
+const cutStart = (text: string, room: number) => {
+  const chars = [...text]
+  return chars.length <= room ? text : `…${chars.slice(chars.length - Math.max(1, room - 1)).join('')}`
+}
+
 // A fact under a handoff: a grey label, then its value, lined up as the
 // Limits rows are.
 const LABEL = 7
@@ -112,15 +121,12 @@ function Facts(c: Ctx, t: Task, note: Note) {
               <Text dimColor>path</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
-              {/* Cut from the start: the worktree's own folder is what tells them apart. */}
-              <Text dimColor wrap="truncate-start">
-                {tilde(where.worktree, c.home)}
-              </Text>
-            </Box>
-            <Box marginLeft={2} flexShrink={0}>
+              {/* The path is the button: a press copies a cd to it, and it says
+                  ✓ copied for a moment. Cut from the start: the worktree's own
+                  folder is what tells them apart. Underlined under the pointer. */}
               <Button key={`copy-${t.id}`} plain onPress={(press: { surface: string }) => c.act.copyPath(t.id, where.worktree, press.surface)}>
-                <Text color={copied ? 'success' : undefined} dimColor={!copied}>
-                  {copied ? '✓ copied' : c.width < 50 ? 'copy' : 'copy cd'}
+                <Text color={copied ? 'success' : undefined} dimColor={!copied} wrap="truncate" hover={{ underline: true, dimColor: false }}>
+                  {copied ? '✓ copied' : cutStart(tilde(where.worktree, c.home), c.width - INDENT)}
                 </Text>
               </Button>
             </Box>

@@ -22,9 +22,9 @@ agent can pick it up quickly.
   rows lined up like the Limits rows: `where` (branch and commit), `path`
   (the worktree, from `~`, cut from the start so its own folder shows) and
   `check` (the last check that passed, and whether it ran before later
-  changes). Hover the path for all of it; `copy cd` puts `cd '<path>'` on
-  the clipboard and says `✓ copied` for a moment, or, where the surface
-  can't copy, gives the path in a toast.
+  changes). Hover the path for all of it. The path is a button: a press puts
+  `cd '<path>'` on the clipboard and the row says `✓ copied` for a moment,
+  or, where the surface can't copy, a toast gives the path.
 
 ## 0.6.3 — 2026-11-20
 

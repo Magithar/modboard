@@ -204,7 +204,7 @@ test('under a handoff, where the work is, its path from ~, and the last check th
   for (const label of ['where', 'path', 'check']) expect(shown).toContain(label)
   expect(shown).toContain('login @ a1b2c3d, uncommitted changes')
   expect(shown).toContain('~/code/app-login')
-  expect(shown).toContain('copy cd')
+  expect(shown.some((t: string) => /^copy/.test(t))).toBe(false)
   // Checked before the work left uncommitted; then, checked at an older commit.
   expect(shown).toContain('npm test passed at a1b2c3d, before uncommitted changes')
   expect(shown).toContain('npm test passed at 0ld0ld0 (before later changes)')
@@ -212,9 +212,13 @@ test('under a handoff, where the work is, its path from ~, and the last check th
   expect((await ui.find({ type: 'Text', text: '/Users/me/code/app-login' }))?.props.wrap).toBe('wrap')
   expect(shown.filter((t: string) => t === 'where')).toHaveLength(2)
   await ui.unmount()
+  // Narrow, the path is cut from the start to fit, its own folder kept.
+  const narrow = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 30 } } as any)
+  expect((await texts(narrow)).filter((t: string) => /^….*app-login$/.test(t) && t.length <= 12)).toHaveLength(2)
+  await narrow.unmount()
 })
 
-test('copy cd puts a cd to the worktree on the clipboard, and says so for a moment', async ($, on) => {
+test('pressing the path puts a cd to the worktree on the clipboard, and says so for a moment', async ($, on) => {
   host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done', where: { ...WHERE, worktree: "/w/it's here" } }] }])
   const copies: string[] = []
   on('ui.copy', (_$, e: any) => {
@@ -230,9 +234,13 @@ test('copy cd puts a cd to the worktree on the clipboard, and says so for a mome
   await new Promise(resolve => setTimeout(resolve, 20))
   expect(copies).toEqual([`cd '/w/it'\\''s here'`])
   expect(await texts(ui)).toContain('✓ copied')
+  // The path gives way to ✓ copied; only the hidden full path under it stays.
+  const paths = async () => (await texts(ui)).filter((t: string) => t === "/w/it's here").length
+  expect(await paths()).toBe(1)
   pass()
   await pressed
-  expect(await texts(ui)).toContain('copy cd')
+  expect(await paths()).toBe(2)
+  expect(await texts(ui)).not.toContain('✓ copied')
   await ui.unmount()
 })
 
@@ -248,7 +256,7 @@ test('where the surface cannot copy, a toast gives the path', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
   await ui.press({ key: 'copy-T-005' })
   expect(toasts.some(t => t.includes("couldn't copy; the worktree is /Users/me/code/app-login"))).toBe(true)
-  expect(await texts(ui)).toContain('copy cd')
+  expect(await texts(ui)).toContain('/Users/me/code/app-login')
   await ui.unmount()
 })
 
