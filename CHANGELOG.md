@@ -20,9 +20,9 @@ agent can pick it up quickly.
   Claude Code gets a `board_check` tool for this.
 - **The pane shows them under a handoff**, apart from its points, as three
   rows lined up like the Limits rows: `where` (branch and commit), `path`
-  (the worktree, from `~`, cut from the start so its own folder shows) and
+  (the worktree, from `~`, cut from the start so its own folder shows; `board show` has it in full) and
   `check` (the last check that passed, and whether it ran before later
-  changes). Hover the path for all of it. The path is a button: a press puts
+  changes). The path is a button: a press puts
   `cd '<path>'` on the clipboard and the row says `✓ copied` for a moment,
   or, where the surface can't copy, a toast gives the path.
 

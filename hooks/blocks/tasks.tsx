@@ -114,7 +114,6 @@ function Facts(c: Ctx, t: Task, note: Note) {
     <Box flexDirection="column" marginTop={1} paddingLeft={7}>
       {where && Fact(c, 'where', branchOf(where))}
       {where && (
-        // Hovered, the whole path shows under the row, so you see where the cd goes.
         <Box key={`path-${t.id}`} flexDirection="column">
           <Box>
             <Box width={LABEL} flexShrink={0}>
@@ -130,11 +129,6 @@ function Facts(c: Ctx, t: Task, note: Note) {
                 </Text>
               </Button>
             </Box>
-          </Box>
-          <Box display="none" hover={{ display: 'flex' }} paddingLeft={LABEL}>
-            <Text dimColor wrap="wrap">
-              {where.worktree}
-            </Text>
           </Box>
         </Box>
       )}

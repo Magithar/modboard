@@ -208,8 +208,8 @@ test('under a handoff, where the work is, its path from ~, and the last check th
   // Checked before the work left uncommitted; then, checked at an older commit.
   expect(shown).toContain('npm test passed at a1b2c3d, before uncommitted changes')
   expect(shown).toContain('npm test passed at 0ld0ld0 (before later changes)')
-  // The full path waits for a hover; a handoff made outside git has no facts.
-  expect((await ui.find({ type: 'Text', text: '/Users/me/code/app-login' }))?.props.wrap).toBe('wrap')
+  // The path shows once; a handoff made outside git has no facts.
+  expect(shown.filter((t: string) => t.includes('app-login'))).toHaveLength(2)
   expect(shown.filter((t: string) => t === 'where')).toHaveLength(2)
   await ui.unmount()
   // Narrow, the path is cut from the start to fit, its own folder kept.
@@ -234,12 +234,11 @@ test('pressing the path puts a cd to the worktree on the clipboard, and says so 
   await new Promise(resolve => setTimeout(resolve, 20))
   expect(copies).toEqual([`cd '/w/it'\\''s here'`])
   expect(await texts(ui)).toContain('✓ copied')
-  // The path gives way to ✓ copied; only the hidden full path under it stays.
-  const paths = async () => (await texts(ui)).filter((t: string) => t === "/w/it's here").length
-  expect(await paths()).toBe(1)
+  // The path gives way to ✓ copied, then comes back.
+  expect(await texts(ui)).not.toContain("/w/it's here")
   pass()
   await pressed
-  expect(await paths()).toBe(2)
+  expect(await texts(ui)).toContain("/w/it's here")
   expect(await texts(ui)).not.toContain('✓ copied')
   await ui.unmount()
 })
