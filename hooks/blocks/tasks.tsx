@@ -74,8 +74,8 @@ const cutStart = (text: string, room: number) => {
   return chars.length <= room ? text : `…${chars.slice(chars.length - Math.max(1, room - 1)).join('')}`
 }
 
-// A fact under a handoff: a grey label, then its value, lined up as the
-// Limits rows are.
+// A fact under a handoff: a grey label, then its value in plain text, so the
+// label recedes and the fact stands out; lined up as the Limits rows are.
 const LABEL = 7
 function Fact(c: Ctx, label: string, value: string) {
   const { Box, Text } = c.ui
@@ -85,7 +85,7 @@ function Fact(c: Ctx, label: string, value: string) {
         <Text dimColor>{label}</Text>
       </Box>
       <Box flexGrow={1} flexShrink={1}>
-        <Text dimColor wrap="truncate">
+        <Text wrap="truncate">
           {value}
         </Text>
       </Box>
@@ -124,7 +124,7 @@ function Facts(c: Ctx, t: Task, note: Note) {
                   ✓ copied for a moment. Cut from the start: the worktree's own
                   folder is what tells them apart. Underlined under the pointer. */}
               <Button key={`copy-${t.id}`} plain onPress={(press: { surface: string }) => c.act.copyPath(t.id, where.worktree, press.surface)}>
-                <Text color={copied ? 'success' : undefined} dimColor={!copied} wrap="truncate" hover={{ underline: true, dimColor: false }}>
+                <Text color={copied ? 'success' : undefined} wrap="truncate" hover={{ underline: true }}>
                   {copied ? '✓ copied' : cutStart(tilde(where.worktree, c.home), c.width - INDENT)}
                 </Text>
               </Button>

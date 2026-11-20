@@ -208,6 +208,10 @@ test('under a handoff, where the work is, its path from ~, and the last check th
   // Checked before the work left uncommitted; then, checked at an older commit.
   expect(shown).toContain('npm test passed at a1b2c3d, before uncommitted changes')
   expect(shown).toContain('npm test passed at 0ld0ld0 (before later changes)')
+  // Grey labels, plain values.
+  expect((await ui.find({ type: 'Text', text: 'where' }))?.props.dimColor).toBe(true)
+  expect((await ui.find({ type: 'Text', text: 'login @ a1b2c3d, uncommitted changes' }))?.props.dimColor).toBeFalsy()
+  expect((await ui.find({ type: 'Text', text: '~/code/app-login' }))?.props.dimColor).toBeFalsy()
   // A blank line parts the rows.
   expect((await ui.find({ key: 'path-T-005' }))?.props.marginTop).toBe(1)
   // The path shows once; a handoff made outside git has no facts.
