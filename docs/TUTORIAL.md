@@ -253,7 +253,9 @@ sessions to work the board. What you'll see:
 - **Work survives a stop.** If you stop `claude 1` partway, or tell it to
   hand off, it releases with a handoff. The line above `claude 2`'s prompt
   shows *T-002* in a yellow box, and `claude 2` reads the
-  handoff before resuming.
+  handoff before resuming. In `/board` the handoff shows `where` (branch and
+  commit), `path` (the worktree; click it to copy a `cd` to it) and `check`
+  (the last check that passed).
 - **A crashed session doesn't hold work hostage.** If a session is killed
   outright, its claims come back after its session has been silent for 3
   minutes. A plain CLI agent's claim comes back when its 15-minute lease
@@ -263,7 +265,7 @@ sessions to work the board. What you'll see:
   the new one becomes `frontend-2` and says so.
 
 When a session ends normally (exit, `/clear`), it releases what it holds,
-with a handoff note saying it ended.
+with a handoff note saying it ended and the worktree it was in.
 
 ---
 
@@ -307,6 +309,12 @@ waiting or in progress, it disappears.
    T-005  Ghost task                            claude 3
           · layout done
           · saving isn't wired yet
+
+          where  settings @ 4f2a9c1, uncommitted changes
+
+          path   ~/code/app-settings
+
+          check  npm test passed at 4f2a9c1, before uncommitted changes
 
  ▸ Not started · 12
 
@@ -483,7 +491,8 @@ Codex needs no name: the board names each Codex thread by when it joined,
 (`AGENTS.md`):
 
 > Use the `board` CLI to coordinate. Claim a task before working on it
-> (`board claim T-001`). Note progress (`board note T-001 "..."`). If you stop
+> (`board claim T-001`). Note progress (`board note T-001 "..."`). Record
+> checks that pass (`board check T-001 "npm test"`). If you stop
 > without finishing, release it with a handoff (`board release T-001
 > --handoff "done X; left Y; see Z"`). Finish with `board done T-001 --note
 > "how you verified it"`. Never touch a task another agent holds.

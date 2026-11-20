@@ -50,7 +50,7 @@ progress, your task.md, CI status, the git branch, or any command's output.
 | **Every agent, the same way** | One CLI that anything with a shell can run. Claude Code also gets a line above the prompt and the `/board` pane. |
 | **One claim wins** | Two agents never end up on the same task. |
 | **Crashed work comes back** | A task held by an agent that died returns to the board on its own. |
-| **Handoffs keep context** | An agent that stops partway leaves a note; the next one reads it and carries on. |
+| **Handoffs keep context** | An agent that stops partway leaves a note, with the worktree it was in and the last check that passed; the next one reads it and carries on there. |
 | **Done means verified** | Nothing is marked done without saying how it was checked. |
 | **Keep it where you want** | The board lives in a folder by default. A storage block you write can keep it in a database instead. |
 
@@ -107,8 +107,9 @@ Or from source: clone `https://github.com/Magithar/modboard.git` and run
 
 The protocol, for any agent's instructions:
 
-> Claim a task before working on it. Note progress. If you stop without
-> finishing, release it with a handoff. Never touch a task another agent holds.
+> Claim a task before working on it. Note progress. Record checks that pass
+> (`board check`). If you stop without finishing, release it with a handoff.
+> Never touch a task another agent holds.
 
 Claude Code gets the board's tools, a line above the prompt and the `/board`
 pane. Names are automatic: the board numbers sessions as they join. To pick
@@ -391,7 +392,8 @@ the CLI directly.
 | **Claims expire** | A claim lasts 15 minutes; a note or heartbeat renews it. An expired claim goes back to waiting. |
 | **Crashes recover fast** | An open Claude session pings the board every minute. If it's killed, its claims go back after 3 minutes of silence. |
 | **Names** | The board numbers sessions as they join: `claude 1`, `codex 1`. A session keeps its name while it's open; a new one takes the lowest free number. |
-| **Handoffs** | `release --handoff` leaves a note the next agent reads first. A Claude session that ends releases what it holds, with a handoff of its own. |
+| **Handoffs** | `release --handoff` leaves a note the next agent reads first, with the worktree, branch and commit the work is in. A Claude session that ends releases what it holds, with a handoff of its own. |
+| **Checks** | `board check` runs a command in your checkout and records it only if it passes, with the commit it ran at; the next agent sees the last check that passed. `--passed` (and the `board_check` tool) records one an agent ran itself, marked as reported. |
 | **Done means verified** | `done` needs a `--note` on how the task was checked, against its `--accept` criteria if it has any. |
 | **A ledger** | Every change, lost claims included, is appended to `ledger.jsonl`. `board doctor` checks it against the board. |
 
@@ -707,7 +709,8 @@ and a board of two tasks, one already held by `alice`. Codex was told only
 
 **`npm test`** runs the CLI tests and the store contract:
 
-- a 20-way claim race, ownership, handoffs, lease expiry, heartbeats,
+- a 20-way claim race, ownership, handoffs and the worktree they record,
+  checks (recorded only when they pass), lease expiry, heartbeats,
   rejected-claim logging, verified done, release-all, automatic names,
   refused flags
 - the store contract against the file block and an in-memory block
@@ -716,7 +719,8 @@ and a board of two tasks, one already held by `alice`. Codex was told only
 - that `board taskfile` reads each way a task file keeps items and priorities
 
 **`claude plugin test .`** runs the mod's tests: the band and how it fits a
-line, the pane's groups and what folds, handoff points, the task file and its
+line, the pane's groups and what folds, handoff points and the where, path
+and check rows under them (and copying the path), the task file and its
 priority button, the Limits heading, the error line, names, the tools, release
 on session end, and choosing blocks.
 
@@ -763,7 +767,7 @@ changed in each version, and [ROADMAP.md](ROADMAP.md) what's planned next.
 modboard/
 ├── bin/board.mjs            # the one CLI every agent uses
 ├── lib/
-│   ├── engine.mjs           # the rules: claims, leases, handoffs, names, the ledger
+│   ├── engine.mjs           # the rules: claims, leases, handoffs, checks, names, the ledger
 │   ├── load-store.mjs       # finds the storage block that config.json names
 │   ├── store-file.mjs       # the built-in storage block: a folder
 │   ├── taskfile.mjs         # reads a project's task file and its priorities

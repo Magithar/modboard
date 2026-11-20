@@ -3,7 +3,7 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
-## Unreleased
+## 0.7.0 — 2026-11-21
 
 A handoff now says where the work is and what last passed there, so the next
 agent can pick it up quickly.
@@ -11,20 +11,32 @@ agent can pick it up quickly.
 ### Added
 
 - **Handoffs record where the work is.** `release` and `release-all` save the
-  worktree, branch and commit, and whether anything is uncommitted. `board
-  show` prints them under the handoff, and the pane shows them under the task
-  in Unfinished.
+  worktree, branch and commit, and whether anything is uncommitted. That
+  includes the handoff a Claude session writes when it ends. `board show`
+  prints them under the handoff, and `release` says where the work is.
 - **`board check <id> "<command>"`** runs a check in your checkout and
-  records it only if it passes, with where it ran. A failed check exits 8 and
-  records nothing. `--passed` records a check you already ran yourself.
-  Claude Code gets a `board_check` tool for this.
-- **The pane shows them under a handoff**, apart from its points, as three
-  rows lined up like the Limits rows: `where` (branch and commit), `path`
-  (the worktree, from `~`, cut from the start so its own folder shows; `board show` has it in full) and
-  `check` (the last check that passed, and whether it ran before later
-  changes). The path is a button: a press puts
-  `cd '<path>'` on the clipboard and the row says `✓ copied` for a moment,
-  or, where the surface can't copy, a toast gives the path.
+  records it only if it passes, with the worktree and commit it ran at. A
+  failed check exits 8 and records nothing, and only the task's holder can
+  run one. `--passed` records a check you already ran yourself; `board show`
+  marks it as reported.
+- **A `board_check` tool for Claude Code**, which records a check the agent
+  ran and saw pass. `board_show` and `board_release` now tell agents about
+  the worktree and the last check.
+- **Under a handoff in `/board`**, apart from its points, three rows a blank
+  line apart, grey labels and plain values, lined up like the Limits rows:
+  - `where`: the branch and commit, and any uncommitted changes.
+  - `path`: the worktree, from `~`, cut from the start so its own folder
+    shows. It is a button: a click puts `cd '<path>'` on the clipboard and
+    it reads `✓ copied` for a moment; where the surface can't copy, a toast
+    gives the path.
+  - `check`: the last check that passed, and whether it ran before later
+    changes.
+
+### Docs
+
+- The README and the tutorial cover `board check`, what a handoff records,
+  and the new rows; the protocol for agents now says to record checks that
+  pass.
 
 ## 0.6.3 — 2026-11-20
 
