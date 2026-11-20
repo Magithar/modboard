@@ -236,3 +236,14 @@ test('a Codex thread is named "codex 1" by when it joined, and keeps its name', 
   // Outside Codex, with no name, it still asks who you are.
   assert.equal(b.run(['claim', 'T-001']).code, 2)
 })
+
+test('a flag the command does not take is refused, and nothing is saved', () => {
+  const b = fresh()
+  const r = b.run(['add', 'guessed', '--description', 'the details'])
+  assert.equal(r.code, 2)
+  assert.match(r.out, /board: add doesn't take --description; it takes --as, --json, --desc, --accept/)
+  assert.deepEqual(b.json(['list', '--all']), [])
+  // The flags every command takes still work everywhere, as the mod relies on.
+  assert.equal(b.run(['add', 'right', '--desc', 'the details', '--as', 'alice']).code, 0)
+  assert.equal(b.json(['show', 'T-001', '--as', 'alice']).description, 'the details')
+})

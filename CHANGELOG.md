@@ -3,6 +3,16 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+### Changed
+
+- **`board` refuses a flag the command doesn't take**, and names the ones it
+  does: `board: add doesn't take --description; it takes --as, --json, --desc,
+  --accept`. Before, a guessed flag was dropped without a word, so an agent
+  that wrote `--description` saved its task with no description. Found by a
+  live run with Codex.
+
 ## 0.6.0 — 2026-11-20
 
 Sessions name themselves, the board shows your project's own task file with

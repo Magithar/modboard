@@ -161,6 +161,29 @@ const commands = {
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
 }
 
+// The flags each command reads, besides --as and --json, which every command
+// takes. Anything else is refused: a guessed flag (--description for --desc)
+// would otherwise be dropped without a word, and the task saved without it.
+const FLAGS = {
+  list: ['all'],
+  add: ['desc', 'accept'],
+  release: ['handoff'],
+  done: ['note'],
+  'release-all': ['handoff', 'session'],
+  register: ['session'],
+  join: ['session'],
+}
+
+function checkFlags(cmd, flags) {
+  const known = ['as', 'json', ...(FLAGS[cmd] ?? [])]
+  const unknown = Object.keys(flags).filter(f => !known.includes(f))
+  if (unknown.length)
+    throw new BoardError(
+      2,
+      `${cmd} doesn't take ${unknown.map(f => `--${f}`).join(', ')}; it takes ${known.map(f => `--${f}`).join(', ')}`,
+    )
+}
+
 // Commands that read no board, so no storage block is loaded for them.
 const BOARDLESS = new Set(['where', 'taskfile'])
 
@@ -173,6 +196,7 @@ async function main() {
     process.exit(2)
   }
   try {
+    checkFlags(cmd, flags)
     const { store, name } = BOARDLESS.has(cmd) ? { store: null, name: '' } : await loadStore(DIR)
     const board =
       store &&
