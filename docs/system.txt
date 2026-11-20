@@ -49,7 +49,7 @@
                  ┌───────────────────┴────────────────────┐
                  ▼                                        ▼
         band above the prompt                    /board pane
-        summary · model · effort · modBOARD      tasks · taskfile · compact · usage
+        summary · model · effort · modBOARD      work · todo · compact · usage
         usage · compact · clock · context        agents · model · effort · clock · context
         + your own blocks                        + your own blocks
 
