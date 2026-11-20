@@ -5,6 +5,20 @@ promised by a date. Shipped work goes in the [changelog](CHANGELOG.md).
 
 ## Next
 
+### Crashed sessions keep their place
+
+A session that hands off or exits leaves the worktree and the last check
+that passed. One that crashes or is killed can't: the board frees its task
+after 3 minutes of silence, with a note that it stopped responding. That
+note isn't a handoff, so the task lands in Not started, and the pane shows
+no `where`, `path` or `check` for it.
+
+- Free a silent session's task as a handoff, so it shows under Unfinished
+  ("claude 1 stopped responding; read the notes above").
+- Give it the last known worktree, from the task's latest check, so the
+  `where`, `path` and `check` rows show and the next agent knows where to
+  start.
+
 ### Colours: `/board colours`
 
 Change the board's colours without touching a setting. `/board colours`
