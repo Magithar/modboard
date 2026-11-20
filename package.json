@@ -1,7 +1,7 @@
 {
   "name": "modboard",
   "version": "0.6.1",
-  "description": "One board coding agents and people share, set up to show whatever you need, through one CLI",
+  "description": "One board for every agent and every person. You decide what's on it.",
   "type": "module",
   "bin": { "board": "bin/board.mjs" },
   "exports": {

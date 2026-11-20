@@ -1,7 +1,7 @@
 {
   "name": "modboard",
   "version": "0.6.1",
-  "description": "One board your agents and you share, showing whatever you set it to: tasks, handoffs, CI, any command's output. Open it with /board",
+  "description": "One board for every agent and every person. You decide what's on it: tasks, handoffs, CI, any command's output. Open it with /board",
   "author": {
     "name": "Magithar",
     "url": "https://github.com/Magithar"

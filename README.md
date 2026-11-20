@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <b>One board every coding agent shares. You choose what goes on it.</b><br/>
+  <b>One board for every agent and every person. You decide what's on it.</b><br/>
   Works with Claude Code, Codex, OpenCode, anything with a shell, and people.
 </p>
 
