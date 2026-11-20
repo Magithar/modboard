@@ -3,6 +3,28 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## 0.6.3 — 2026-11-20
+
+Two pane blocks get names that say what they show, so the pane setting no
+longer lists two blocks that both start with "task".
+
+### Changed
+
+- **`tasks` is now `work`**: who's doing what, in the In progress,
+  Unfinished, Not started and Done groups.
+- **`taskfile` is now `todo`**: your task.md, under the pane's To do heading.
+- **The default pane setting** is `work,todo,compact,usage`.
+- **The old names still work.** A `pane` or `band` setting that names `tasks`
+  or `taskfile` shows the same blocks as before, so nothing needs changing
+  after an update. Both old names stay reserved, so a block of your own can't
+  take them; neither can `work` or `todo`. A block of your own already called
+  `work` or `todo` is now skipped, with a toast saying why: rename it in
+  **Your own blocks**.
+
+### Docs
+
+- The README's block table, the tutorial and both diagrams use the new names.
+
 ## 0.6.2 — 2026-11-20
 
 modBOARD is now described as what it is: one board for every agent and every
