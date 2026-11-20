@@ -3,7 +3,10 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
-## Unreleased
+## 0.6.1 — 2026-11-20
+
+`board` refuses a flag it doesn't take instead of dropping it, found by
+the first live run with real Codex, and every push now runs CI.
 
 ### Changed
 

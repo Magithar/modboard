@@ -1,6 +1,6 @@
 {
   "name": "modboard",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "A task board several coding agents share, through one CLI",
   "type": "module",
   "bin": { "board": "bin/board.mjs" },

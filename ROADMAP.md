@@ -41,8 +41,3 @@ Left before it ships:
 - Work through the issues found trying it.
 - Decide how a fixed colour should behave across light and dark themes.
 - Check exact colours on terminals with 256 colours only (macOS Terminal).
-
-## Later
-
-- **The v0.6.0 release**: version bump and npm publish of what's in
-  Unreleased.
