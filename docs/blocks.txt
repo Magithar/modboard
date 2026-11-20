@@ -76,15 +76,15 @@
         built in                        your own, no code                 your own, in code
         hooks/blocks/*.tsx              the blocks setting, as JSON:      a file of the same shape
         listed in index.ts              {"ci": "gh run list ..."}         in hooks/blocks/, listed
-        summary · board · tasks         every 30 s: sh -c the command,    in index.ts, in your copy
-        taskfile · usage · compact      show its first line (60 chars)    of the mod: a fork or a PR
+        summary · board · work          every 30 s: sh -c the command,    in index.ts, in your copy
+        todo · usage · compact          show its first line (60 chars)    of the mod: a fork or a PR
         model · effort · clock
         context · agents
             │                               │                                 │
             └───────────────────────────────┼─────────────────────────────────┘
                                             ▼
                            band  setting   summary,model,effort,board           the order is the importance
-                           pane  setting   tasks,taskfile,compact,usage
+                           pane  setting   work,todo,compact,usage
 
 
   DISPLAY BLOCKS:  WHAT ONE IS

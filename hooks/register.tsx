@@ -189,10 +189,15 @@ const TOOLS = [
 
 const SYMBOL = { todo: '○', claimed: '◐', done: '●' } as const
 
+// Names blocks had before they were renamed, so a setting written then still
+// shows them. They stay taken: a command block can't use them either.
+const RENAMED: Record<string, string> = { tasks: 'work', taskfile: 'todo' }
+
 const pick = (all: Block[], setting: unknown, fallback: string) =>
   String(setting ?? fallback)
     .split(',')
-    .map(name => all.find(b => b.name === name.trim()))
+    .map(name => name.trim())
+    .map(name => all.find(b => b.name === (RENAMED[name] ?? name)))
     .filter(b => b !== undefined)
 
 // Each command block's first line of output; a failing command shows nothing.
@@ -334,11 +339,11 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
 }
 
 export const register: Register = (on, options) => {
-  const { commands, problems } = parseCommandBlocks(options.blocks, BLOCKS.map(b => b.name))
+  const { commands, problems } = parseCommandBlocks(options.blocks, [...BLOCKS.map(b => b.name), ...Object.keys(RENAMED)])
   const all = [...BLOCKS, ...Object.keys(commands).map(commandBlock)]
   const band = pick(all, options.band, 'summary,model,effort,board').filter(b => b.band)
-  const pane = pick(all, options.pane, 'tasks,taskfile,compact,usage').filter(b => b.pane)
-  readsTaskfile = [...band, ...pane].some(b => b.name === 'taskfile')
+  const pane = pick(all, options.pane, 'work,todo,compact,usage').filter(b => b.pane)
+  readsTaskfile = [...band, ...pane].some(b => b.name === 'todo')
   const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
 
   on('session.start', async ($, e, next) => {

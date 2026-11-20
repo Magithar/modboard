@@ -110,7 +110,7 @@ function Group(c: Ctx, name: GroupName, list: Task[], last = false) {
 // up; then what nobody has started; then what is done.
 // What needs you is never cut short.
 export const tasks: Block = {
-  name: 'tasks',
+  name: 'work',
   pane: c => {
     const { Box, Text } = c.ui
     const todo = c.tasks.filter(t => t.status === 'todo')

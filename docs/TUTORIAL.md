@@ -341,7 +341,7 @@ waiting or in progress, it disappears.
 
 ## 6. Your task.md on the board
 
-If your repository keeps a task list in a markdown file, the `taskfile`
+If your repository keeps a task list in a markdown file, the `todo`
 block shows it in the pane, beside the board's own tasks. It's found when it's called `task.md`, `tasks.md` or
 `todo.md` (any capitals), at the repo's root or in `docs/`.
 
@@ -493,7 +493,7 @@ Two settings list the display's blocks, in order:
 | Setting | Default | Also available |
 |---|---|---|
 | Band blocks (the line) | `summary,model,effort,board` | `usage`, `compact`, `clock`, `context` |
-| Pane blocks (`/board`) | `tasks,taskfile,compact,usage` | `agents`, `model`, `effort`, `clock`, `context` |
+| Pane blocks (`/board`) | `work,todo,compact,usage` | `agents`, `model`, `effort`, `clock`, `context` |
 
 The band's order is its order of importance: when the line is short, the
 last blocks go first, so model and effort are the first to drop. Clicking

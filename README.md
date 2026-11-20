@@ -317,15 +317,15 @@ The band and the pane are each a list of display blocks, in order:
 
 ```
 band: summary,model,effort,board        (the default)
-pane: tasks,taskfile,compact,usage      (the default)
+pane: work,todo,compact,usage           (the default)
 ```
 
 | Block | Band | Pane | Shows |
 |---|:-:|:-:|---|
 | `summary` | ✓ | | what's waiting and active, and the unfinished boxes |
 | `board` | ✓ | | the `modBOARD` button |
-| `tasks` | | ✓ | In progress, Unfinished, Not started and Done |
-| `taskfile` | | ✓ | your task.md under To do |
+| `work` | | ✓ | who's doing what: In progress, Unfinished, Not started and Done |
+| `todo` | | ✓ | your task.md under To do |
 | `compact` | ✓ | ✓ | the context window as a bar, and a button that compacts the conversation |
 | `usage` | ✓ | ✓ | the 5-hour limit as a bar (in the band, only once it passes 50%) |
 | `model` | ✓ | ✓ | the model; click to switch |
@@ -333,6 +333,9 @@ pane: tasks,taskfile,compact,usage      (the default)
 | `clock` | ✓ | ✓ | the time |
 | `context` | ✓ | ✓ | context fill and the session's cost, as text |
 | `agents` | | ✓ | who is live on the board |
+
+`work` and `todo` were called `tasks` and `taskfile` before 0.6.3; the old
+names still work.
 
 In a narrow window, the band's last blocks drop first, so put what matters
 most first. To show something not in this list, [make your own

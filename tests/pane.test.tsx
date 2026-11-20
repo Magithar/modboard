@@ -388,7 +388,7 @@ test('usage is plain with room, yellow from 70%, red from 90%', QUIET, async ($,
   }
 })
 
-test('the band and pane settings pick blocks and their order', { options: { band: 'clock', pane: 'clock,tasks,context' } } as any, async ($, on) => {
+test('the band and pane settings pick blocks and their order', { options: { band: 'clock', pane: 'clock,work,context' } } as any, async ($, on) => {
   host(on, [task('T-001', 'todo')])
   on('session.measure', (_$, e: any) => ({ changed: e.changed }))
   await $.session.start(START)
@@ -410,8 +410,8 @@ const TASKFILE: TaskFile = {
   ],
 }
 
-const BOARD_ONLY = { options: { pane: 'tasks,taskfile' } } as any
-const BOARD_ONLY_BARS = { options: { pane: 'tasks,taskfile,compact,usage' } } as any
+const BOARD_ONLY = { options: { pane: 'work,todo' } } as any
+const BOARD_ONLY_BARS = { options: { pane: 'work,todo,compact,usage' } } as any
 
 test('the task.md button says what is left, and shows only that when pressed', BOARD_ONLY, async ($, on) => {
   host(on, [task('T-001', 'todo')], { taskfile: TASKFILE })
@@ -567,6 +567,14 @@ test('a task file without priorities has no priority button', async ($, on) => {
   expect(await ui.find({ key: 'tier' })).toBeUndefined()
 })
 
+test('the names work and todo had before, tasks and taskfile, still show them', { options: { pane: 'tasks,taskfile' } } as any, async ($, on) => {
+  host(on, [task('T-001', 'todo')], { taskfile: TASKFILE })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await label(ui, 'taskfile')).toBe('▸ To do')
+  expect((await texts(ui)).some(t => t.includes('Not started'))).toBe(true)
+})
+
 test('with no task.md the pane shows no button for it', async ($, on) => {
   host(on, [task('T-001', 'todo')])
   await $.session.start(START)
@@ -574,7 +582,7 @@ test('with no task.md the pane shows no button for it', async ($, on) => {
   expect(await ui.find({ key: 'taskfile' })).toBeUndefined()
 })
 
-test('task.md is never read when no shown block uses it', { options: { pane: 'tasks' } } as any, async ($, on) => {
+test('task.md is never read when no shown block uses it', { options: { pane: 'work' } } as any, async ($, on) => {
   const calls = host(on, [], { taskfile: TASKFILE })
   await $.session.start(START)
   expect(calls.some(argv => argv[2] === 'taskfile')).toBe(false)
@@ -799,7 +807,7 @@ test('at every width, what the band draws fits the line', FULL, async ($, on) =>
 })
 
 test('a command block shows its first line in the band and the pane; a failing one shows nothing', {
-  options: { blocks: '{"ci": "echo passing", "broken": "false"}', band: 'summary,ci,broken', pane: 'tasks,ci,broken' },
+  options: { blocks: '{"ci": "echo passing", "broken": "false"}', band: 'summary,ci,broken', pane: 'work,ci,broken' },
 } as any, async ($, on) => {
   const calls = host(on, [task('T-001', 'todo')])
   await $.session.start(START)
@@ -814,7 +822,7 @@ test('a command block shows its first line in the band and the pane; a failing o
 })
 
 test('the blocks setting refuses what it cannot use, by name, and never runs it', {
-  options: { blocks: '{"tasks": "echo hijack", "Bad Name": "echo x", "ok": "echo fine"}', band: 'summary,ok' },
+  options: { blocks: '{"tasks": "echo hijack", "todo": "echo hijack", "Bad Name": "echo x", "ok": "echo fine"}', band: 'summary,ok' },
 } as any, async ($, on) => {
   const toasts: string[] = []
   on('ui.toast', (_$, e: any) => {
@@ -824,6 +832,7 @@ test('the blocks setting refuses what it cannot use, by name, and never runs it'
   const calls = host(on, [task('T-001', 'todo')])
   await $.session.start(START)
   expect(toasts.some(t => t.includes('"tasks" is a built-in block'))).toBe(true)
+  expect(toasts.some(t => t.includes('"todo" is a built-in block'))).toBe(true)
   expect(toasts.some(t => t.includes('"Bad Name"'))).toBe(true)
   expect(calls).not.toContainEqual(['sh', '-c', 'echo hijack'])
   expect(calls).toContainEqual(['sh', '-c', 'echo fine'])

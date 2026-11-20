@@ -26,8 +26,8 @@
     "pane": {
       "type": "string",
       "title": "Pane blocks",
-      "description": "Blocks in the /board pane, in order, comma-separated: tasks, taskfile (the project's task.md, behind a button), compact (context bar and a compact button), usage, model, effort, clock, context, agents, or your own from Your own blocks.",
-      "default": "tasks,taskfile,compact,usage"
+      "description": "Blocks in the /board pane, in order, comma-separated: work (who's doing what), todo (the project's task.md, behind a button), compact (context bar and a compact button), usage, model, effort, clock, context, agents, or your own from Your own blocks.",
+      "default": "work,todo,compact,usage"
     },
     "blocks": {
       "type": "string",

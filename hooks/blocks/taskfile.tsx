@@ -68,7 +68,7 @@ function Row(c: Ctx, i: Item, indent: number) {
 // file on each press. It is for
 // reading: to work an item through the board, add it there (board add).
 export const taskfile: Block = {
-  name: 'taskfile',
+  name: 'todo',
   pane: c => {
     const { Box, Button, Text } = c.ui
     const { file } = c.taskfile
