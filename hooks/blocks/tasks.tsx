@@ -114,7 +114,7 @@ function Facts(c: Ctx, t: Task, note: Note) {
     <Box flexDirection="column" marginTop={1} paddingLeft={7}>
       {where && Fact(c, 'where', branchOf(where))}
       {where && (
-        <Box key={`path-${t.id}`} flexDirection="column">
+        <Box key={`path-${t.id}`} flexDirection="column" marginTop={1}>
           <Box>
             <Box width={LABEL} flexShrink={0}>
               <Text dimColor>path</Text>
@@ -132,7 +132,8 @@ function Facts(c: Ctx, t: Task, note: Note) {
           </Box>
         </Box>
       )}
-      {check && Fact(c, 'check', passed)}
+      {/* A blank line between the rows, so each reads on its own. */}
+      {check && <Box marginTop={where ? 1 : 0}>{Fact(c, 'check', passed)}</Box>}
     </Box>
   )
 }

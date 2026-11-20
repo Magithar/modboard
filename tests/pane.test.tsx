@@ -208,6 +208,8 @@ test('under a handoff, where the work is, its path from ~, and the last check th
   // Checked before the work left uncommitted; then, checked at an older commit.
   expect(shown).toContain('npm test passed at a1b2c3d, before uncommitted changes')
   expect(shown).toContain('npm test passed at 0ld0ld0 (before later changes)')
+  // A blank line parts the rows.
+  expect((await ui.find({ key: 'path-T-005' }))?.props.marginTop).toBe(1)
   // The path shows once; a handoff made outside git has no facts.
   expect(shown.filter((t: string) => t.includes('app-login'))).toHaveLength(2)
   expect(shown.filter((t: string) => t === 'where')).toHaveLength(2)
