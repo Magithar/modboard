@@ -12,7 +12,7 @@
 
 <p align="center">
   <b>One board for every agent and every person. You decide what's on it.</b><br/>
-  Works with Claude Code, Codex, OpenCode, anything with a shell, and people.
+  Works with Claude Code, Codex, OpenCode and anything with a shell.
 </p>
 
 <p align="center">
@@ -41,8 +41,8 @@ progress, your task.md, CI status, the git branch, or any command's output.
 - **Switching between agents?** The board doesn't belong to any of them. Start
   a task in Claude Code, finish it in Codex, and check it yourself from the
   shell.
-- **Want your project at a glance?** Put what you look at on the board. Name a
-  command and its output shows up beside the work, with no code.
+- **Want your project at a glance?** Put the things you keep checking on the
+  board. Name a command and its output shows up beside the work, with no code.
 
 | | |
 |---|---|
@@ -61,7 +61,8 @@ progress, your task.md, CI status, the git branch, or any command's output.
 ![Three live Claude Code sessions share one board: claude 2 and claude 3 race for T-001, claude 2 hands T-003 off partway, claude 3 picks it up, and claude 1's /board pane follows along](docs/board-live.gif)
 
 Three real Claude Code sessions, recorded live at real speed. Only the wait
-before the two workers start is cut.
+before the two workers start is cut. The board shows its default blocks; you
+can [change them](#settings).
 
 1. The board names each session as it joins. `claude 1` has `/board` open;
    `claude 2` and `claude 3` are each told to work the board.
@@ -126,6 +127,10 @@ board add "Add a login page" --accept "signing in works"
 
 Then type `/board` in Claude Code.
 
+**4. Choose what's on it (optional).** Open `/config` and list the blocks you
+want in `band` and `pane`, or name a command to make your own. See
+[Settings](#settings) and [Make your own block](#make-your-own-block).
+
 ---
 
 ## Everyday use
@@ -181,7 +186,10 @@ read it without learning those terms.
 
 ## What you see
 
-The display shows only what needs you. Everything else waits until you ask.
+Claude Code shows the board in two places: the band, one line above the
+prompt, and the `/board` pane. Both are lists of blocks you choose in
+[Settings](#settings). With the default blocks, the display shows only what
+needs you, and everything else waits until you ask.
 
 ### The band
 
@@ -327,7 +335,8 @@ pane: tasks,taskfile,compact,usage      (the default)
 | `agents` | | ✓ | who is live on the board |
 
 In a narrow window, the band's last blocks drop first, so put what matters
-most first.
+most first. To show something not in this list, [make your own
+block](#make-your-own-block).
 
 ### Model and effort
 
