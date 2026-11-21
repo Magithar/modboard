@@ -18,6 +18,12 @@ no `where`, `path` or `check` for it.
 - Give it the last known worktree, from the task's latest check, so the
   `where`, `path` and `check` rows show and the next agent knows where to
   start.
+- Mark that worktree as possibly stale, since the session may have kept
+  working after its last check:
+
+  ```
+  where  login @ 9056822 · last known, may be stale
+  ```
 
 ### Colours: `/board colours`
 
