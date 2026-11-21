@@ -190,6 +190,7 @@ function Group(c: Ctx, name: GroupName, list: Task[], last = false) {
 // What needs you is never cut short.
 export const tasks: Block = {
   name: 'work',
+  about: "who's doing what",
   pane: c => {
     const { Box, Text } = c.ui
     const todo = c.tasks.filter(t => t.status === 'todo')

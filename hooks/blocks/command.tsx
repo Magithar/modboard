@@ -7,9 +7,11 @@ import { words } from './types'
 // The name then goes in `band` or `pane` like any built-in block. The setting
 // is yours (user config), never the project's, so cloning a repo cannot make
 // your session run its commands.
-export function commandBlock(name: string): Block {
+export function commandBlock(name: string, command = ''): Block {
   return {
     name,
+    // On the list of blocks: the command it runs.
+    about: command || 'your command',
     band: ({ ui: { Text }, custom }) => {
       const text = custom[name]
       if (!text) return null

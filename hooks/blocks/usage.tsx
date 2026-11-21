@@ -21,6 +21,7 @@ const shown = (u: Ctx['usage']) => u.limits.filter(l => l.kind !== 'seven_day')
 // half, since below that it is noise; in the pane, each window with its reset.
 export const usage: Block = {
   name: 'usage',
+  about: '5-hour limit',
   band: ({ ui, usage: u }) => {
     const top = [...shown(u)].sort((a, b) => b.percentUsed - a.percentUsed)[0]
     if (!top || top.percentUsed < 50) return null

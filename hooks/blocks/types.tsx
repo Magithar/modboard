@@ -27,7 +27,7 @@ export type Ctx = {
   copied: string
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; openBlocks: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void> }
 }
 
 // One way a block can draw in the band, and how many columns it takes.
@@ -41,6 +41,10 @@ export type BandForm = { tree: any; width: number; end?: boolean }
 // past the narrowest it leaves the block out.
 export type Block = {
   name: string
+  // What it shows, in a few words, on the pane's list of blocks. Every block
+  // with a pane part is on that list by itself; `listed: false` leaves it off.
+  about?: string
+  listed?: false
   band?: (c: Ctx) => BandForm[] | null
   pane?: (c: Ctx) => any
   // A bar block's figures for the Limits heading when it is folded:

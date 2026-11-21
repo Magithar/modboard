@@ -331,7 +331,7 @@ pane: work,todo,compact,usage           (the default)
 | Block | Band | Pane | Shows |
 |---|:-:|:-:|---|
 | `summary` | ✓ | | what's waiting and active, and the unfinished boxes |
-| `board` | ✓ | | the `modBOARD` button |
+| `board` | ✓ | | the `blocks` and `modBOARD` buttons |
 | `work` | | ✓ | who's doing what: In progress, Unfinished, Not started and Done |
 | `todo` | | ✓ | your task.md under To do |
 | `compact` | ✓ | ✓ | the context window as a bar, and a button that compacts the conversation |
@@ -344,6 +344,10 @@ pane: work,todo,compact,usage           (the default)
 
 `work` and `todo` were called `tasks` and `taskfile` before 0.6.3; the old
 names still work.
+
+Or click **blocks** on the band: the pane turns to a list of the blocks it
+can show, and a click ticks one on or off. **Done** shows the board. The
+choice is kept between sessions, until `pane` is changed in `/config`.
 
 In a narrow window, the band's last blocks drop first, so put what matters
 most first. To show something not in this list, [make your own

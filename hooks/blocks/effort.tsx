@@ -4,6 +4,8 @@ import type { Block } from './types'
 // `efforts` setting, through Claude Code's own /effort.
 export const effort: Block = {
   name: 'effort',
+  // Off the list of blocks: the band shows it already.
+  listed: false,
   band: ({ ui: { Button, Text }, effort: level, act }) => {
     // Beside the model, the level says what it is ("low"), so the band gives it no label.
     const shown = level || '–'

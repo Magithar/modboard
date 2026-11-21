@@ -11,6 +11,8 @@ export const modelName = (id: string) => {
 // setting, through Claude Code's own /model, as if you had typed it.
 export const model: Block = {
   name: 'model',
+  // Off the list of blocks: the band shows it already.
+  listed: false,
   band: ({ ui: { Button, Text }, model: id, act }) => {
     // The name says what it is ("Sonnet 5.5"), so the band gives it no label.
     const name = modelName(id)

@@ -3,6 +3,32 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+### Added
+
+- **`blocks` on the band, before `modBOARD`**, in the logo's orange. It opens
+  the pane at a list of the blocks the board can show; click a row to tick it
+  on or off, then **Done** (or `modBOARD`) to see the board. A newly ticked
+  block goes last. Pressed again while the list shows, `blocks` closes the
+  pane. The choice is kept between sessions; a `pane` setting changed in
+  `/config` since wins over it.
+- Every block with a part in the pane is on the list by itself, your command
+  blocks too (described by their command). `model`, `effort`, `clock` and
+  `context` stay off it: the band or `compact` shows them already, and the
+  clock waits for the pixel clock. They still work when named in `pane`.
+
+### Changed
+
+- **`agents` is one line**: `Live  ● claude 1 (you)  ○ codex 1`, a green dot
+  for an agent seen in the last 90 seconds, a grey one for the quiet. All of
+  it grey but the dots, since none of it is pressable.
+- **The pane opens at once**, from `modBOARD`, a task's box or `/board`, on the
+  last reading, and reads the board again just after.
+- **Smoother scrolling.** The 3-second poll writes only what changed, so the
+  pane is no longer redrawn for nothing; and each drawing reads what it needs
+  at once, not one value after another.
+
 ## 0.7.1 — 2026-11-21
 
 A session that crashes now keeps its place, as a session that hands off

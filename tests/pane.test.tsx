@@ -28,7 +28,8 @@ function host(
     taskfile = { file: null, items: [] },
     broken = { now: false },
     home,
-  }: { home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
+    live = [{ name: 'codex', lastSeen: '' }],
+  }: { live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -72,7 +73,7 @@ function host(
     }
     const stdout =
       argv[2] === 'view'
-        ? JSON.stringify({ tasks, agents: [{ name: 'codex', lastSeen: '' }] })
+        ? JSON.stringify({ tasks, agents: live })
         : argv[2] === 'taskfile'
           ? JSON.stringify(taskfile)
           : argv[2] === 'join'
@@ -781,7 +782,7 @@ test('the band defaults to the tasks, model and effort, then a modBOARD button; 
   await $.session.start(START)
   await $.session.measure({ ...measure(64), context: { window: 200000, percent: 72 } } as any)
   const shown = await bandAt($, 140)
-  expect(shown).toEqual(['1 waiting', 'Sonnet 5.5', 'low', 'modBOARD'])
+  expect(shown).toEqual(['1 waiting', 'Sonnet 5.5', 'low', 'blocks', 'modBOARD'])
 })
 
 
@@ -979,4 +980,158 @@ test('the pane opens with modBOARD, this session\'s name, and the counts of what
   expect((await ui.find({ type: 'Text', text: '1 active' }))?.props.color).toBe('success')
   const logo = (await ui.find({ type: 'Text', text: 'modBOARD' }))?.props
   expect([logo?.color, logo?.bold, logo?.size]).toEqual(['success', true, 'heading'])
+})
+
+// The plugin's store, kept in a map the test can read and seed.
+function store(on: On, seed: Record<string, unknown> = {}) {
+  const kept = new Map(Object.entries(seed))
+  on('store.get', (_$, e: any) => ({ value: kept.get(e.key) }))
+  on('store.set', (_$, e: any) => {
+    kept.set(e.key, e.value)
+    return { value: undefined }
+  })
+  return kept
+}
+
+test('blocks opens the pane at the list of blocks alone; ticks change the board; Done shows it', { options: { band: 'summary,board' } } as any, async ($, on) => {
+  const calls = host(on, [task('T-001', 'claimed', 'codex')])
+  const kept = store(on)
+  const opened: any[] = []
+  on('ui.open', (_$, e: any) => {
+    opened.push(e)
+    return { value: { isPlaced: true } }
+  })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  const shown = (await texts(band)) as string[]
+  // It sits just before modBOARD.
+  expect(shown.indexOf('blocks')).toBe(shown.indexOf('modBOARD') - 1)
+  // Bold, in the logo's cap orange.
+  const look = (await band.find({ type: 'Text', text: 'blocks' }))?.props
+  expect([look?.bold, look?.color]).toEqual([true, '#F27238'])
+  const before = (calls: string[][]) => calls.filter(c => c[2] === 'view').length
+  const views = before(calls)
+  await band.press({ key: 'blocks' })
+  expect(opened.map(e => e.id)).toEqual(['modboard'])
+  // Straight to the list: no read of the board first.
+  expect(before(calls)).toBe(views)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  let list = (await texts(pane)) as string[]
+  // Only the list: no board under it.
+  expect(list[0]).toBe('What should the board show?')
+  expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
+  // The default pane: work, todo, compact, usage ticked; the rest not.
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
+  expect(list).toContain('[ ] agents   who is live')
+  // What the band or another block shows already is left off the list.
+  for (const name of ['model', 'effort', 'clock', 'context']) expect(await pane.find({ key: `pick-${name}` })).toBeUndefined()
+  // Ticks in the cap's orange, as blocks on the band is.
+  // One colour a row: ticked orange, the rest grey.
+  expect((await pane.find({ type: 'Text', text: /^\[x\] work/ }))?.props.color).toBe('#F27238')
+  expect((await pane.find({ type: 'Text', text: /^\[ \] agents/ }))?.props.dimColor).toBe(true)
+  await pane.press({ key: 'pick-agents' })
+  await pane.press({ key: 'pick-work' })
+  list = (await texts(pane)) as string[]
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
+  // Done is a plain word, no brackets.
+  expect((await pane.find({ key: 'blocks-done' }))?.props.plain).toBe(true)
+  // Green, as modBOARD is: both show the board.
+  expect((await pane.find({ type: 'Text', text: 'Done' }))?.props.color).toBe('success')
+  // Done shows the board: work gone, agents there.
+  await pane.press({ key: 'blocks-done' })
+  expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
+  expect((await texts(pane)).some((t: string) => t.includes('codex'))).toBe(true)
+  // Kept between sessions, with the setting it was ticked from.
+  expect(kept.get('paneBlocks')).toEqual({ from: 'work,todo,compact,usage', blocks: ['todo', 'compact', 'usage', 'agents'] })
+})
+
+test('modBOARD on the list of blocks turns the pane to the board instead of closing it', { options: { band: 'summary,board' } } as any, async ($, on) => {
+  host(on, [task('T-001', 'claimed', 'codex')])
+  store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  const closed: string[] = []
+  on('ui.close', (_$, e: any) => {
+    closed.push(e.id)
+    return { value: undefined }
+  })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await band.press({ key: 'board' })
+  expect(closed).toEqual([])
+  expect(await label(pane, 'group-in-progress')).toBe('▾ In progress')
+  await band.press({ key: 'board' })
+  expect(closed).toEqual(['modboard'])
+})
+
+test('a pane changed in /config since the list was ticked wins over it', { options: { pane: 'work,agents' } } as any, async ($, on) => {
+  host(on, [task('T-001', 'claimed', 'codex')])
+  store(on, { paneBlocks: { from: 'work,todo,compact,usage', blocks: ['usage'] } })
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await label(pane, 'group-in-progress')).toBe('▾ In progress')
+})
+
+test('the ticked list comes back in the next session', async ($, on) => {
+  host(on, [task('T-001', 'claimed', 'codex')])
+  store(on, { paneBlocks: { from: 'work,todo,compact,usage', blocks: ['agents'] } })
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
+  expect((await texts(pane)).some((t: string) => t.includes('codex'))).toBe(true)
+})
+
+test('blocks pressed again while the list shows closes the pane; from the board it shows the list', { options: { band: 'summary,board' } } as any, async ($, on) => {
+  host(on, [task('T-001', 'claimed', 'codex')])
+  store(on)
+  const opened: string[] = []
+  on('ui.open', (_$, e: any) => {
+    opened.push(e.id)
+    return { value: { isPlaced: true } }
+  })
+  const closed: string[] = []
+  on('ui.close', (_$, e: any) => {
+    closed.push(e.id)
+    return { value: undefined }
+  })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  await band.press({ key: 'blocks' })
+  expect(closed).toEqual(['modboard'])
+  // With the board showing, it turns the pane to the list and keeps it open.
+  await band.press({ key: 'board' })
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect((await texts(pane))[0]).toBe('What should the board show?')
+  expect(opened).toEqual(['modboard', 'modboard'])
+  expect(closed).toEqual(['modboard'])
+})
+
+test('a block of your own shows on the list by itself, with the command it runs', { options: { blocks: '{"ci": "echo green"}' } } as any, async ($, on) => {
+  host(on, [])
+  store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await texts(pane)).toContain('[ ] ci       echo green')
+  await pane.press({ key: 'pick-ci' })
+  await pane.press({ key: 'blocks-done' })
+  expect(await texts(pane)).toContain('green')
+})
+
+test('agents is one line: Live, then a green dot for each agent seen lately and a grey one for the quiet', { options: { pane: 'agents' } } as any, async ($, on) => {
+  const ago = (s: number) => new Date(NOW - s * 1000).toISOString()
+  host(on, [], { live: [{ name: 'claude 1', lastSeen: ago(10) }, { name: 'codex 1', lastSeen: ago(150) }] })
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const shown = (await texts(pane)) as string[]
+  expect(shown.slice(0, 5)).toEqual(['Live', '● ', 'claude 1 (you)', '○ ', 'codex 1'])
+  expect((await pane.find({ type: 'Text', text: '● ' }))?.props.color).toBe('success')
+  // Nothing here is pressable, so nothing is white: grey words, a green dot.
+  for (const text of ['Live', 'claude 1 (you)', 'codex 1']) expect((await pane.find({ type: 'Text', text }))?.props.dimColor).toBe(true)
+  expect(shown.some(t => t.startsWith('live:'))).toBe(false)
 })

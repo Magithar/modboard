@@ -4,6 +4,8 @@ import { words, type Block } from './types'
 // Claude Code shows the context already.
 export const context: Block = {
   name: 'context',
+  // Off the list of blocks: compact's bar shows the context.
+  listed: false,
   band: ({ ui: { Text }, usage: u }) =>
     u.context === undefined
       ? null

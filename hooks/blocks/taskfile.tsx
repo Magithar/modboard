@@ -69,6 +69,7 @@ function Row(c: Ctx, i: Item, indent: number) {
 // reading: to work an item through the board, add it there (board add).
 export const taskfile: Block = {
   name: 'todo',
+  about: 'your task.md',
   pane: c => {
     const { Box, Button, Text } = c.ui
     const { file } = c.taskfile

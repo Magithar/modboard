@@ -3,6 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Agent, Task, TaskFile } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
+import { CAP } from './blocks/board'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 import { groupOpen, type GroupName } from './blocks/tasks'
 import { tone } from './blocks/meter'
@@ -45,6 +46,11 @@ const COPIED_MS = 2_000
 // Why the last read of the board failed, or '' when it worked: the pane would
 // otherwise go on showing old tasks as if they were current.
 const boardError = atom({ plugin: 'modboard', key: 'boardError' } as const, '')
+// What the pane shows: the board, or the list of blocks to tick on and off.
+const paneView = atom({ plugin: 'modboard', key: 'paneView' } as const, 'board')
+// The pane's blocks by name, in order: the `pane` setting, until the person
+// ticks blocks on the list; then their choice, kept between sessions.
+const paneBlocks = atom({ plugin: 'modboard', key: 'paneBlocks' } as const, [] as string[])
 
 let session = ''
 let lastBeat = 0
@@ -99,6 +105,40 @@ async function estimateContext($: EngineInterface) {
 
 // Whether any shown block reads task.md; when none does, it is never read.
 let readsTaskfile = false
+let bandReadsTodo = false
+// The `pane` setting as written, the blocks the pane can show, and the
+// setting's own choice of them (see register).
+let paneSetting = ''
+let paneChoosable: string[] = []
+let paneFromSetting: string[] = []
+
+function reads(names: string[]) {
+  readsTaskfile = bandReadsTodo || names.includes('todo')
+}
+
+// The list kept in the store, while the setting is the one it was ticked
+// from: a `pane` changed in /config since wins over it.
+async function loadPane($: EngineInterface) {
+  const kept: any = await $.store.get('paneBlocks').catch(() => undefined)
+  const names =
+    kept && kept.from === paneSetting && Array.isArray(kept.blocks)
+      ? (kept.blocks as unknown[]).filter((n): n is string => typeof n === 'string' && paneChoosable.includes(n))
+      : paneFromSetting
+  await update($, paneBlocks, () => names)
+  reads(names)
+}
+
+// A row on the list of blocks pressed: ticked, the block goes last, below
+// the others; unticked, it leaves the pane. Kept between sessions.
+async function toggleBlock($: EngineInterface, name: string) {
+  const now = await read($, paneBlocks)
+  const names = now.includes(name) ? now.filter(n => n !== name) : [...now, name]
+  // The tick changes first; saving follows.
+  await update($, paneBlocks, () => names)
+  reads(names)
+  await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
+  if (name === 'todo' && names.includes('todo')) await refresh($)
+}
 
 // What went wrong, in one line: the board's own message, or the error line of
 // a crash ("EACCES: permission denied, open '…/board.json'"), not its stack.
@@ -108,14 +148,18 @@ function reason(text: string) {
   return line.replace(/^board:\s*/, '').replace(/^\w*Error:\s*/, '')
 }
 
+// A polled value is written only when it changed: each write redraws its
+// readers, and a pane redrawn every few seconds for nothing scrolls in jerks.
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+
 async function refresh($: EngineInterface) {
   let problem = ''
   try {
     const out = await cli($, ['view', '--json'])
     if (out.ok) {
       const view = JSON.parse(out.text) as { tasks: Task[]; agents: Agent[] }
-      await update($, tasks, () => view.tasks)
-      await update($, agents, () => view.agents)
+      if (!same(await read($, tasks), view.tasks)) await update($, tasks, () => view.tasks)
+      if (!same(await read($, agents), view.agents)) await update($, agents, () => view.agents)
     } else problem = reason(out.text) || `the board CLI exited with ${out.code}`
   } catch {
     problem = 'the board CLI could not run (is node on PATH?)'
@@ -127,7 +171,7 @@ async function refresh($: EngineInterface) {
     try {
       parsed = file.ok ? (JSON.parse(file.text) as TaskFile) : undefined
     } catch {}
-    if (parsed) await update($, taskfile, () => parsed!)
+    if (parsed && !same(await read($, taskfile), parsed)) await update($, taskfile, () => parsed!)
   }
 }
 
@@ -225,7 +269,7 @@ async function runCommands($: EngineInterface, commands: Record<string, string>)
     const run = await $.process.run(['sh', '-c', command]).catch(() => undefined)
     if (run && run.exitCode === 0) out[name] = firstLine(run.stdout)
   }
-  await update($, custom, () => out)
+  if (!same(await read($, custom), out)) await update($, custom, () => out)
 }
 
 const GAP = 3
@@ -269,15 +313,18 @@ function after(cycle: string[], current: string) {
 
 // Switch the way the person would, through Claude Code's own commands, so
 // everything else in the session sees the change.
-// Open the /board pane, fresh: the board and the task file read again first.
+// Open the /board pane, then read the board and the task file again.
 // Ask for room for the whole board; the surface may give less, and the pane's
 // body scrolls with the wheel when it does.
 
 async function openBoard($: EngineInterface) {
-  await refresh($)
-  await estimateContext($)
+  // Open at once on what the 3-second poll last read; the fresh read follows,
+  // and the pane redraws when it lands.
+  await update($, paneView, () => 'board')
   const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
   if (opened.isPlaced) await update($, paneOpen, () => true)
+  await refresh($)
+  await estimateContext($)
   return opened
 }
 
@@ -295,10 +342,26 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       await update($, effort, () => to)
     },
     // modBOARD on the band: opens the pane, or closes it when it is already open.
+    // Open at the list of blocks, it turns the pane to the board instead.
     openBoard: async () => {
       if (!(await read($, paneOpen))) return void (await openBoard($))
+      if ((await read($, paneView)) !== 'board') return void (await update($, paneView, () => 'board'))
       await $.ui.close({ id: PANE }).catch(() => {})
       await update($, paneOpen, () => false)
+    },
+    // blocks on the band: the pane, open at the list of blocks alone.
+    // Pressed again while the list shows, it closes the pane.
+    openBlocks: async () => {
+      if ((await read($, paneOpen)) && (await read($, paneView)) === 'blocks') {
+        await $.ui.close({ id: PANE }).catch(() => {})
+        return void (await update($, paneOpen, () => false))
+      }
+      await update($, paneView, () => 'blocks')
+      if (await read($, paneOpen)) return
+      // Straight to the list: it needs no fresh read of the board, and the
+      // board's 3-second poll keeps it current for Done.
+      const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
+      if (opened.isPlaced) await update($, paneOpen, () => true)
     },
     // A task's box on the band. With the pane closed, it opens the pane at
     // the group that holds the task, unfolded, so the task and its note are
@@ -345,34 +408,60 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
   }
 }
 
+// Everything a drawing reads, asked for at once: a pane is drawn again on
+// every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow] =
+    await Promise.all([
+      $.clock.now(),
+      read($, me),
+      read($, tasks),
+      read($, agents),
+      read($, usage),
+      read($, model),
+      read($, effort),
+      read($, custom),
+      read($, taskfile),
+      read($, taskfileOpen),
+      read($, taskfileTier),
+      read($, groupsOpen),
+      read($, home),
+      read($, copied),
+    ])
   return {
     ui,
     width,
-    now: await $.clock.now(),
-    who: await read($, me),
-    tasks: await read($, tasks),
-    agents: await read($, agents),
-    usage: await read($, usage),
-    model: await read($, model),
-    effort: await read($, effort),
-    custom: await read($, custom),
-    taskfile: await read($, taskfile),
-    taskfileOpen: await read($, taskfileOpen),
-    taskfileTier: await read($, taskfileTier),
-    groupsOpen: await read($, groupsOpen),
-    home: await read($, home),
-    copied: await read($, copied),
+    now,
+    who,
+    tasks: tasksNow,
+    agents: agentsNow,
+    usage: usageNow,
+    model: modelNow,
+    effort: effortNow,
+    custom: customNow,
+    taskfile: taskfileNow,
+    taskfileOpen: taskfileOpenNow,
+    taskfileTier: taskfileTierNow,
+    groupsOpen: groupsOpenNow,
+    home: homeNow,
+    copied: copiedNow,
     act,
   }
 }
 
 export const register: Register = (on, options) => {
   const { commands, problems } = parseCommandBlocks(options.blocks, [...BLOCKS.map(b => b.name), ...Object.keys(RENAMED)])
-  const all = [...BLOCKS, ...Object.keys(commands).map(commandBlock)]
+  const all = [...BLOCKS, ...Object.entries(commands).map(([name, command]) => commandBlock(name, command))]
   const band = pick(all, options.band, 'summary,model,effort,board').filter(b => b.band)
-  const pane = pick(all, options.pane, 'work,todo,compact,usage').filter(b => b.pane)
-  readsTaskfile = [...band, ...pane].some(b => b.name === 'todo')
+  // Every block the pane can show, and the `pane` setting's own choice of them.
+  const choosable = all.filter(b => b.pane)
+  const setting = String(options.pane ?? 'work,todo,compact,usage')
+  const fromSetting = pick(choosable, setting, '').map(b => b.name)
+  bandReadsTodo = band.some(b => b.name === 'todo')
+  paneSetting = setting
+  paneChoosable = choosable.map(b => b.name)
+  paneFromSetting = fromSetting
+  reads(fromSetting)
   const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
 
   on('session.start', async ($, e, next) => {
@@ -405,6 +494,7 @@ export const register: Register = (on, options) => {
       })
     await $.command.register({ name: 'board', description: 'Open the modboard pane' })
     await estimateContext($)
+    await loadPane($)
 
     await refresh($)
     $.clock.every(POLL_MS, () => refresh($).catch(() => {}))
@@ -515,7 +605,42 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
-    const c = await context($, e.props.bodyColumns ?? 40, { Box, Text, Button }, actions($, cycles))
+    const [c, chosen, view, problem] = await Promise.all([
+      context($, e.props.bodyColumns ?? 40, { Box, Text, Button }, actions($, cycles)),
+      read($, paneBlocks),
+      read($, paneView),
+      read($, boardError),
+    ])
+    // The list of blocks, alone: each row ticks its block on or off; Done
+    // turns the pane to the board, as modBOARD does.
+    if (view === 'blocks') {
+      const listed = choosable.filter(b => b.listed !== false)
+      const pad = Math.max(...listed.map(b => b.name.length)) + 2
+      return (
+        <Box flexDirection="column" paddingX={1}>
+          <Text bold>What should the board show?</Text>
+          <Box flexDirection="column" marginTop={1} paddingLeft={2}>
+            {listed.map(b => (
+              <Box>
+                <Button key={`pick-${b.name}`} plain onPress={() => toggleBlock($, b.name)}>
+                  {/* One Text in one colour, so the pointer lights the row as one
+                      bar: ticked rows orange, the rest grey. */}
+                  <Text color={chosen.includes(b.name) ? CAP : undefined} dimColor={!chosen.includes(b.name)} wrap="truncate">
+                    {`${chosen.includes(b.name) ? '[x]' : '[ ]'} ${b.name.padEnd(pad)}${b.about ?? ''}`}
+                  </Text>
+                </Button>
+              </Box>
+            ))}
+          </Box>
+          <Box marginTop={1} paddingLeft={2}>
+            <Button key="blocks-done" plain onPress={() => update($, paneView, () => 'board')}>
+              <Text bold color="success">Done</Text>
+            </Button>
+          </Box>
+        </Box>
+      )
+    }
+    const pane = chosen.map(name => choosable.find(b => b.name === name)).filter(b => b !== undefined)
     const parts = pane.map(b => ({ block: b, part: b.pane!(c) })).filter(p => p.part !== null)
     // Sections, in order: each block on its own, except that bars side by
     // side (context, the 5-hour limit) make one, under a Limits heading.
@@ -555,7 +680,6 @@ export const register: Register = (on, options) => {
     const body = (section: typeof parts) => (BARS.has(section[0]!.block.name) ? limits(section) : section[0]!.part)
     // A grey rule between sections.
     const rule = '─'.repeat(Math.max(1, (e.props.bodyColumns ?? 40) - 2))
-    const problem = await read($, boardError)
     return (
       <Box flexDirection="column" paddingX={1}>
         {/* First, in red, when the board stopped answering: what is below is old. */}

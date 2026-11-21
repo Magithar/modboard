@@ -5,6 +5,8 @@ const hhmm = (now: number) => `${pad(new Date(now).getHours())}:${pad(new Date(n
 
 export const clock: Block = {
   name: 'clock',
+  // Off the list of blocks: waits for the pixel clock.
+  listed: false,
   band: ({ ui: { Text }, now }) => [words(Text, hhmm(now), { dimColor: true })],
   pane: ({ ui: { Text }, now }) => <Text dimColor>{hhmm(now)}</Text>,
 }

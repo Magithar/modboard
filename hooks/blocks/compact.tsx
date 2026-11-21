@@ -9,6 +9,7 @@ import { Bar, CELLS, barParts, barWidth } from './meter'
 // with an empty bar if no figure has come yet. The bar takes colour from 70%.
 export const compact: Block = {
   name: 'compact',
+  about: 'context bar + compact button',
   band: ({ ui, usage: u, act }) => {
     if (u.context === undefined) return null
     const { Button, Text } = ui
