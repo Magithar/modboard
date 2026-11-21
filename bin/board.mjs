@@ -62,7 +62,7 @@ function whereNow() {
 
 // "/repo/wt-login · login @ a1b2c3d, uncommitted changes"
 const at = w => `${w.commit || 'no commits'}${w.dirty ? ', uncommitted changes' : ''}`
-const place = w => `${w.worktree}${w.branch ? ` · ${w.branch}` : ' · detached'} @ ${at(w)}`
+const place = w => `${w.worktree}${w.branch ? ` · ${w.branch}` : ' · detached'} @ ${at(w)}${w.stale ? ' (last known, may be stale)' : ''}`
 
 function inside(root) {
   const old = path.join(root, '.agent-board')

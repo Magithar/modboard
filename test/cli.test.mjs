@@ -305,3 +305,35 @@ test('release-all records where the ending session worked', () => {
   b.run(['release-all', '--as', 'alice'], {}, wt)
   assert.equal(b.json(['show', 'T-001']).notes.at(-1).where.branch, 'login')
 })
+
+test('a session that went away after doing work leaves a handoff, with where it was last seen, marked stale', async () => {
+  const b = fresh()
+  const { wt, commit } = checkout(b)
+  const quick = { BOARD_PRESENCE_MS: '1500' }
+  for (const title of ['worked on', 'only claimed']) b.run(['add', title])
+  b.run(['register', 'ghost', '--session', 's1'], quick)
+  b.run(['claim', 'T-001', '--as', 'ghost'], quick)
+  b.run(['claim', 'T-002', '--as', 'ghost'], quick)
+  b.run(['check', 'T-001', 'true', '--as', 'ghost'], quick, wt)
+  await new Promise(resolve => setTimeout(resolve, 2000))
+  const t1 = b.json(['show', 'T-001'], quick)
+  assert.equal(t1.status, 'todo')
+  const left = t1.notes.at(-1)
+  assert.equal(left.by, 'board')
+  assert.match(left.text, /^HANDOFF: ghost stopped responding \(its session went silent\); read the notes above$/)
+  assert.deepEqual(left.where, { worktree: wt, branch: 'login', commit, dirty: false, stale: true })
+  assert.match(b.run(['show', 'T-001'], quick).out, /login @ .*\(last known, may be stale\)/)
+  // Claimed and gone with nothing recorded: back to not started, no handoff.
+  assert.doesNotMatch(b.json(['show', 'T-002'], quick).notes.at(-1).text, /^HANDOFF/)
+})
+
+test('a lease that runs out after work leaves a handoff too', async () => {
+  const b = fresh()
+  b.run(['add', 'long job'])
+  b.run(['claim', 'T-001', '--as', 'codex'], { BOARD_LEASE_MS: '300' })
+  b.run(['note', 'T-001', 'half done', '--as', 'codex'], { BOARD_LEASE_MS: '300' })
+  await new Promise(resolve => setTimeout(resolve, 500))
+  const left = b.json(['show', 'T-001']).notes.at(-1)
+  assert.equal(left.text, 'HANDOFF: lease of codex expired; read the notes above')
+  assert.equal(left.where, undefined)
+})

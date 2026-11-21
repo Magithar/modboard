@@ -9,7 +9,9 @@ export type Task = {
 }
 
 // Where work sits: the checkout a handoff or check was made in.
-export type Where = { worktree: string; branch: string; commit: string; dirty: boolean }
+// `stale`: the last place the work was seen, written by the board for a session
+// that went away without a handoff; the work may have moved on since.
+export type Where = { worktree: string; branch: string; commit: string; dirty: boolean; stale?: boolean }
 
 // A handoff carries `where`; a check that passed carries `check` and `where`.
 // `ran` is true when the board ran the check itself, false when an agent reported it.

@@ -5,8 +5,14 @@ const QUIET_MS = 5 * 60 * 1000
 // A task someone released with a handoff, that nobody has picked up yet.
 export const handoffWaiting = (t: Task) => t.status === 'todo' && (t.notes.at(-1)?.text.startsWith('HANDOFF:') ?? false)
 
-// The last agent to hand a task off, read from its handoff note.
-export const handedOffBy = (t: Task) => t.notes.at(-1)?.by ?? ''
+// The last agent to hand a task off, read from its handoff note. One the
+// board wrote, for a session that went away, names the agent that went: the
+// last to write anything before it.
+export const handedOffBy = (t: Task) => {
+  const last = t.notes.at(-1)
+  if (last?.by !== 'board') return last?.by ?? ''
+  return [...t.notes].reverse().find(n => n.by !== 'board')?.by ?? 'board'
+}
 
 // A claim whose lease is nearly out: its agent has stopped working, or stopped
 // renewing, for most of a lease.
@@ -18,7 +24,7 @@ export const lastCheck = (t: Task): Note | undefined => [...t.notes].reverse().f
 
 // "a1b2c3d, uncommitted changes"; "login @ a1b2c3d".
 export const commitOf = (w: Where) => `${w.commit || 'no commits'}${w.dirty ? ', uncommitted changes' : ''}`
-export const branchOf = (w: Where) => `${w.branch || 'detached'} @ ${commitOf(w)}`
+export const branchOf = (w: Where) => `${w.branch || 'detached'} @ ${commitOf(w)}${w.stale ? ' · last known, may be stale' : ''}`
 
 // A path under the home directory reads from ~.
 export const tilde = (path: string, home: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path)

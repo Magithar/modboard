@@ -3,6 +3,32 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## 0.7.1 — 2026-11-21
+
+A session that crashes now keeps its place, as a session that hands off
+does. The idea came from a reader, who asked for the last known path even if
+it might be stale.
+
+### Changed
+
+- **A crashed session's work shows as unfinished.** When the board frees a
+  task because its session went silent, or its lease ran out, and its agent
+  had recorded work on it (a note or a check), it writes a handoff for it:
+  "claude 1 stopped responding (its session went silent); read the notes
+  above". The task then waits under Unfinished, named after the agent that
+  left it, not under Not started. A task claimed with nothing recorded still
+  goes back to Not started.
+- **That handoff carries the last place the work was seen**, from the task's
+  latest note that has one (a check, usually), so the `where`, `path` and
+  `check` rows show. It is marked as such, since the work may have moved on
+  after: `login @ 9056822 · last known, may be stale` in the pane, and
+  `(last known, may be stale)` in `board show`.
+
+### Docs
+
+- The README says what happens to a crashed session's task. The roadmap item
+  is done and gone from the roadmap.
+
 ## 0.7.0 — 2026-11-21
 
 A handoff now says where the work is and what last passed there, so the next

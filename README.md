@@ -389,7 +389,7 @@ the CLI directly.
 |---|---|
 | **Where the board lives** | `.modboard/`, beside the repo's git folder, so every worktree shares one board. Add it to `.gitignore`. |
 | **One claim wins** | Each change takes a lock and replaces the board in one step, so exactly one claimant wins. Only the holder can note, release or finish a task. |
-| **Claims expire** | A claim lasts 15 minutes; a note or heartbeat renews it. An expired claim goes back to waiting. |
+| **Claims expire** | A claim lasts 15 minutes; a note or heartbeat renews it. An expired claim goes back to waiting. If its agent had recorded work (a note or a check), the board writes a handoff for it, so the task shows under Unfinished with the last place the work was seen, marked *last known, may be stale*. |
 | **Crashes recover fast** | An open Claude session pings the board every minute. If it's killed, its claims go back after 3 minutes of silence. |
 | **Names** | The board numbers sessions as they join: `claude 1`, `codex 1`. A session keeps its name while it's open; a new one takes the lowest free number. |
 | **Handoffs** | `release --handoff` leaves a note the next agent reads first, with the worktree, branch and commit the work is in. A Claude session that ends releases what it holds, with a handoff of its own. |
@@ -672,7 +672,7 @@ the tool descriptions:
 | Both told "do the next task on the board" | they collided on one task; the loser moved to another by itself; each claimed before writing files |
 | One session does part 1 and releases with a handoff | the other read the handoff and resumed from part 2 without redoing part 1 |
 | `codex` claims a task from the shell | Claude was refused, said so, and left it alone |
-| An agent's lease runs out | the task goes back to waiting, and the ledger records `expire` |
+| An agent's lease runs out | the task goes back to waiting, and the ledger records `expire`; with work recorded, it waits under Unfinished, with a handoff the board wrote |
 
 The task file, priorities, compact button and automatic names came later.
 They've run in live sessions while being built (the demo above shows the

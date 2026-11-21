@@ -224,6 +224,27 @@ test('under a handoff, where the work is, its path from ~, and the last check th
   await narrow.unmount()
 })
 
+test('a handoff the board wrote for a session that went away names that agent, and marks its place stale', async ($, on) => {
+  host(on, [
+    {
+      ...task('T-005', 'todo'),
+      notes: [
+        checked({ ...WHERE, dirty: false }),
+        { at: '', by: 'board', text: 'HANDOFF: claude 1 stopped responding (its session went silent); read the notes above', where: { ...WHERE, dirty: false, stale: true } },
+      ],
+    },
+  ])
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  const shown = await texts(ui)
+  expect(await label(ui, 'group-partway')).toBe('▾ Unfinished')
+  expect(shown).toContain('claude 1')
+  expect(shown).not.toContain('board')
+  expect(shown).toContain('login @ a1b2c3d · last known, may be stale')
+  expect(shown).toContain('npm test passed at a1b2c3d')
+  await ui.unmount()
+})
+
 test('pressing the path puts a cd to the worktree on the clipboard, and says so for a moment', async ($, on) => {
   host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done', where: { ...WHERE, worktree: "/w/it's here" } }] }])
   const copies: string[] = []

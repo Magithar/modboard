@@ -259,7 +259,9 @@ sessions to work the board. What you'll see:
 - **A crashed session doesn't hold work hostage.** If a session is killed
   outright, its claims come back after its session has been silent for 3
   minutes. A plain CLI agent's claim comes back when its 15-minute lease
-  runs out.
+  runs out. If it had noted progress or recorded a check, the task waits
+  under Unfinished, with the last place its work was seen, marked *last
+  known, may be stale*.
 - **Names don't collide.** A third session becomes `claude 3`. If you name
   sessions yourself and start a second `frontend` while the first is live,
   the new one becomes `frontend-2` and says so.
