@@ -53,13 +53,17 @@ function Row(c: Ctx, t: Task) {
   return (
     <Box flexDirection="column">
       {row}
-      {points.map(p => (
-        <Box paddingLeft={7}>
-          <Text dimColor wrap="truncate">
-            {points.length > 1 ? `· ${p}` : p}
-          </Text>
-        </Box>
-      ))}
+      {/* A blank line under the title, as between the facts below, so the
+          task reads in three even parts: title, handoff, facts. */}
+      <Box flexDirection="column" marginTop={1}>
+        {points.map(p => (
+          <Box paddingLeft={7}>
+            <Text dimColor wrap="truncate">
+              {points.length > 1 ? `· ${p}` : p}
+            </Text>
+          </Box>
+        ))}
+      </Box>
       {Facts(c, t, note!)}
     </Box>
   )
