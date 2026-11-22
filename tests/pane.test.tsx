@@ -1517,3 +1517,41 @@ test('every row shows ▲ and ▼; the first row\'s ▲ and the last row\'s ▼ 
   expect(await pane.find({ key: 'up-work' })).toBeFalsy()
   expect(await pane.find({ key: 'down-pixel-clock' })).toBeFalsy()
 })
+
+test('every ▲ and every ▼ moves its block one place, on the terminal and the desktop app; grey ones do nothing', ORDER, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.sleep', () => ({ value: undefined }))
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const start = ['work', 'usage', 'compact', 'pixel-clock']
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const pane = await $.ui.mount({ plugin: 'modboard', surface, ...PANE } as any)
+    await pane.press({ key: 'tab-order' })
+    const now = () => (kept.get('paneBlocks') as any)?.blocks ?? start
+    for (let at = 0; at < start.length; at++) {
+      for (const by of [-1, 1] as const) {
+        const before = [...now()]
+        const name = before[at]!
+        const key = `${by < 0 ? 'up' : 'down'}-${name}`
+        const to = at + by
+        if (to < 0 || to >= before.length) {
+          // The grey arrow: nothing to press, nothing changes.
+          expect(await pane.find({ key })).toBeFalsy()
+          continue
+        }
+        await pane.press({ key })
+        const want = [...before]
+        want[at] = before[to]!
+        want[to] = name
+        expect(now()).toEqual(want)
+        // And back, so each row is tried from its own place.
+        await pane.press({ key: `${by < 0 ? 'down' : 'up'}-${name}` })
+        expect(now()).toEqual(before)
+      }
+    }
+    await pane.unmount()
+  }
+})
