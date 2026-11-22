@@ -1419,3 +1419,18 @@ test('stop is bold green, like Done, beside the yellow alarm line', { options: {
   expect([stop?.color, stop?.bold]).toEqual(['success', true])
   expect((await pane.find({ type: 'Text', text: '⏰ 09:41  ' }))?.props.color).toBe('warning')
 })
+
+test('an agent alarm at 1:30 with no am or pm rings at the next 1:30; 13:30 and am/pm are taken as said', async ($, on) => {
+  // NOW is 09:41.
+  host(on, [])
+  store(on)
+  await $.session.start(START)
+  const alarm = async (at: string) => ((await $.tool.call({ tool: 'mcp__modboard__board_alarm', note: 'n', at } as any)) as any).result
+  expect(await alarm('1:30')).toBe('the alarm rings once at 13:30: n')
+  expect(await alarm('9:30')).toBe('the alarm rings once at 21:30: n')
+  expect(await alarm('10:00')).toBe('the alarm rings once at 10:00: n')
+  expect(await alarm('12:15')).toBe('the alarm rings once at 12:15: n')
+  expect(await alarm('13:30')).toBe('the alarm rings once at 13:30: n')
+  expect(await alarm('1:30am')).toBe('the alarm rings once at 01:30: n')
+  expect(await alarm('01:30')).toBe('the alarm rings once at 01:30: n')
+})

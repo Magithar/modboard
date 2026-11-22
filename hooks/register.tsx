@@ -540,6 +540,26 @@ async function ringFinished($: EngineInterface, list: Task[]) {
     }
 }
 
+// An agent's "1:30" with no am or pm: whichever of 01:30 and 13:30 comes
+// next, since a one-off alarm means the next one. "13:30", "01:30", "0:15"
+// and "6pm" say which already. (Your own /board alarm times repeat daily, on the
+// 24-hour clock.)
+function soonest(text: string, now: number) {
+  const at = alarmTime(text)
+  const bare = text.trim().match(/^([1-9]|1[0-2])(?::\d{2})?$/)
+  if (!at || !bare) return at
+  const [h, m] = at.split(':').map(Number) as [number, number]
+  const other = `${String((h + 12) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  const nowAt = hhmm(now)
+  // Minutes from now until each, wrapping past midnight; the nearer wins.
+  const until = (t: string) => {
+    const [th, tm] = t.split(':').map(Number) as [number, number]
+    const [nh, nm] = nowAt.split(':').map(Number) as [number, number]
+    return (th * 60 + tm - (nh * 60 + nm) + 24 * 60) % (24 * 60) || 24 * 60
+  }
+  return until(at) <= until(other) ? at : other
+}
+
 let lastAgentRing = -Infinity
 
 // The board_alarm tool: ring now, at a time, or in some minutes; always with
@@ -550,7 +570,7 @@ async function agentAlarm($: EngineInterface, input: { note?: unknown; at?: unkn
   const now = await $.clock.now()
   let at: string | undefined
   if (input.at !== undefined && input.at !== '') {
-    at = alarmTime(String(input.at))
+    at = soonest(String(input.at), now)
     if (!at) return `error: "${input.at}" is not a time; give HH:MM (18:00) or 6pm`
   } else if (input.inMinutes !== undefined) {
     const m = Number(input.inMinutes)
@@ -822,7 +842,7 @@ export const register: Register = (on, options) => {
         type: 'object',
         properties: {
           note: { type: 'string', description: 'Why the person should look, in a few words: "T-004 done: deploy is green".' },
-          at: { type: 'string', description: 'A time to ring once, HH:MM or 6pm. Leave out to ring now.' },
+          at: { type: 'string', description: 'A time to ring once: 13:30, 6pm, or 1:30 for whichever 1:30 comes next. Leave out to ring now.' },
           inMinutes: { type: 'number', description: 'Ring once this many minutes from now, instead of at.' },
         },
         required: ['note'],

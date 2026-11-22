@@ -403,7 +403,8 @@ In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
   Tasks already done when the session starts stay quiet.
 - **Agents can ring it too**, with the `board_alarm` tool and a note saying
   why: now (`⏰ deploy is green`), or once at a time or in some minutes
-  (`⏰ 18:00 · check the deploy`), which `/board alarm` lists and
+  (`⏰ 18:00 · check the deploy`; a bare `1:30` means whichever 1:30 comes
+  next), which `/board alarm` lists and
   `/board alarm off` clears. Its description tells them to ring only when you
   asked or something needs you, and it rings now at most once a minute.
 
