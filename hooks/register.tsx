@@ -167,6 +167,7 @@ async function toggleBlock($: EngineInterface, name: string) {
   reads(names)
   await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
   if (name === 'todo' && names.includes('todo')) await refresh($)
+  if (name === 'pixel-clock' && names.includes('pixel-clock')) void askOnTick($)
 }
 
 // On the Order screen (▲ ▼): a ticked block moves to place `to` among the ticked
@@ -495,14 +496,15 @@ function changes(before: string[], after: string[]) {
   return parts.join(' · ')
 }
 
-// Leaving the list (Done, or modBOARD on the band): the board shows, in its
-// new order, and a newly ticked pixel clock may ask for a location.
+// Leaving the list (the Board tab, or modBOARD on the band): the board shows,
+// in its new order. Every tick and move was saved as it was made.
 async function leaveList($: EngineInterface) {
   await update($, paneView, () => 'board')
-  void askOnDone($)
 }
 
-async function askOnDone($: EngineInterface) {
+// Ticking the pixel clock asks once where you are, while no location is set
+// and you haven't answered before.
+async function askOnTick($: EngineInterface) {
   if (place || configLocation.trim() || !(await read($, paneBlocks)).includes('pixel-clock')) return
   if (await $.store.get('locationAsked').catch(() => false)) return
   $.ui.toast(await askLocation($))
@@ -1063,30 +1065,26 @@ export const register: Register = (on, options) => {
           </Text>
         </Button>
       )
-      // What Done will change, in yellow at the right end of the tabs' line, as
-      // you tick and move.
+      // What changed since the list opened, in yellow at the right end of the
+      // tabs' line. Each tick and move is saved as it is made: there is no Done.
       const changed = changes(await read($, listStart), chosen)
       const tabs = (
         <Box flexDirection="column">
           <Box gap={4}>
+            <Button key="tab-board" plain onPress={() => leaveList($)}>
+              <Text dimColor>Board</Text>
+            </Button>
             {tab('blocks', 'Blocks')}
             {tab('order', 'Order')}
             {changed ? (
               <Box flexGrow={1} justifyContent="flex-end">
                 <Text color="warning" wrap="truncate">
-                  {changed}
+                  {`saved · ${changed}`}
                 </Text>
               </Box>
             ) : null}
           </Box>
-          <Text color={CAP}>{view === 'blocks' ? '━━━━━━' : `${' '.repeat(10)}━━━━━`}</Text>
-        </Box>
-      )
-      const done = (
-        <Box marginTop={1} paddingLeft={2}>
-          <Button key="blocks-done" plain onPress={() => leaveList($)}>
-            <Text bold color="success">Done</Text>
-          </Button>
+          <Text color={CAP}>{view === 'blocks' ? `${' '.repeat(9)}━━━━━━` : `${' '.repeat(19)}━━━━━`}</Text>
         </Box>
       )
       if (view === 'blocks') {
@@ -1107,7 +1105,6 @@ export const register: Register = (on, options) => {
                 </Box>
               ))}
             </Box>
-            {done}
           </Box>
         )
       }
@@ -1146,7 +1143,6 @@ export const register: Register = (on, options) => {
               <Text dimColor>Nothing ticked yet: tick blocks on the Blocks tab.</Text>
             )}
           </Box>
-          {done}
         </Box>
       )
     }

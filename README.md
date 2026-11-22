@@ -350,11 +350,13 @@ pane: work,todo,compact,usage           (the default)
 names still work.
 
 Or click **blocks** on the band: the pane turns to a list of the blocks it
-can show, on two tabs. On **Blocks**, a click ticks one on or off. On
-**Order**, the ticked blocks are numbered in the board's order, and **▲**
-and **▼** move one a place (grey where there's no room to move). At the right of the tabs, in yellow, is what
-**Done** will change: `added agents · order changed`. **Done** shows the board. The
-choice is kept between sessions, until `pane` is changed in `/config`.
+can show. On **Blocks**, a click ticks one on or off. On **Order**, the
+ticked blocks are numbered in the board's order, and **▲** and **▼** move one
+a place (grey where there's no room to move). Each click is saved as it's
+made; at the right of the tabs, in yellow, is what changed:
+`saved · added agents · order changed`. **Board** (or `modBOARD`) shows the
+board. The choice is kept between sessions, until `pane` is changed in
+`/config`.
 
 In a narrow window, the band's last blocks drop first, so put what matters
 most first. To show something not in this list, [make your own
@@ -378,7 +380,7 @@ In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
 | `units` | `celsius` | `celsius` or `fahrenheit` |
 | `alarm` | empty | times to ring at, comma-separated: `07:30, 6:45pm` |
 
-- **Where you are**: tick `pixel-clock` and press **Done**, and modboard asks
+- **Where you are**: tick `pixel-clock`, and modboard asks
   once: *Use my location (from my IP)*, *Not now*, or type your city under
   **Other**. Esc or *Not now* means no weather, and it doesn't ask again; the
   clock says `weather: /board location` instead. Later, type

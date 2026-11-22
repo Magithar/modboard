@@ -993,7 +993,7 @@ function store(on: On, seed: Record<string, unknown> = {}) {
   return kept
 }
 
-test('blocks opens the pane at the list of blocks alone; ticks change the board; Done shows it', { options: { band: 'summary,board' } } as any, async ($, on) => {
+test('blocks opens the pane at the list of blocks alone; ticks change the board; the Board tab shows it', { options: { band: 'summary,board' } } as any, async ($, on) => {
   const calls = host(on, [task('T-001', 'claimed', 'codex')])
   const kept = store(on)
   const opened: any[] = []
@@ -1018,7 +1018,7 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   let list = (await texts(pane)) as string[]
   // Only the list: no board under it.
-  expect(list[0]).toBe('Blocks')
+  expect(list[0]).toBe('Board')
   expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
   // The default pane: work, todo, compact, usage ticked; the rest not.
   expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
@@ -1033,12 +1033,9 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   await pane.press({ key: 'pick-work' })
   list = (await texts(pane)) as string[]
   expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
-  // Done is a plain word, no brackets.
-  expect((await pane.find({ key: 'blocks-done' }))?.props.plain).toBe(true)
-  // Green, as modBOARD is: both show the board.
-  expect((await pane.find({ type: 'Text', text: 'Done' }))?.props.color).toBe('success')
-  // Done shows the board: work gone, agents there.
-  await pane.press({ key: 'blocks-done' })
+  // There is no Done: each tick is saved as it is made. The Board tab shows the board: work gone, agents there.
+  expect(await pane.find({ key: 'blocks-done' })).toBeFalsy()
+  await pane.press({ key: 'tab-board' })
   expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
   expect((await texts(pane)).some((t: string) => t.includes('codex'))).toBe(true)
   // Kept between sessions, with the setting it was ticked from.
@@ -1104,7 +1101,7 @@ test('blocks pressed again while the list shows closes the pane; from the board 
   await band.press({ key: 'board' })
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect((await texts(pane))[0]).toBe('Blocks')
+  expect((await texts(pane))[0]).toBe('Board')
   expect(opened).toEqual(['modboard', 'modboard'])
   expect(closed).toEqual(['modboard'])
 })
@@ -1119,7 +1116,7 @@ test('a block of your own shows on the list by itself, with the command it runs'
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   expect(await texts(pane)).toContain('[ ] ci           echo green')
   await pane.press({ key: 'pick-ci' })
-  await pane.press({ key: 'blocks-done' })
+  await pane.press({ key: 'tab-board' })
   expect(await texts(pane)).toContain('green')
 })
 
@@ -1328,13 +1325,13 @@ const pickClock = async ($: any) => {
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   await pane.press({ key: 'pick-pixel-clock' })
-  await pane.press({ key: 'blocks-done' })
+  await pane.press({ key: 'tab-board' })
   await settle()
   return pane
 }
 const CHOOSE = { options: { band: 'summary,board' } } as any
 
-test('ticking the pixel clock and pressing Done asks for a location; a typed city gets the weather', CHOOSE, async ($, on) => {
+test('ticking the pixel clock asks for a location; a typed city gets the weather', CHOOSE, async ($, on) => {
   host(on, [])
   const kept = store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -1359,7 +1356,7 @@ test('Use my location reads the city from the IP, once', CHOOSE, async ($, on) =
   expect(urls.some(u => u.startsWith('https://api.open-meteo.com/'))).toBe(true)
 })
 
-test('Esc means no weather and Done does not ask again; /board location asks again', CHOOSE, async ($, on) => {
+test('Esc means no weather and ticking again does not ask again; /board location asks again', CHOOSE, async ($, on) => {
   host(on, [])
   store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -1370,10 +1367,12 @@ test('Esc means no weather and Done does not ask again; /board location asks aga
   expect(asked).toHaveLength(1)
   expect(urls).toEqual([])
   expect(await texts(pane)).toContain('weather: /board location')
-  // Done again: no second question.
+  // Unticked and ticked again: no second question.
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
-  await pane.press({ key: 'blocks-done' })
+  await pane.press({ key: 'pick-pixel-clock' })
+  await pane.press({ key: 'pick-pixel-clock' })
+  await pane.press({ key: 'tab-board' })
   await settle()
   expect(asked).toHaveLength(1)
   const said = ((await $.command.run({ command: 'board', args: 'location' } as any)) as any).text
@@ -1473,13 +1472,13 @@ test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbere
   host(on, [])
   store(on)
   const pane = await openOrder($, on)
-  expect(((await texts(pane)) as string[]).slice(0, 3)).toEqual(['Blocks', 'Order', '          ━━━━━'])
+  expect(((await texts(pane)) as string[]).slice(0, 4)).toEqual(['Board', 'Blocks', 'Order', `${' '.repeat(19)}━━━━━`])
   expect(await order(pane)).toEqual(['work', 'usage', 'compact', 'pixel-clock'])
   // No ▲ on the first, no ▼ on the last; nothing else to press but the arrows.
   for (const [key, there] of [['up-work', false], ['down-work', true], ['up-pixel-clock', true], ['down-pixel-clock', false], ['top-compact', false], ['bottom-usage', false]] as const)
     expect(!!(await pane.find({ key }))).toBe(there)
   await pane.press({ key: 'tab-blocks' })
-  expect(((await texts(pane)) as string[])[2]).toBe('━━━━━━')
+  expect(((await texts(pane)) as string[])[3]).toBe(`${' '.repeat(9)}━━━━━━`)
   expect(await pane.find({ key: 'pick-agents' })).toBeTruthy()
 })
 
@@ -1503,7 +1502,7 @@ test('▲ and ▼ move a block a place; the board follows and the order is kept;
   expect(await order(pane)).toEqual(['pixel-clock', 'work', 'usage', 'compact'])
   const p2 = pane.press({ key: 'down-work' }); await settle(); pass(); await p2
   expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'usage', 'work', 'compact'])
-  await pane.press({ key: 'blocks-done' })
+  await pane.press({ key: 'tab-board' })
   expect(await pane.find({ key: 'tab-order' })).toBeFalsy()
 })
 
@@ -1556,7 +1555,7 @@ test('every ▲ and every ▼ moves its block one place, on the terminal and the
   }
 })
 
-test('beside the tabs, in yellow, what Done will change: added, removed, order changed; nothing when nothing changed', ORDER, async ($, on) => {
+test('at the right of the tabs, in yellow, what was saved: added, removed, order changed; nothing when nothing changed', ORDER, async ($, on) => {
   host(on, [])
   store(on)
   const toasts: string[] = []
@@ -1572,10 +1571,10 @@ test('beside the tabs, in yellow, what Done will change: added, removed, order c
   expect(await note()).toBeUndefined()
   await pane.press({ key: 'pick-agents' })
   await pane.press({ key: 'pick-usage' })
-  expect((await note())?.text).toBe('added agents · removed usage')
+  expect((await note())?.text).toBe('saved · added agents · removed usage')
   await pane.press({ key: 'tab-order' })
   await pane.press({ key: 'up-pixel-clock' })
-  expect((await note())?.text).toBe('added agents · removed usage · order changed')
+  expect((await note())?.text).toBe('saved · added agents · removed usage · order changed')
   // Ticked back and moved back: nothing to say.
   await pane.press({ key: 'down-pixel-clock' })
   await pane.press({ key: 'tab-blocks' })
@@ -1586,8 +1585,8 @@ test('beside the tabs, in yellow, what Done will change: added, removed, order c
   await pane.press({ key: 'up-usage' })
   await pane.press({ key: 'up-usage' })
   expect(await note()).toBeUndefined()
-  await pane.press({ key: 'blocks-done' })
+  await pane.press({ key: 'tab-board' })
   await settle()
-  // Done shows the board; no corner notification.
+  // The Board tab shows the board; no corner notification.
   expect(toasts.filter(t => t.startsWith('board:'))).toEqual([])
 })
