@@ -32,8 +32,11 @@ export type Usage = {
   costUsd?: number
 }
 
+// A weather reading from Open-Meteo: `at` is when it came in, in ms.
+export type Weather = { temp: number; high: number; code: number; place: string; at: number }
+
 declare module 'claude-code' {
   interface PluginState {
-    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean>; boardError: string; copied: string; home: string; paneView: string; paneBlocks: string[] }
+    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean>; boardError: string; copied: string; home: string; paneView: string; paneBlocks: string[]; weather: Weather | null; alarms: string[]; ringing: string; minute: string }
   }
 }

@@ -339,6 +339,8 @@ pane: work,todo,compact,usage           (the default)
 | `model` | ✓ | ✓ | the model; click to switch |
 | `effort` | ✓ | ✓ | the effort level; click to step through |
 | `clock` | ✓ | ✓ | the time |
+| `pixel-clock` | ✓ | ✓ | the time in large pixel digits, the weather beside it, and the alarm |
+| `weather` | ✓ | | the temperature and conditions: `☀ 18°` |
 | `context` | ✓ | ✓ | context fill and the session's cost, as text |
 | `agents` | | ✓ | who is live on the board |
 
@@ -352,6 +354,38 @@ choice is kept between sessions, until `pane` is changed in `/config`.
 In a narrow window, the band's last blocks drop first, so put what matters
 most first. To show something not in this list, [make your own
 block](#make-your-own-block).
+
+### Pixel clock, weather and alarm
+
+Tick `pixel-clock` on the list of blocks, or name it in `pane`:
+
+```
+  █▀█ █▀█   ▀▀█ ▀▀█      ☀  18°
+  █ █ ▀▀█ ▀  ▀█ █▀▀      Bengaluru
+  █▄█ ▄▄█ ▀ ▄▄█ █▄▄      clear · H 24°
+
+  ⏰ 07:30
+```
+
+In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
+
+| Setting | Default | What it is |
+|---|---|---|
+| `location` | empty | a city (`Bengaluru`) or `latitude,longitude` for the weather |
+| `units` | `celsius` | `celsius` or `fahrenheit` |
+| `alarm` | empty | times to ring at, comma-separated: `07:30, 6:45pm` |
+
+- **Weather** comes from [Open-Meteo](https://open-meteo.com), which needs no
+  key, through Claude Code's own fetch, so it follows your organization's
+  network policy. Nothing is sent until `location` is set, and only that
+  location is sent. It's read every 20 minutes; offline, the last reading
+  stays and says how old it is.
+- **The alarm** rings at its minute: a toast, a notification, a chime for up
+  to a minute, and the clock turns yellow with a **stop** button. From the
+  prompt: `/board alarm 7:30` adds one, `/board alarm` lists them,
+  `/board alarm off 7:30` removes one and `/board alarm off` clears all. Those
+  are kept between sessions, until `alarm` is changed in `/config`. It rings
+  only while a session is open.
 
 ### Model and effort
 

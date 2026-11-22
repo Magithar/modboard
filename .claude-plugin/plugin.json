@@ -20,13 +20,13 @@
     "band": {
       "type": "string",
       "title": "Band blocks",
-      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, board (a button that opens the pane), usage, compact, model, effort, clock, context, or your own from Your own blocks.",
+      "description": "Blocks on the one line above the prompt, in order, comma-separated: summary, board (a button that opens the pane), usage, compact, model, effort, clock, pixel-clock, weather, context, or your own from Your own blocks.",
       "default": "summary,model,effort,board"
     },
     "pane": {
       "type": "string",
       "title": "Pane blocks",
-      "description": "Blocks in the /board pane, in order, comma-separated: work (who's doing what), todo (the project's task.md, behind a button), compact (context bar and a compact button), usage, model, effort, clock, context, agents, or your own from Your own blocks.",
+      "description": "Blocks in the /board pane, in order, comma-separated: work (who's doing what), todo (the project's task.md, behind a button), compact (context bar and a compact button), usage, model, effort, clock, pixel-clock, context, agents, or your own from Your own blocks.",
       "default": "work,todo,compact,usage"
     },
     "blocks": {
@@ -46,6 +46,30 @@
       "title": "Effort levels to switch between",
       "description": "The levels the effort block steps through, in order, as /effort takes them.",
       "default": "low,medium,high,xhigh,max"
+    },
+    "location": {
+      "type": "string",
+      "title": "Weather location",
+      "description": "A city (Bengaluru) or latitude,longitude (12.97,77.59) for the weather beside the pixel clock and the weather block. Empty: no weather, and nothing is sent. Only this location is sent, to Open-Meteo.",
+      "default": ""
+    },
+    "units": {
+      "type": "string",
+      "title": "Temperature units",
+      "description": "celsius or fahrenheit.",
+      "default": "celsius"
+    },
+    "alarm": {
+      "type": "string",
+      "title": "Alarm",
+      "description": "Times the pixel clock rings at, comma-separated: 07:30, 6:45pm. /board alarm 7:30 and /board alarm off change them from the prompt.",
+      "default": ""
     }
+  },
+  "network": {
+    "hosts": [
+      "api.open-meteo.com",
+      "geocoding-api.open-meteo.com"
+    ]
   }
 }

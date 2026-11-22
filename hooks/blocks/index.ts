@@ -10,12 +10,14 @@ import { compact } from './compact'
 import { context } from './context'
 import { effort } from './effort'
 import { model } from './model'
+import { pixelClock } from './pixel'
 import { summary } from './summary'
 import { taskfile } from './taskfile'
 import { tasks } from './tasks'
 import { usage } from './usage'
+import { weather } from './weather'
 import type { Block } from './types'
 
-export const BLOCKS: Block[] = [summary, board, tasks, taskfile, usage, compact, model, effort, clock, context, agents]
+export const BLOCKS: Block[] = [summary, board, tasks, taskfile, usage, compact, model, effort, clock, pixelClock, weather, context, agents]
 
 export type { BandForm, Block, Ctx } from './types'

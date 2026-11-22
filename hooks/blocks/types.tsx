@@ -1,4 +1,4 @@
-import type { Agent, Task, TaskFile, Usage } from '../../types'
+import type { Agent, Task, TaskFile, Usage, Weather } from '../../types'
 
 // What every block draws from. `ui` is the surface's own element table.
 export type Ctx = {
@@ -25,9 +25,14 @@ export type Ctx = {
   // worktree path was just copied, for a moment, so its row says so.
   home: string
   copied: string
+  // The last weather reading, or null before one (or with no location set);
+  // the alarm times set, "07:30"; and the one ringing now, or ''.
+  weather: Weather | null
+  alarms: string[]
+  ringing: string
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; openBlocks: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; openBlocks: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void>; stopAlarm: () => Promise<void> }
 }
 
 // One way a block can draw in the band, and how many columns it takes.

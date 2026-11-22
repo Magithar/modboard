@@ -1,9 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Agent, Task, TaskFile } from '../types'
+import type { Agent, Task, TaskFile, Weather } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import { CAP } from './blocks/board'
+import { hhmm } from './blocks/clock'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 import { groupOpen, type GroupName } from './blocks/tasks'
 import { tone } from './blocks/meter'
@@ -51,6 +52,17 @@ const paneView = atom({ plugin: 'modboard', key: 'paneView' } as const, 'board')
 // The pane's blocks by name, in order: the `pane` setting, until the person
 // ticks blocks on the list; then their choice, kept between sessions.
 const paneBlocks = atom({ plugin: 'modboard', key: 'paneBlocks' } as const, [] as string[])
+
+// The pixel clock's minute, written when it turns, so the clock redraws then
+// and not on every poll; the weather; the alarm times; and the one ringing.
+const minute = atom({ plugin: 'modboard', key: 'minute' } as const, '')
+const weather = atom({ plugin: 'modboard', key: 'weather' } as const, null as Weather | null)
+const alarms = atom({ plugin: 'modboard', key: 'alarms' } as const, [] as string[])
+const ringing = atom({ plugin: 'modboard', key: 'ringing' } as const, '')
+const TICK_MS = 5_000
+const WEATHER_MS = 20 * 60_000
+const RING_MS = 60_000
+const ALARM_SOUND = 'hooks/sounds/alarm.wav'
 
 let session = ''
 let lastBeat = 0
@@ -311,6 +323,140 @@ function after(cycle: string[], current: string) {
   return cycle[(at + 1) % cycle.length]!
 }
 
+// ── The weather ─────────────────────────────────────────────────────────────
+// Open-Meteo needs no key. Only the location set in /config is sent, through
+// Claude Code's own fetch, so the organization's network policy holds.
+
+type Place = { latitude: number; longitude: number; name: string }
+let place: Place | null = null
+let weatherSetting = ''
+let fahrenheit = false
+
+// "Bengaluru" is looked up once a session; "12.97,77.59" is used as it is.
+async function locate($: EngineInterface): Promise<Place | null> {
+  if (place) return place
+  const coords = weatherSetting.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/)
+  if (coords) return (place = { latitude: Number(coords[1]), longitude: Number(coords[2]), name: weatherSetting.trim() })
+  const found = await $.http.fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(weatherSetting.trim())}`)
+  if (!found.ok) return null
+  const first = (JSON.parse(found.text) as { results?: Place[] }).results?.[0]
+  if (!first) {
+    $.ui.toast(`board: no place called "${weatherSetting.trim()}" for the weather`)
+    return null
+  }
+  return (place = { latitude: first.latitude, longitude: first.longitude, name: first.name })
+}
+
+// A failed fetch keeps the last reading; the block says how old it is.
+async function fetchWeather($: EngineInterface) {
+  if (!weatherSetting.trim()) return
+  try {
+    const at = await locate($)
+    if (!at) return
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${at.latitude}&longitude=${at.longitude}` +
+      `&current=temperature_2m,weather_code&daily=temperature_2m_max&forecast_days=1&timezone=auto` +
+      (fahrenheit ? '&temperature_unit=fahrenheit' : '')
+    const out = await $.http.fetch(url)
+    if (!out.ok) return
+    const body = JSON.parse(out.text) as { current: { temperature_2m: number; weather_code: number }; daily: { temperature_2m_max: number[] } }
+    const reading: Weather = {
+      temp: body.current.temperature_2m,
+      high: body.daily.temperature_2m_max[0] ?? body.current.temperature_2m,
+      code: body.current.weather_code,
+      place: at.name,
+      at: await $.clock.now(),
+    }
+    await update($, weather, () => reading)
+    await $.store.set('weather', { from: `${weatherSetting}|${fahrenheit}`, reading }).catch(() => {})
+  } catch {}
+}
+
+// ── The alarm ───────────────────────────────────────────────────────────────
+// Set in /config (`alarm`) or with /board alarm 7:30; the times set with the
+// command are kept between sessions, until `alarm` is changed in /config.
+
+let alarmSetting = ''
+let stopSound: AbortController | null = null
+
+// "7:30", "07:30", "7:30pm", "19:30" → "07:30"; anything else → undefined.
+function alarmTime(text: string) {
+  const m = text.trim().toLowerCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/)
+  if (!m) return undefined
+  let h = Number(m[1])
+  const min = Number(m[2] ?? '0')
+  if (m[3]) {
+    if (h < 1 || h > 12) return undefined
+    h = (h % 12) + (m[3] === 'pm' ? 12 : 0)
+  }
+  if (h > 23 || min > 59) return undefined
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+}
+
+const alarmList = (text: string) => [...new Set(text.split(',').map(alarmTime).filter((t): t is string => !!t))].sort()
+
+async function loadAlarms($: EngineInterface) {
+  const kept: any = await $.store.get('alarms').catch(() => undefined)
+  const times = kept && kept.from === alarmSetting && Array.isArray(kept.times) ? alarmList(kept.times.join(',')) : alarmList(alarmSetting)
+  await update($, alarms, () => times)
+}
+
+async function saveAlarms($: EngineInterface, times: string[]) {
+  await update($, alarms, () => times)
+  await $.store.set('alarms', { from: alarmSetting, times }).catch(() => $.ui.toast('board: could not save the alarm'))
+}
+
+async function ring($: EngineInterface, at: string) {
+  await update($, ringing, () => at)
+  $.ui.toast(`⏰ ${at}`)
+  $.ui.notify(`It's ${at}.`, { title: '⏰ Alarm', key: `alarm-${at}` }).catch(() => {})
+  stopSound?.abort()
+  const stop = (stopSound = new AbortController())
+  $.audio.play({ asset: ALARM_SOUND }, { shouldLoop: true, signal: stop.signal }).catch(() => {})
+  // Rings a minute, unless stopped first.
+  await $.clock.sleep(RING_MS)
+  if (stopSound === stop) await stopAlarm($)
+}
+
+async function stopAlarm($: EngineInterface) {
+  stopSound?.abort()
+  stopSound = null
+  await update($, ringing, () => '')
+}
+
+// Every few seconds: when the minute turns, the clock redraws, and an alarm
+// set for it rings.
+async function tick($: EngineInterface) {
+  const now = hhmm(await $.clock.now())
+  if ((await read($, minute)) === now) return
+  await update($, minute, () => now)
+  if ((await read($, alarms)).includes(now)) void ring($, now)
+}
+
+// /board alarm 7:30 · /board alarm off · /board alarm off 7:30 · /board alarm
+async function alarmCommand($: EngineInterface, args: string) {
+  const now = await read($, alarms)
+  const words_ = args.trim().split(/\s+/).filter(Boolean)
+  const listed = (times: string[]) => (times.length ? `Alarm set for ${times.join(', ')}.` : 'No alarm set.')
+  if (!words_.length) return listed(now)
+  if (words_[0] === 'off' || words_[0] === 'clear') {
+    await stopAlarm($)
+    if (words_.length === 1) {
+      await saveAlarms($, [])
+      return 'Alarm off.'
+    }
+    const drop = alarmList(words_.slice(1).join(','))
+    const left = now.filter(t => !drop.includes(t))
+    await saveAlarms($, left)
+    return listed(left)
+  }
+  const time = alarmTime(words_.join(' '))
+  if (!time) return `board: "${args.trim()}" is not a time; try /board alarm 7:30 or /board alarm 7:30pm`
+  const times = [...new Set([...now, time])].sort()
+  await saveAlarms($, times)
+  return listed(times)
+}
+
 // Switch the way the person would, through Claude Code's own commands, so
 // everything else in the session sees the change.
 // Open the /board pane, then read the board and the task file again.
@@ -388,6 +534,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       await $.clock.sleep(COPIED_MS)
       await update($, copied, now => (now === id ? '' : now))
     },
+    stopAlarm: () => stopAlarm($),
     toggleGroup: async (name: string) => {
       await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
     },
@@ -411,7 +558,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
 // Everything a drawing reads, asked for at once: a pane is drawn again on
 // every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
-  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow] =
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow] =
     await Promise.all([
       $.clock.now(),
       read($, me),
@@ -427,6 +574,11 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
       read($, groupsOpen),
       read($, home),
       read($, copied),
+      read($, weather),
+      read($, alarms),
+      read($, ringing),
+      // Read so a drawing of the clock redraws when the minute turns.
+      read($, minute),
     ])
   return {
     ui,
@@ -445,6 +597,9 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     groupsOpen: groupsOpenNow,
     home: homeNow,
     copied: copiedNow,
+    weather: weatherNow,
+    alarms: alarmsNow,
+    ringing: ringingNow,
     act,
   }
 }
@@ -462,6 +617,10 @@ export const register: Register = (on, options) => {
   paneChoosable = choosable.map(b => b.name)
   paneFromSetting = fromSetting
   reads(fromSetting)
+  weatherSetting = String(options.location ?? '')
+  fahrenheit = /^f/i.test(String(options.units ?? ''))
+  alarmSetting = String(options.alarm ?? '')
+  place = null
   const cycles = { models: list(options.models, 'opus,sonnet,haiku'), efforts: list(options.efforts, 'low,medium,high,xhigh,max') }
 
   on('session.start', async ($, e, next) => {
@@ -492,9 +651,21 @@ export const register: Register = (on, options) => {
         inputSchema: { type: 'object', properties: t.schema ?? {}, required: t.required ?? [] },
         isDeferred: false,
       })
-    await $.command.register({ name: 'board', description: 'Open the modboard pane' })
+    await $.command.register({ name: 'board', description: 'Open the modboard pane · /board alarm 7:30 sets an alarm, /board alarm off clears it' })
     await estimateContext($)
     await loadPane($)
+
+    await loadAlarms($)
+    await tick($)
+    $.clock.every(TICK_MS, () => tick($).catch(() => {}))
+    // Weather, only once a location is set: the last reading at once, then
+    // a fresh one, then one every 20 minutes.
+    if (weatherSetting.trim()) {
+      const kept: any = await $.store.get('weather').catch(() => undefined)
+      if (kept && kept.from === `${weatherSetting}|${fahrenheit}` && kept.reading) await update($, weather, () => kept.reading as Weather)
+      void fetchWeather($)
+      $.clock.every(WEATHER_MS, () => fetchWeather($).catch(() => {}))
+    }
 
     await refresh($)
     $.clock.every(POLL_MS, () => refresh($).catch(() => {}))
@@ -558,7 +729,9 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  on('command.run', { command: 'board' }, async $ => {
+  on('command.run', { command: 'board' }, async ($, e) => {
+    const [sub, ...rest] = (e.args ?? '').trim().split(/\s+/)
+    if (sub === 'alarm') return { text: await alarmCommand($, rest.join(' ')) }
     const opened = await openBoard($)
     if (opened.isPlaced) return { text: 'Board pane opened.' }
     const list = (await read($, tasks)).filter(t => t.status !== 'done')

@@ -15,8 +15,19 @@ modboard was called agent-board until 0.5.0.
   `/config` since wins over it.
 - Every block with a part in the pane is on the list by itself, your command
   blocks too (described by their command). `model`, `effort`, `clock` and
-  `context` stay off it: the band or `compact` shows them already, and the
-  clock waits for the pixel clock. They still work when named in `pane`.
+  `context` stay off it: the band or `compact` shows them already, and
+  `pixel-clock` is the clock to tick. They still work when named in `pane`.
+
+- **`pixel-clock`**: the time in large pixel digits, three rows tall, with
+  the weather beside it and the next alarm under it. In the band, the time
+  plainly with the next alarm.
+- **`weather`**: `☀ 18°` on the band, from Open-Meteo, once `location` is set
+  in `/config` (a city or `latitude,longitude`; `units` for °F). Nothing is
+  sent before then, and only the location. Read every 20 minutes; offline,
+  the last reading stays and says how old it is.
+- **An alarm**: set `alarm` in `/config`, or `/board alarm 7:30` from the
+  prompt (`/board alarm off` clears it). At its minute: a toast, a
+  notification, a chime for up to a minute, and a **stop** button on the clock.
 
 ### Changed
 

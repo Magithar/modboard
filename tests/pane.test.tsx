@@ -1022,7 +1022,7 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
   // The default pane: work, todo, compact, usage ticked; the rest not.
   expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
-  expect(list).toContain('[ ] agents   who is live')
+  expect(list).toContain('[ ] agents       who is live')
   // What the band or another block shows already is left off the list.
   for (const name of ['model', 'effort', 'clock', 'context']) expect(await pane.find({ key: `pick-${name}` })).toBeUndefined()
   // Ticks in the cap's orange, as blocks on the band is.
@@ -1117,7 +1117,7 @@ test('a block of your own shows on the list by itself, with the command it runs'
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect(await texts(pane)).toContain('[ ] ci       echo green')
+  expect(await texts(pane)).toContain('[ ] ci           echo green')
   await pane.press({ key: 'pick-ci' })
   await pane.press({ key: 'blocks-done' })
   expect(await texts(pane)).toContain('green')
@@ -1134,4 +1134,100 @@ test('agents is one line: Live, then a green dot for each agent seen lately and 
   // Nothing here is pressable, so nothing is white: grey words, a green dot.
   for (const text of ['Live', 'claude 1 (you)', 'codex 1']) expect((await pane.find({ type: 'Text', text }))?.props.dimColor).toBe(true)
   expect(shown.some(t => t.startsWith('live:'))).toBe(false)
+})
+
+// ── The pixel clock, the weather and the alarm ──────────────────────────────
+
+// Open-Meteo, as the host's fetch answers it: the place, then the weather.
+function openMeteo(on: On, { down = false } = {}) {
+  const urls: string[] = []
+  on('http.fetch', (_$, e: any) => {
+    urls.push(e.url)
+    if (down) return { value: { status: 503, ok: false, headers: {}, text: '' } }
+    const text = e.url.includes('geocoding')
+      ? JSON.stringify({ results: [{ latitude: 12.97, longitude: 77.59, name: 'Bengaluru' }] })
+      : JSON.stringify({ current: { temperature_2m: 18.4, weather_code: 0 }, daily: { temperature_2m_max: [24.2] } })
+    return { value: { status: 200, ok: true, headers: {}, text } }
+  })
+  return urls
+}
+
+const settle = () => new Promise(resolve => setTimeout(resolve, 20))
+const PIXEL = { options: { band: 'pixel-clock,weather', pane: 'pixel-clock', location: 'Bengaluru' } } as any
+
+test('the pixel clock draws the time three rows tall, with the weather beside it', PIXEL, async ($, on) => {
+  host(on, [])
+  store(on)
+  const urls = openMeteo(on)
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const shown = await texts(pane)
+  expect(shown.slice(0, 3)).toEqual(['█▀█ █▀█   █ █ ▀█ ', '█ █ ▀▀█ ▀ ▀▀█  █ ', '█▄█ ▄▄█ ▀   █ ▄█▄'])
+  expect(shown).toContain('☀  18°')
+  expect(shown).toContain('Bengaluru')
+  expect(shown).toContain('clear · H 24°')
+  // Only the location is sent, and only to Open-Meteo.
+  expect(urls.every(u => u.startsWith('https://geocoding-api.open-meteo.com/') || u.startsWith('https://api.open-meteo.com/'))).toBe(true)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  expect(await texts(band)).toEqual(['09:41', '☀ 18°'])
+})
+
+test('with no location set, nothing is fetched and the clock stands alone', { options: { pane: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  store(on)
+  const urls = openMeteo(on)
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(urls).toEqual([])
+  expect(await texts(pane)).toHaveLength(3)
+})
+
+test('offline, the weather keeps the last reading and says how old it is', PIXEL, async ($, on) => {
+  host(on, [])
+  store(on, { weather: { from: 'Bengaluru|false', reading: { temp: 21, high: 26, code: 61, place: 'Bengaluru', at: NOW - 90 * 60_000 } } })
+  openMeteo(on, { down: true })
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await texts(pane)).toContain('rain · H 26° · 90 min old')
+})
+
+test('an alarm set for this minute rings: toast, notification, sound, and a stop button', { options: { band: 'pixel-clock', pane: 'pixel-clock', alarm: '9:41' } } as any, async ($, on) => {
+  host(on, [])
+  store(on)
+  const toasts: string[] = []
+  const notes: string[] = []
+  const played: any[] = []
+  on('ui.toast', (_$, e: any) => (toasts.push(e.text), { value: undefined }))
+  on('ui.notify', (_$, e: any) => (notes.push(e.text), { value: { isSent: true, channel: 'test' } }))
+  on('audio.play', (_$, e: any) => (played.push(e), { value: undefined }))
+  on('clock.sleep', () => new Promise(() => {}) as any)
+  await $.session.start(START)
+  await settle()
+  expect(toasts).toContain('⏰ 09:41')
+  expect(notes).toEqual(["It's 09:41."])
+  expect(played).toHaveLength(1)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  expect(await texts(band)).toEqual(['⏰ 09:41 ringing'])
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await pane.press({ key: 'alarm-stop' })
+  expect(await texts(band)).toEqual(['09:41  ⏰ 09:41'])
+})
+
+test('/board alarm sets, lists and clears alarms, kept between sessions', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  await $.session.start(START)
+  const run = async (args: string) => ((await $.command.run({ command: 'board', args } as any)) as any).text
+  expect(await run('alarm')).toBe('No alarm set.')
+  expect(await run('alarm 7:30pm')).toBe('Alarm set for 19:30.')
+  expect(await run('alarm 07:05')).toBe('Alarm set for 07:05, 19:30.')
+  expect(await run('alarm tea')).toMatch(/is not a time/)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  expect(await texts(band)).toEqual(['09:41  ⏰ 19:30'])
+  expect((kept.get('alarms') as any).times).toEqual(['07:05', '19:30'])
+  expect(await run('alarm off 19:30')).toBe('Alarm set for 07:05.')
+  expect(await run('alarm off')).toBe('Alarm off.')
 })
