@@ -556,7 +556,8 @@ the weather and the next alarm beside it:
   `/board location` asks again, or set **Weather location** in `/config`.
 - **An alarm of your own**: `/board alarm 7:30` (every day), `/board alarm`
   to list, `/board alarm off` to clear. Or ask Claude: "remind me at 6pm to
-  check the deploy" rings once, with that note.
+  check the deploy" rings once, with that note, and "turn off the alarm"
+  clears them.
 - **When important work is done**: `board add "Ship release" --ring`, or
   `board ring T-004` for a task already on the board. When it turns done,
   whoever finishes it, the clock chimes and shows `⏰ T-004 done · Ship release`.

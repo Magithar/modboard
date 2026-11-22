@@ -184,7 +184,7 @@ board ring T-001                          # ring the alarm when it's done; --off
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
 `board_claim`, `board_note`, `board_check`, `board_release`, `board_done`
-`board_alarm` and `board_location`. Any tool call renews the session's claims.
+`board_alarm`, `board_alarm_off` and `board_location`. Any tool call renews the session's claims.
 
 The CLI and the tools use the board's precise terms (claim, release, handoff,
 lease), because agents act on them. The display uses plain words, so you can
@@ -423,6 +423,8 @@ In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
   next), which `/board alarm` lists and
   `/board alarm off` clears. Its description tells them to ring only when you
   asked or something needs you, and it rings now at most once a minute.
+  Ask Claude to turn the alarm off and it uses `board_alarm_off`: it stops one
+  ringing and clears the alarms, all of them or just one time (`2pm`).
 
 ### Model and effort
 

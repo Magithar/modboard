@@ -3,6 +3,13 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+### Added
+
+- **`board_alarm_off`**, a tool for Claude agents: stop a ringing alarm and
+  clear the alarms set, all or just one time (`at`).
+
 ## 0.8.0 — 2026-11-22
 
 A clock for the board, with the weather beside it and an alarm that agents
@@ -38,8 +45,6 @@ reorder without touching a setting.
 - **`board_alarm`**, a tool for Claude agents: ring now with a note, or once
   at a time or in some minutes. At most once a minute for ringing now;
   `/board alarm` lists the ones it set and `/board alarm off` clears them.
-- **`board_alarm_off`**, a tool for Claude agents: stop a ringing alarm and
-  clear the alarms set, all or just one time (`at`).
 - **modboard asks where you are** for the weather, once, when you tick
   `pixel-clock`: your IP's city, a city you type, or not
   now. Esc means no weather; `/board location`, or asking Claude (the
