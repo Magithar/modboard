@@ -1298,6 +1298,20 @@ test('board_alarm sets a one-off alarm at a time or in minutes, shown on the clo
   expect(listed).toBe('Once at 10:01: check the deploy\nOnce at 18:00: standup')
 })
 
+test('board_alarm_off clears one-off alarms, all or just one time', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  await $.session.start(START)
+  const call = async (tool: string, input: object) => ((await $.tool.call({ tool: `mcp__modboard__${tool}`, ...input } as any)) as any).result
+  await call('board_alarm', { note: 'a', at: '14:00' })
+  await call('board_alarm', { note: 'b', at: '18:00' })
+  expect(await call('board_alarm_off', { at: 'soon' })).toMatch(/is not a time/)
+  await call('board_alarm_off', { at: '2pm' })
+  expect((kept.get('reminders') as any).map((r: any) => r.at)).toEqual(['18:00'])
+  expect(await call('board_alarm_off', {})).toBe('Alarm off.')
+  expect(kept.get('reminders')).toEqual([])
+})
+
 test('a one-off alarm rings once at its minute with its note, then is gone', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
   host(on, [])
   const kept = store(on, { reminders: [{ at: '09:41', note: 'check the deploy' }, { at: '18:00', note: 'standup' }] })

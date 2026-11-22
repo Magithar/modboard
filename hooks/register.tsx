@@ -906,6 +906,12 @@ export const register: Register = (on, options) => {
       },
       isDeferred: false,
     })
+    await $.tool.register({
+      name: 'board_alarm_off',
+      description: "Turn off the person's alarm: stop one ringing, and clear the alarms set (the daily ones and one-offs). Give a time to clear only that one.",
+      inputSchema: { type: 'object', properties: { at: { type: 'string', description: 'Clear only the alarm at this time (14:00, 2pm). Leave out to clear all.' } }, required: [] },
+      isDeferred: false,
+    })
     await $.tool.register({ name: 'board_location', description: LOCATION_TOOL, inputSchema: { type: 'object', properties: {}, required: [] }, isDeferred: false })
     await $.command.register({ name: 'board', description: 'Open the modboard pane · /board alarm 7:30 sets an alarm, /board alarm off clears it · /board location sets the weather\'s' })
     await estimateContext($)
@@ -951,6 +957,12 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'mcp__modboard__board_alarm' } as any, async ($, e: any) => ({ result: await agentAlarm($, e) })).catch(() => ({
     result: 'error: the alarm could not be set',
   }))
+
+  on('tool.call', { tool: 'mcp__modboard__board_alarm_off' } as any, async ($, e: any) => {
+    const at = e.at === undefined || e.at === '' ? '' : String(e.at)
+    if (at && !alarmTime(at)) return { result: `error: "${at}" is not a time; give HH:MM (14:00) or 2pm` }
+    return { result: await alarmCommand($, `off ${at}`) }
+  }).catch(() => ({ result: 'error: the alarm could not be turned off' }))
 
   // Leases need a heartbeat; an LLM won't send one, so tool activity does.
   on('tool.call', async ($, e, next) => {
