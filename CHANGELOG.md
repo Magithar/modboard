@@ -41,8 +41,8 @@ modboard was called agent-board until 0.5.0.
   `board_location` tool), asks again. Kept between sessions; `location` in
   `/config` wins over it.
 - **An Order tab on the list of blocks**: the ticked blocks, numbered in the
-  board's order, with **▲ ▼** to move one a place and **top**, **bottom** to
-  send it to either end. The moved row lights up for a moment. The order is
+  board's order, with **▲ ▼** to move one a place. The moved row lights up
+  for a moment. The order is
   kept between sessions. The **Blocks** tab ticks, as before.
 
 ### Changed

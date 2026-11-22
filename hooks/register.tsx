@@ -166,7 +166,7 @@ async function toggleBlock($: EngineInterface, name: string) {
   if (name === 'todo' && names.includes('todo')) await refresh($)
 }
 
-// On the Order screen: a ticked block moves to place `to` among the ticked
+// On the Order screen (▲ ▼): a ticked block moves to place `to` among the ticked
 // blocks the list shows (0 is the top), and the board follows that order. The
 // row lights up for a moment, so you can see where it landed. Kept between
 // sessions, as the ticks are.
@@ -1070,9 +1070,8 @@ export const register: Register = (on, options) => {
           </Box>
         )
       }
-      // Each button fills a fixed column, or a blank as wide where it would
-      // do nothing, so every row's buttons line up. top shows from the third
-      // row down, bottom down to the third from last: where they save a click.
+      // ▲ and ▼ each fill a fixed column, or a blank as wide where they would
+      // do nothing (▲ on the first row, ▼ on the last), so the rows line up.
       const pad = Math.max(0, ...ticked.map(n => n.length)) + 3
       const last = ticked.length - 1
       const slot = (key: string, label: string, show: boolean, to: number, name: string) =>
@@ -1098,8 +1097,6 @@ export const register: Register = (on, options) => {
                   <Box flexShrink={0} gap={1}>
                     {slot(`up-${name}`, '[ ▲ ]', at > 0, at - 1, name)}
                     {slot(`down-${name}`, '[ ▼ ]', at < last, at + 1, name)}
-                    {slot(`top-${name}`, '[ top ]', at > 1, 0, name)}
-                    {slot(`bottom-${name}`, '[ bottom ]', at < last - 1, last, name)}
                   </Box>
                 </Box>
               ))

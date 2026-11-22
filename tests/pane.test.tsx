@@ -1475,34 +1475,34 @@ test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbere
   const pane = await openOrder($, on)
   expect(((await texts(pane)) as string[]).slice(0, 3)).toEqual(['Blocks', 'Order', '          ━━━━━'])
   expect(await order(pane)).toEqual(['work', 'usage', 'compact', 'pixel-clock'])
-  // No ▲ on the first, no ▼ on the last; top from the third row, bottom to the third from last.
-  for (const [key, there] of [['up-work', false], ['down-pixel-clock', false], ['top-usage', false], ['top-compact', true], ['bottom-usage', true], ['bottom-compact', false]] as const)
+  // No ▲ on the first, no ▼ on the last; nothing else to press but the arrows.
+  for (const [key, there] of [['up-work', false], ['down-work', true], ['up-pixel-clock', true], ['down-pixel-clock', false], ['top-compact', false], ['bottom-usage', false]] as const)
     expect(!!(await pane.find({ key }))).toBe(there)
   await pane.press({ key: 'tab-blocks' })
   expect(((await texts(pane)) as string[])[2]).toBe('━━━━━━')
   expect(await pane.find({ key: 'pick-agents' })).toBeTruthy()
 })
 
-test('▲ ▼ top and bottom move a block; the board follows and the order is kept; the moved row lights up', ORDER, async ($, on) => {
+test('▲ and ▼ move a block a place; the board follows and the order is kept; the moved row lights up', ORDER, async ($, on) => {
   host(on, [])
   const kept = store(on)
   let pass = () => {}
   on('clock.sleep', () => new Promise(resolve => (pass = () => resolve({ value: undefined }))) as any)
   const pane = await openOrder($, on)
-  const pressed = pane.press({ key: 'top-pixel-clock' })
+  const pressed = pane.press({ key: 'up-pixel-clock' })
   await settle()
-  expect(await order(pane)).toEqual(['pixel-clock', 'work', 'usage', 'compact'])
-  expect((await pane.find({ type: 'Text', text: ' 1  pixel-clock   ' }))?.props.color).toBe(CAP_COLOR)
+  expect(await order(pane)).toEqual(['work', 'usage', 'pixel-clock', 'compact'])
+  expect((await pane.find({ type: 'Text', text: ' 3  pixel-clock   ' }))?.props.color).toBe(CAP_COLOR)
   pass()
   await pressed
-  expect((await pane.find({ type: 'Text', text: ' 1  pixel-clock   ' }))?.props.color).toBeUndefined()
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'work', 'usage', 'compact'])
+  expect((await pane.find({ type: 'Text', text: ' 3  pixel-clock   ' }))?.props.color).toBeUndefined()
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'usage', 'pixel-clock', 'compact'])
+  for (let i = 0; i < 2; i++) {
+    const p = pane.press({ key: 'up-pixel-clock' }); await settle(); pass(); await p
+  }
+  expect(await order(pane)).toEqual(['pixel-clock', 'work', 'usage', 'compact'])
   const p2 = pane.press({ key: 'down-work' }); await settle(); pass(); await p2
-  expect(await order(pane)).toEqual(['pixel-clock', 'usage', 'work', 'compact'])
-  const p3 = pane.press({ key: 'bottom-pixel-clock' }); await settle(); pass(); await p3
-  expect(await order(pane)).toEqual(['usage', 'work', 'compact', 'pixel-clock'])
-  const p4 = pane.press({ key: 'up-compact' }); await settle(); pass(); await p4
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['usage', 'compact', 'work', 'pixel-clock'])
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'usage', 'work', 'compact'])
   await pane.press({ key: 'blocks-done' })
   expect(await pane.find({ key: 'tab-order' })).toBeFalsy()
 })
@@ -1512,6 +1512,6 @@ test('every row\'s buttons line up: a missing button leaves a blank as wide', OR
   store(on)
   const pane = await openOrder($, on)
   const blanks = ((await texts(pane)) as string[]).filter(t => /^ +$/.test(t))
-  // work: no ▲, no top; usage: no top; compact: no bottom; pixel-clock: no ▼, no bottom.
-  expect(blanks.sort()).toEqual(['     ', '     ', '       ', '       ', '          ', '          '].sort())
+  // work: no ▲; pixel-clock: no ▼. Each blank is as wide as the button.
+  expect(blanks).toEqual(['     ', '     '])
 })
