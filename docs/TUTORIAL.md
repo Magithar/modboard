@@ -280,13 +280,14 @@ here.**
 ### The line above the prompt
 
 ```
-2 waiting · 1 active   [T-005]   Sonnet 5.5   low   modBOARD
+2 waiting · 1 active   [T-005]   Sonnet 5.5   low   blocks   modBOARD
 ```
 
 | Part | Says |
 |---|---|
 | `2 waiting · 1 active` | the board at a glance; `active` is green |
 | `[T-005]` | a yellow box: click it to open `/board` at the Unfinished group, again to fold it; the one thing that needs you: work someone handed off and nobody has picked up |
+| `blocks` | in orange, opens the pane at the list of blocks, to choose what the board shows ([part 8](#8-making-the-board-yours)); click it again to close the pane |
 | `modBOARD` | in green, opens the `/board` pane, like typing `/board`; click it again to close the pane |
 | `Sonnet 5.5   low` | the session's model and effort. Click either to switch to the next one |
 
@@ -538,18 +539,23 @@ and **▼** move one a place. Each click is saved as it's made, and the right
 of the tabs says what changed (`saved · added agents · order changed`). Click
 `modBOARD` to see the board.
 
+<table>
+  <tr>
+    <td><img src="blocks-list.png" alt="The Blocks tab: work, todo, usage, compact and pixel-clock ticked in orange, agents unticked in grey, and saved · added pixel-clock in yellow at the right of the tabs"/></td>
+    <td><img src="blocks-order.png" alt="The Order tab: the ticked blocks numbered 1 to 5, pixel-clock just moved to the top and lit in orange, each row with ▲ and ▼, the first row's ▲ and the last row's ▼ in grey, and saved · order changed in yellow"/></td>
+  </tr>
+  <tr>
+    <td align="center">Blocks</td>
+    <td align="center">Order</td>
+  </tr>
+</table>
+
 ### Clock, weather and an alarm
 
 Tick `pixel-clock` and the pane gets a big clock under a `▾ Clock` heading,
 the weather and the next alarm beside it:
 
-```
-  ▾ Clock
-
-    ▀█  ▀▀█   █ █ ▀▀█      ☀ 31°  Chennai
-     █   ▀█ ▀ ▀▀█ █▀▀      clear · H 31°
-    ▄█▄ ▄▄█ ▀   █ █▄▄      ⏰ 14:00
-```
+<img src="pane-clock.png" width="604" alt="The pane with the pixel clock on top under a Clock heading: 09:41 in large orange digits, and beside it ☁ 24° Bengaluru, partly cloudy · H 27°, and the next alarm, ⏰ 18:00 · check the deploy"/>
 
 - **Weather.** Ticking the clock asks once where you are: your city from
   your IP, a city you type, or not now. Nothing is sent before you answer.

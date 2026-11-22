@@ -1,6 +1,6 @@
 {
   "name": "modboard",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "One board for every agent and every person. You decide what's on it.",
   "type": "module",
   "bin": { "board": "bin/board.mjs" },

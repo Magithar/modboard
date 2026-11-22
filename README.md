@@ -212,6 +212,7 @@ One line above the prompt, while there's work on the board:
 | `2 waiting · 1 active` | tasks not started, and tasks being worked on (in green) | |
 | `T-005` in a yellow box | someone stopped it partway and left a handoff; up to three boxes, then `+N` | open `/board` at Unfinished; click again to fold it |
 | `Sonnet 5.5` · `low` | the model and effort | switch to the next one |
+| `blocks` | in orange: what the board shows | open `/board` at the list of blocks; click again to close it |
 | `modBOARD` | the board | open or close `/board` |
 
 With nothing waiting or in progress, the line disappears. It never wraps: in a
@@ -223,6 +224,7 @@ narrow window the last parts drop off first.
 <br/>
 
 ```
+ 75 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   low   blocks   modBOARD
  66 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   low   modBOARD
  60 cols   2 waiting · 1 active   [T-005]   Sonnet 5.5   modBOARD
  48 cols   2 waiting · 1 active   [T-005]   modBOARD
@@ -853,7 +855,8 @@ modboard/
 │   └── store-memory.mjs     # a complete storage block in about 20 lines
 ├── hooks/
 │   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
-│   └── blocks/              # one file per display block, listed in index.ts
+│   ├── blocks/              # one file per display block, listed in index.ts
+│   └── sounds/alarm.wav     # the alarm's chime
 ├── .claude-plugin/
 │   └── plugin.json          # the mod's manifest and settings
 ├── test/                    # CLI and store contract tests (npm test)
@@ -867,6 +870,9 @@ modboard/
     ├── blocks.txt  .png     # how blocks work
     ├── render.mjs           # rebuilds each diagram from its .txt
     ├── band.mjs    .png     # the band image
+    ├── pane.mjs             # draws blocks-*.png, pane-clock.png, clock-ringing.png
+    ├── blocks-*.png         # the list of blocks: the Blocks and Order tabs
+    ├── pane-clock.png       # the pixel clock, and clock-ringing.png as it rings
     ├── board-live.gif       # the live demo
     ├── pane-*.png           # screenshots of the /board pane
     ├── taskfile-*.png       # the To do list, at P0 and at all
