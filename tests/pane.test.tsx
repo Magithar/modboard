@@ -1162,8 +1162,9 @@ test('the pixel clock draws the time three rows tall, with the weather beside it
   await settle()
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const shown = await texts(pane)
-  expect(shown.slice(0, 3)).toEqual(['█▀█ █▀█   █ █ ▀█ ', '█ █ ▀▀█ ▀ ▀▀█  █ ', '█▄█ ▄▄█ ▀   █ ▄█▄'])
-  expect(shown.slice(3)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°'])
+  expect(shown[0]).toBe('▾ Clock')
+  expect(shown.slice(1, 4)).toEqual(['█▀█ █▀█   █ █ ▀█ ', '█ █ ▀▀█ ▀ ▀▀█  █ ', '█▄█ ▄▄█ ▀   █ ▄█▄'])
+  expect(shown.slice(4)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°'])
   // Only the location is sent, and only to Open-Meteo.
   expect(urls.every(u => u.startsWith('https://geocoding-api.open-meteo.com/') || u.startsWith('https://api.open-meteo.com/'))).toBe(true)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
@@ -1178,7 +1179,7 @@ test('with no location set, nothing is fetched and the clock stands alone', { op
   await settle()
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   expect(urls).toEqual([])
-  expect((await texts(pane)).slice(3)).toEqual(['weather: /board location'])
+  expect((await texts(pane)).slice(4)).toEqual(['weather: /board location'])
 })
 
 test('offline, the weather keeps the last reading and says how old it is', PIXEL, async ($, on) => {
@@ -1439,11 +1440,11 @@ test('the alarm sits third in the column beside the digits, and a note that only
   await $.session.start(START)
   await settle()
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect((await texts(pane)).slice(3)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°', '⏰ 14:00'])
+  expect((await texts(pane)).slice(4)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°', '⏰ 14:00'])
   // Narrow, the column goes under the digits.
   await pane.unmount()
   const narrow = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 30 } } as any)
-  expect((await texts(narrow)).slice(3)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°', '⏰ 14:00'])
+  expect((await texts(narrow)).slice(4)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°', '⏰ 14:00'])
 })
 
 test('a note that says more than the time stays', { options: { pane: 'pixel-clock' } } as any, async ($, on) => {
@@ -1451,7 +1452,7 @@ test('a note that says more than the time stays', { options: { pane: 'pixel-cloc
   store(on, { reminders: [{ at: '14:00', note: 'check the deploy' }] })
   await $.session.start(START)
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect((await texts(pane)).slice(3)).toEqual(['weather: /board location', '⏰ 14:00 · check the deploy'])
+  expect((await texts(pane)).slice(4)).toEqual(['weather: /board location', '⏰ 14:00 · check the deploy'])
 })
 
 // The logo's orange (CAP in hooks/blocks/board.tsx).
@@ -1589,4 +1590,18 @@ test('at the right of the tabs, in yellow, what was saved: added, removed, order
   await settle()
   // modBOARD shows the board; no corner notification.
   expect(toasts.filter(t => t.startsWith('board:'))).toEqual([])
+})
+
+test('the clock has a Clock heading that folds to one line: the time, the weather and the alarm', { options: { pane: 'pixel-clock', location: 'Bengaluru' } } as any, async ($, on) => {
+  host(on, [])
+  store(on, { reminders: [{ at: '14:00', note: 'check the deploy' }] })
+  openMeteo(on)
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await label(pane, 'group-clock')).toBe('▾ Clock')
+  await pane.press({ key: 'group-clock' })
+  expect(await texts(pane)).toEqual(['▸ Clock', ' · 09:41 · ☀ 18° · ⏰ 14:00 · check the deploy'])
+  await pane.press({ key: 'group-clock' })
+  expect((await texts(pane))[1]).toBe('█▀█ █▀█   █ █ ▀█ ')
 })

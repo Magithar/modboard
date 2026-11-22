@@ -153,6 +153,8 @@ export const GROUPS = {
   // Not a task group: the pane's bars (context, the 5-hour limit), folded the
   // same way. See register.tsx.
   limits: { title: 'Limits', open: true },
+  // The pixel clock, with its weather and alarm (see pixel.tsx).
+  clock: { title: 'Clock', open: true },
 } as const
 export type GroupName = keyof typeof GROUPS
 

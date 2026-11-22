@@ -1,7 +1,8 @@
 import { CAP } from './board'
+import { groupOpen } from './tasks'
 import { hhmm } from './clock'
 import { words, type Block } from './types'
-import { weatherLines } from './weather'
+import { conditions, degrees, weatherLines } from './weather'
 
 // Each digit three rows tall and three wide, in half blocks, so it is six
 // pixels high.
@@ -60,7 +61,7 @@ export const pixelClock: Block = {
   },
   // The digits, and beside them one column of three rows: the weather, the
   // conditions, the alarm. Too narrow for both, the column goes under them.
-  pane: ({ ui: { Box, Text, Button }, now, weather, alarms, reminders, located, ringing, width, act }) => {
+  pane: ({ ui: { Box, Text, Button }, now, weather, alarms, reminders, located, ringing, width, act, groupsOpen }) => {
     const rows = pixels(hhmm(now))
     const all = [...new Set([...alarms, ...reminders.map(r => r.at)])]
     const next = nextAlarm(all, now)
@@ -94,7 +95,7 @@ export const pixelClock: Block = {
       ) : null,
     ]
     const wide = Math.max(0, ...[sky, day, alarm + (ringing ? '  stop' : '')].map(t => [...t].length))
-    const beside = width >= DIGITS_WIDE + GAP + wide + 2
+    const beside = width >= DIGITS_WIDE + GAP + wide + 4
     const digits = (
       <Box flexDirection="column" flexShrink={0}>
         {rows.map(row => (
@@ -104,7 +105,7 @@ export const pixelClock: Block = {
         ))}
       </Box>
     )
-    return beside ? (
+    const content = beside ? (
       <Box gap={GAP}>
         {digits}
         <Box flexDirection="column">{column}</Box>
@@ -115,6 +116,25 @@ export const pixelClock: Block = {
         {column.some(Boolean) ? (
           <Box flexDirection="column" marginTop={1}>
             {column}
+          </Box>
+        ) : null}
+      </Box>
+    )
+    // A heading like Limits: open, the digits under it; folded, one line with
+    // the time, the weather and the alarm. A ringing alarm opens it.
+    const open = ringing || groupOpen(groupsOpen, 'clock')
+    const brief = [hhmm(now), weather ? `${conditions(weather.code).sign} ${degrees(weather.temp)}` : '', alarm].filter(Boolean)
+    return (
+      <Box flexDirection="column">
+        <Box>
+          <Button key="group-clock" plain onPress={() => act.toggleGroup('clock')}>
+            <Text bold>{`${open ? '▾' : '▸'} Clock`}</Text>
+          </Button>
+          {!open ? <Text dimColor wrap="truncate">{` · ${brief.join(' · ')}`}</Text> : null}
+        </Box>
+        {open ? (
+          <Box marginTop={1} paddingLeft={2}>
+            {content}
           </Box>
         ) : null}
       </Box>

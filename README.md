@@ -364,7 +364,8 @@ block](#make-your-own-block).
 
 ### Pixel clock, weather and alarm
 
-Tick `pixel-clock` on the list of blocks, or name it in `pane`:
+Tick `pixel-clock` on the list of blocks, or name it in `pane`. It sits under
+a `▾ Clock` heading, which folds to one line (`▸ Clock · 13:46 · ☀ 31° · ⏰ 14:00`):
 
 ```
   █▀█ █▀█   ▀▀█ ▀▀█      ☀ 18°  Bengaluru

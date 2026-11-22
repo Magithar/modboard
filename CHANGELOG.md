@@ -49,6 +49,8 @@ modboard was called agent-board until 0.5.0.
 
 ### Changed
 
+- **The pixel clock has a heading**, `▾ Clock`, like Limits. Folded, it is one
+  line: `▸ Clock · 13:46 · ☀ 31° · ⏰ 14:00`. A ringing alarm opens it.
 - **The pixel clock's column**: beside the digits, one column of three rows:
   the weather and place, the conditions, the next alarm. Too narrow, it goes
   under the digits. An alarm note that only repeats the time ("Alarm set for
