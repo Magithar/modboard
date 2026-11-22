@@ -26,12 +26,12 @@ export function age(w: Weather, now: number) {
   return min < 120 ? `${min} min old` : `${Math.round(min / 60)} h old`
 }
 
-// The weather lines beside the pixel clock: the sign and temperature, the
-// place, then the conditions and the day's high.
-export function weatherLines(w: Weather, now: number): string[] {
+// The weather's two lines beside the pixel clock: the sign, temperature and
+// place; then the conditions and the day's high.
+export function weatherLines(w: Weather, now: number): [string, string] {
   const { sign, word } = conditions(w.code)
   const old = age(w, now)
-  return [`${sign}  ${degrees(w.temp)}`, w.place, `${word} · H ${degrees(w.high)}${old ? ` · ${old}` : ''}`]
+  return [`${sign} ${degrees(w.temp)}  ${w.place}`, `${word} · H ${degrees(w.high)}${old ? ` · ${old}` : ''}`]
 }
 
 export const weather: Block = {

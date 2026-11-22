@@ -163,6 +163,19 @@ async function toggleBlock($: EngineInterface, name: string) {
   if (name === 'todo' && names.includes('todo')) await refresh($)
 }
 
+// ↑ or ↓ beside a ticked block on the list: it swaps with the ticked block
+// above or below it that the list shows, and the board follows that order.
+// Kept between sessions, as the ticks are.
+async function moveBlock($: EngineInterface, name: string, by: -1 | 1, shown: string[]) {
+  const now = await read($, paneBlocks)
+  const visible = now.filter(n => shown.includes(n))
+  const other = visible[visible.indexOf(name) + by]
+  if (other === undefined) return
+  const names = now.map(n => (n === name ? other : n === other ? name : n))
+  await update($, paneBlocks, () => names)
+  await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
+}
+
 // What went wrong, in one line: the board's own message, or the error line of
 // a crash ("EACCES: permission denied, open '…/board.json'"), not its stack.
 function reason(text: string) {
@@ -995,21 +1008,41 @@ export const register: Register = (on, options) => {
     // The list of blocks, alone: each row ticks its block on or off; Done
     // turns the pane to the board, as modBOARD does.
     if (view === 'blocks') {
-      const listed = choosable.filter(b => b.listed !== false)
+      // Ticked blocks first, in the board's order, each with ↑ and ↓; then the
+      // rest, in the list's own order.
+      const offered = choosable.filter(b => b.listed !== false)
+      const names = offered.map(b => b.name)
+      const ticked = chosen.filter(n => names.includes(n))
+      const listed = [...ticked.map(n => offered.find(b => b.name === n)!), ...offered.filter(b => !chosen.includes(b.name))]
       const pad = Math.max(...listed.map(b => b.name.length)) + 2
+      const aboutPad = Math.max(...listed.map(b => (b.about ?? '').length)) + 2
+      const arrow = (b: Block, by: -1 | 1, at: number) =>
+        ticked[at + by] === undefined ? (
+          <Text>{'  '}</Text>
+        ) : (
+          <Button key={`${by < 0 ? 'up' : 'down'}-${b.name}`} plain onPress={() => moveBlock($, b.name, by, names)}>
+            <Text color={CAP}>{by < 0 ? '↑' : '↓'}</Text>
+          </Button>
+        )
       return (
         <Box flexDirection="column" paddingX={1}>
           <Text bold>What should the board show?</Text>
           <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-            {listed.map(b => (
+            {listed.map((b, at) => (
               <Box>
                 <Button key={`pick-${b.name}`} plain onPress={() => toggleBlock($, b.name)}>
                   {/* One Text in one colour, so the pointer lights the row as one
                       bar: ticked rows orange, the rest grey. */}
                   <Text color={chosen.includes(b.name) ? CAP : undefined} dimColor={!chosen.includes(b.name)} wrap="truncate">
-                    {`${chosen.includes(b.name) ? '[x]' : '[ ]'} ${b.name.padEnd(pad)}${b.about ?? ''}`}
+                    {`${chosen.includes(b.name) ? '[x]' : '[ ]'} ${b.name.padEnd(pad)}${chosen.includes(b.name) ? (b.about ?? '').padEnd(aboutPad) : (b.about ?? '')}`}
                   </Text>
                 </Button>
+                {chosen.includes(b.name) ? (
+                  <Box flexShrink={0} gap={1}>
+                    {arrow(b, -1, at)}
+                    {arrow(b, 1, at)}
+                  </Box>
+                ) : null}
               </Box>
             ))}
           </Box>

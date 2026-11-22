@@ -1166,9 +1166,7 @@ test('the pixel clock draws the time three rows tall, with the weather beside it
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const shown = await texts(pane)
   expect(shown.slice(0, 3)).toEqual(['█▀█ █▀█   █ █ ▀█ ', '█ █ ▀▀█ ▀ ▀▀█  █ ', '█▄█ ▄▄█ ▀   █ ▄█▄'])
-  expect(shown).toContain('☀  18°')
-  expect(shown).toContain('Bengaluru')
-  expect(shown).toContain('clear · H 24°')
+  expect(shown.slice(3)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°'])
   // Only the location is sent, and only to Open-Meteo.
   expect(urls.every(u => u.startsWith('https://geocoding-api.open-meteo.com/') || u.startsWith('https://api.open-meteo.com/'))).toBe(true)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
@@ -1296,7 +1294,7 @@ test('board_alarm sets a one-off alarm at a time or in minutes, shown on the clo
   expect(await alarm({ note: 'standup', at: '6pm' })).toBe('the alarm rings once at 18:00: standup')
   expect(await alarm({ note: 'x', at: 'soon' })).toMatch(/is not a time/)
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect(await texts(pane)).toContain('⏰ next 10:01 · check the deploy · 2 set')
+  expect(await texts(pane)).toContain('⏰ 10:01 · check the deploy · 2 set')
   expect((kept.get('reminders') as any).map((r: any) => r.at)).toEqual(['10:01', '18:00'])
   const listed = ((await $.command.run({ command: 'board', args: 'alarm' } as any)) as any).text
   expect(listed).toBe('Once at 10:01: check the deploy\nOnce at 18:00: standup')
@@ -1344,7 +1342,7 @@ test('ticking the pixel clock and pressing Done asks for a location; a typed cit
   const asked = asks(on, 'Bengaluru')
   const pane = await pickClock($)
   expect(asked).toHaveLength(1)
-  expect(await texts(pane)).toContain('☀  18°')
+  expect(await texts(pane)).toContain('☀ 18°  Bengaluru')
   expect((kept.get('location') as any).name).toBe('Bengaluru')
 })
 
@@ -1417,7 +1415,7 @@ test('stop is bold green, like Done, beside the yellow alarm line', { options: {
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const stop = (await pane.find({ type: 'Text', text: 'stop' }))?.props
   expect([stop?.color, stop?.bold]).toEqual(['success', true])
-  expect((await pane.find({ type: 'Text', text: '⏰ 09:41  ' }))?.props.color).toBe('warning')
+  expect((await pane.find({ type: 'Text', text: '⏰ 09:41' }))?.props.color).toBe('warning')
 })
 
 test('an agent alarm at 1:30 with no am or pm rings at the next 1:30; 13:30 and am/pm are taken as said', async ($, on) => {
@@ -1433,4 +1431,52 @@ test('an agent alarm at 1:30 with no am or pm rings at the next 1:30; 13:30 and 
   expect(await alarm('13:30')).toBe('the alarm rings once at 13:30: n')
   expect(await alarm('1:30am')).toBe('the alarm rings once at 01:30: n')
   expect(await alarm('01:30')).toBe('the alarm rings once at 01:30: n')
+})
+
+test('on the list of blocks, ↑ and ↓ move a ticked block, the board follows, and the order is kept', { options: { band: 'summary,board', pane: 'work,usage,pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  // Ticked rows first, in the board's order; the first has no ↑, the last no ↓.
+  const rows = async () => ((await texts(pane)) as string[]).filter(t => /^\[[x ]\]/.test(t)).map(t => t.split(/\s+/)[1])
+  expect((await rows()).slice(0, 3)).toEqual(['work', 'usage', 'pixel-clock'])
+  expect(await pane.find({ key: 'up-work' })).toBeFalsy()
+  expect(await pane.find({ key: 'down-pixel-clock' })).toBeFalsy()
+  // The clock to the top, in two presses.
+  await pane.press({ key: 'up-pixel-clock' })
+  await pane.press({ key: 'up-pixel-clock' })
+  expect((await rows()).slice(0, 3)).toEqual(['pixel-clock', 'work', 'usage'])
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'work', 'usage'])
+  await pane.press({ key: 'down-work' })
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'usage', 'work'])
+  // Unticked blocks have no arrows.
+  expect(await pane.find({ key: 'up-agents' })).toBeFalsy()
+  await pane.press({ key: 'blocks-done' })
+  expect(((await texts(pane)) as string[])[0]).toBe('█▀█ █▀█   █ █ ▀█ ')
+})
+
+test('the alarm sits third in the column beside the digits, and a note that only repeats the time is left out', { options: { pane: 'pixel-clock', location: 'Bengaluru' } } as any, async ($, on) => {
+  host(on, [])
+  store(on, { reminders: [{ at: '14:00', note: 'Alarm set for 2 PM' }] })
+  openMeteo(on)
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect((await texts(pane)).slice(3)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°', '⏰ 14:00'])
+  // Narrow, the column goes under the digits.
+  await pane.unmount()
+  const narrow = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 30 } } as any)
+  expect((await texts(narrow)).slice(3)).toEqual(['☀ 18°  Bengaluru', 'clear · H 24°', '⏰ 14:00'])
+})
+
+test('a note that says more than the time stays', { options: { pane: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  store(on, { reminders: [{ at: '14:00', note: 'check the deploy' }] })
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect((await texts(pane)).slice(3)).toEqual(['weather: /board location', '⏰ 14:00 · check the deploy'])
 })

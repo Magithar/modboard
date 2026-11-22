@@ -350,7 +350,9 @@ pane: work,todo,compact,usage           (the default)
 names still work.
 
 Or click **blocks** on the band: the pane turns to a list of the blocks it
-can show, and a click ticks one on or off. **Done** shows the board. The
+can show, and a click ticks one on or off. Ticked blocks come first, in the
+board's order, each with **↑** and **↓** to move it up or down. **Done**
+shows the board. The
 choice is kept between sessions, until `pane` is changed in `/config`.
 
 In a narrow window, the band's last blocks drop first, so put what matters
@@ -362,11 +364,9 @@ block](#make-your-own-block).
 Tick `pixel-clock` on the list of blocks, or name it in `pane`:
 
 ```
-  █▀█ █▀█   ▀▀█ ▀▀█      ☀  18°
-  █ █ ▀▀█ ▀  ▀█ █▀▀      Bengaluru
-  █▄█ ▄▄█ ▀ ▄▄█ █▄▄      clear · H 24°
-
-  ⏰ 07:30
+  █▀█ █▀█   ▀▀█ ▀▀█      ☀ 18°  Bengaluru
+  █ █ ▀▀█ ▀  ▀█ █▀▀      clear · H 24°
+  █▄█ ▄▄█ ▀ ▄▄█ █▄▄      ⏰ 07:30
 ```
 
 In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
