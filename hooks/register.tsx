@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Agent, Task, TaskFile, Weather } from '../types'
+import type { Agent, Reminder, Task, TaskFile, Weather } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import { CAP } from './blocks/board'
 import { hhmm } from './blocks/clock'
@@ -59,9 +59,16 @@ const minute = atom({ plugin: 'modboard', key: 'minute' } as const, '')
 const weather = atom({ plugin: 'modboard', key: 'weather' } as const, null as Weather | null)
 const alarms = atom({ plugin: 'modboard', key: 'alarms' } as const, [] as string[])
 const ringing = atom({ plugin: 'modboard', key: 'ringing' } as const, '')
+// One-off alarms an agent set with board_alarm: each rings once, then goes.
+const reminders = atom({ plugin: 'modboard', key: 'reminders' } as const, [] as Reminder[])
 const TICK_MS = 5_000
 const WEATHER_MS = 20 * 60_000
 const RING_MS = 60_000
+// An agent may ring now at most this often, so a chatty one can't drown you.
+const AGENT_RING_MS = 60_000
+// A ring that isn't a set time (a task done, an agent ringing now) chimes
+// this many times and stops.
+const CHIMES = 3
 const ALARM_SOUND = 'hooks/sounds/alarm.wav'
 
 let session = ''
@@ -170,6 +177,7 @@ async function refresh($: EngineInterface) {
     const out = await cli($, ['view', '--json'])
     if (out.ok) {
       const view = JSON.parse(out.text) as { tasks: Task[]; agents: Agent[] }
+      await ringFinished($, view.tasks)
       if (!same(await read($, tasks), view.tasks)) await update($, tasks, () => view.tasks)
       if (!same(await read($, agents), view.agents)) await update($, agents, () => view.agents)
     } else problem = reason(out.text) || `the board CLI exited with ${out.code}`
@@ -207,13 +215,19 @@ const TOOLS = [
   {
     name: 'board_add',
     description: 'Add a task to the shared board. Give it acceptance criteria: how to tell it is done.',
-    schema: { title: { type: 'string' }, description: { type: 'string' }, accept: { type: 'string' } },
+    schema: {
+      title: { type: 'string' },
+      description: { type: 'string' },
+      accept: { type: 'string' },
+      ring: { type: 'boolean', description: 'Ring the person\'s alarm when this task is done, whoever finishes it. Only for what they asked to hear about, or a milestone worth interrupting them for.' },
+    },
     required: ['title'],
     args: (i: any) => [
       'add',
       i.title,
       ...(i.description ? ['--desc', i.description] : []),
       ...(i.accept ? ['--accept', i.accept] : []),
+      ...(i.ring ? ['--ring'] : []),
     ],
   },
   {
@@ -260,6 +274,11 @@ const TOOLS = [
     args: (i: any) => ['done', i.id, '--note', i.note ?? ''],
   },
 ]
+
+const AGENT_ALARM =
+  "Ring the person's alarm: a toast, a notification and a chime, with your note. Now (leave out at and inMinutes), or once at a time. " +
+  'Use it sparingly: when they asked to be told, or something important finished or needs them (a release shipped, a long run done, a blocker). ' +
+  'Never for routine progress. To ring when a board task is done, whoever finishes it, add it with board_add ring: true instead.'
 
 const SYMBOL = { todo: '○', claimed: '◐', done: '●' } as const
 
@@ -406,16 +425,80 @@ async function saveAlarms($: EngineInterface, times: string[]) {
   await $.store.set('alarms', { from: alarmSetting, times }).catch(() => $.ui.toast('board: could not save the alarm'))
 }
 
-async function ring($: EngineInterface, at: string) {
-  await update($, ringing, () => at)
-  $.ui.toast(`⏰ ${at}`)
-  $.ui.notify(`It's ${at}.`, { title: '⏰ Alarm', key: `alarm-${at}` }).catch(() => {})
+// Rings: `shown` on the clock and in a toast, `told` in the notification.
+// A set time chimes for a minute; anything else chimes a few times. Either
+// stays on the clock a minute, unless stopped first.
+async function ring($: EngineInterface, shown: string, told: string, { loop }: { loop: boolean }) {
+  await update($, ringing, () => shown)
+  $.ui.toast(`⏰ ${shown}`)
+  $.ui.notify(told, { title: '⏰ modboard', key: `alarm-${shown}` }).catch(() => {})
   stopSound?.abort()
   const stop = (stopSound = new AbortController())
-  $.audio.play({ asset: ALARM_SOUND }, { shouldLoop: true, signal: stop.signal }).catch(() => {})
-  // Rings a minute, unless stopped first.
+  if (loop) $.audio.play({ asset: ALARM_SOUND }, { shouldLoop: true, signal: stop.signal }).catch(() => {})
+  else
+    void (async () => {
+      for (let i = 0; i < CHIMES && !stop.signal.aborted; i++) await $.audio.play({ asset: ALARM_SOUND }).catch(() => {})
+    })()
   await $.clock.sleep(RING_MS)
   if (stopSound === stop) await stopAlarm($)
+}
+
+const ringAt = ($: EngineInterface, at: string) => ring($, at, `It's ${at}.`, { loop: true })
+
+async function saveReminders($: EngineInterface, list: Reminder[]) {
+  await update($, reminders, () => list)
+  await $.store.set('reminders', list).catch(() => {})
+}
+
+async function loadReminders($: EngineInterface) {
+  const kept: any = await $.store.get('reminders').catch(() => undefined)
+  const list = Array.isArray(kept) ? kept.filter((r: any) => r && typeof r.at === 'string' && alarmTime(r.at)).map((r: any) => ({ at: alarmTime(r.at)!, note: String(r.note ?? '') })) : []
+  await update($, reminders, () => list)
+}
+
+// A task flagged to ring (board add --ring, board ring <id>) that turned done
+// since the last read rings, whoever finished it: Claude, Codex or a person.
+// Null until the first read, so tasks done before this session stay quiet.
+let seenDone: Set<string> | null = null
+
+async function ringFinished($: EngineInterface, list: Task[]) {
+  const done = new Set(list.filter(t => t.status === 'done').map(t => t.id))
+  const before = seenDone
+  seenDone = done
+  if (!before) return
+  for (const t of list)
+    if (t.ring && t.status === 'done' && !before.has(t.id)) {
+      const by = t.notes.at(-1)?.by
+      void ring($, `${t.id} done · ${t.title}`, `${t.id} done: ${t.title}${by ? ` (by ${by})` : ''}`, { loop: false })
+    }
+}
+
+let lastAgentRing = -Infinity
+
+// The board_alarm tool: ring now, at a time, or in some minutes; always with
+// a note saying why.
+async function agentAlarm($: EngineInterface, input: { note?: unknown; at?: unknown; inMinutes?: unknown }) {
+  const note = typeof input.note === 'string' ? input.note.trim() : ''
+  if (!note) return 'error: board_alarm needs a note saying why the person should look'
+  const now = await $.clock.now()
+  let at: string | undefined
+  if (input.at !== undefined && input.at !== '') {
+    at = alarmTime(String(input.at))
+    if (!at) return `error: "${input.at}" is not a time; give HH:MM (18:00) or 6pm`
+  } else if (input.inMinutes !== undefined) {
+    const m = Number(input.inMinutes)
+    if (!Number.isFinite(m) || m < 0 || m > 24 * 60) return 'error: inMinutes is a number of minutes, up to a day'
+    if (m >= 1) at = hhmm(now + Math.round(m) * 60_000)
+  }
+  if (!at || at === hhmm(now)) {
+    if (now - lastAgentRing < AGENT_RING_MS)
+      return `error: the alarm rang ${Math.round((now - lastAgentRing) / 1000)} s ago; ring only for what needs the person, and not twice in a minute`
+    lastAgentRing = now
+    void ring($, note, note, { loop: false })
+    return `rang the alarm: ${note}`
+  }
+  await saveReminders($, [...(await read($, reminders)), { at, note }])
+  return `the alarm rings once at ${at}: ${note}`
 }
 
 async function stopAlarm($: EngineInterface) {
@@ -430,24 +513,34 @@ async function tick($: EngineInterface) {
   const now = hhmm(await $.clock.now())
   if ((await read($, minute)) === now) return
   await update($, minute, () => now)
-  if ((await read($, alarms)).includes(now)) void ring($, now)
+  const due = (await read($, reminders)).filter(r => r.at === now)
+  if (due.length) {
+    await saveReminders($, (await read($, reminders)).filter(r => r.at !== now))
+    const note = due.map(r => r.note).join(' · ')
+    return void ring($, `${now} · ${note}`, note, { loop: true })
+  }
+  if ((await read($, alarms)).includes(now)) void ringAt($, now)
 }
 
 // /board alarm 7:30 · /board alarm off · /board alarm off 7:30 · /board alarm
 async function alarmCommand($: EngineInterface, args: string) {
   const now = await read($, alarms)
   const words_ = args.trim().split(/\s+/).filter(Boolean)
-  const listed = (times: string[]) => (times.length ? `Alarm set for ${times.join(', ')}.` : 'No alarm set.')
+  const once = await read($, reminders)
+  const listed = (times: string[]) =>
+    [times.length ? `Alarm set for ${times.join(', ')}.` : once.length ? '' : 'No alarm set.', ...once.map(r => `Once at ${r.at}: ${r.note}`)].filter(Boolean).join('\n')
   if (!words_.length) return listed(now)
   if (words_[0] === 'off' || words_[0] === 'clear') {
     await stopAlarm($)
     if (words_.length === 1) {
       await saveAlarms($, [])
+      await saveReminders($, [])
       return 'Alarm off.'
     }
     const drop = alarmList(words_.slice(1).join(','))
     const left = now.filter(t => !drop.includes(t))
     await saveAlarms($, left)
+    await saveReminders($, once.filter(r => !drop.includes(r.at)))
     return listed(left)
   }
   const time = alarmTime(words_.join(' '))
@@ -558,7 +651,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
 // Everything a drawing reads, asked for at once: a pane is drawn again on
 // every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
-  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow] =
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow] =
     await Promise.all([
       $.clock.now(),
       read($, me),
@@ -577,6 +670,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
       read($, weather),
       read($, alarms),
       read($, ringing),
+      read($, reminders),
       // Read so a drawing of the clock redraws when the minute turns.
       read($, minute),
     ])
@@ -600,6 +694,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     weather: weatherNow,
     alarms: alarmsNow,
     ringing: ringingNow,
+    reminders: remindersNow,
     act,
   }
 }
@@ -651,11 +746,26 @@ export const register: Register = (on, options) => {
         inputSchema: { type: 'object', properties: t.schema ?? {}, required: t.required ?? [] },
         isDeferred: false,
       })
+    await $.tool.register({
+      name: 'board_alarm',
+      description: AGENT_ALARM,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          note: { type: 'string', description: 'Why the person should look, in a few words: "T-004 done: deploy is green".' },
+          at: { type: 'string', description: 'A time to ring once, HH:MM or 6pm. Leave out to ring now.' },
+          inMinutes: { type: 'number', description: 'Ring once this many minutes from now, instead of at.' },
+        },
+        required: ['note'],
+      },
+      isDeferred: false,
+    })
     await $.command.register({ name: 'board', description: 'Open the modboard pane · /board alarm 7:30 sets an alarm, /board alarm off clears it' })
     await estimateContext($)
     await loadPane($)
 
     await loadAlarms($)
+    await loadReminders($)
     await tick($)
     $.clock.every(TICK_MS, () => tick($).catch(() => {}))
     // Weather, only once a location is set: the last reading at once, then
@@ -687,6 +797,10 @@ export const register: Register = (on, options) => {
       await refresh($)
       return { result: out.ok ? out.text : `error: ${out.text}` }
     }).catch(() => ({ result: 'error: the board CLI could not run (is node on PATH?)' }))
+
+  on('tool.call', { tool: 'mcp__modboard__board_alarm' } as any, async ($, e: any) => ({ result: await agentAlarm($, e) })).catch(() => ({
+    result: 'error: the alarm could not be set',
+  }))
 
   // Leases need a heartbeat; an LLM won't send one, so tool activity does.
   on('tool.call', async ($, e, next) => {

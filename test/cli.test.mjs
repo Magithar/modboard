@@ -241,7 +241,7 @@ test('a flag the command does not take is refused, and nothing is saved', () => 
   const b = fresh()
   const r = b.run(['add', 'guessed', '--description', 'the details'])
   assert.equal(r.code, 2)
-  assert.match(r.out, /board: add doesn't take --description; it takes --as, --json, --desc, --accept/)
+  assert.match(r.out, /board: add doesn't take --description; it takes --as, --json, --desc, --accept, --ring/)
   assert.deepEqual(b.json(['list', '--all']), [])
   // The flags every command takes still work everywhere, as the mod relies on.
   assert.equal(b.run(['add', 'right', '--desc', 'the details', '--as', 'alice']).code, 0)
@@ -336,4 +336,18 @@ test('a lease that runs out after work leaves a handoff too', async () => {
   const left = b.json(['show', 'T-001']).notes.at(-1)
   assert.equal(left.text, 'HANDOFF: lease of codex expired; read the notes above')
   assert.equal(left.where, undefined)
+})
+
+test('a task flagged to ring says so, and the flag can be set and taken off later', () => {
+  const b = fresh()
+  assert.match(b.run(['add', 'ship it', '--ring', '--as', 'lead']).out, /rings an alarm when done/)
+  assert.equal(b.json(['show', 'T-001']).ring, true)
+  assert.match(b.run(['show', 'T-001']).out, /Rings an alarm when done\./)
+  b.run(['add', 'plain', '--as', 'lead'])
+  assert.equal(b.json(['show', 'T-002']).ring, undefined)
+  assert.match(b.run(['ring', 'T-002', '--as', 'lead']).out, /T-002 rings an alarm when done/)
+  assert.equal(b.json(['show', 'T-002']).ring, true)
+  assert.match(b.run(['ring', 'T-002', '--off', '--as', 'lead']).out, /no longer rings/)
+  assert.equal(b.json(['show', 'T-002']).ring, undefined)
+  assert.equal(b.run(['ring', 'T-404', '--as', 'lead']).code !== 0, true)
 })

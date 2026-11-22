@@ -145,6 +145,7 @@ board check T-001 "npm test"              # runs it; records it only if it passe
 board release T-001 --handoff "done X; left Y; see Z"
 board done T-001 --note "ran X, saw Y"    # required: how you checked it
 board add "title" --desc "..." --accept "how to tell it is done"
+board add "Ship release" --ring           # ring the alarm when it's done
 ```
 
 Each command answers in a line or two (`claimed T-001 … it's yours until
@@ -168,6 +169,7 @@ board agents                              # who is live
 board view                                # every task and live agent, as JSON
 board doctor                              # check the ledger against the state
 board taskfile                            # the project's task.md, read only
+board ring T-001                          # ring the alarm when it's done; --off takes it back
 ```
 
 | Exit code | Meaning |
@@ -181,8 +183,8 @@ board taskfile                            # the project's task.md, read only
 | 8 | the check failed; nothing was recorded |
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
-`board_claim`, `board_note`, `board_check`, `board_release` and `board_done`. Any tool call
-renews the session's claims.
+`board_claim`, `board_note`, `board_check`, `board_release`, `board_done`
+and `board_alarm`. Any tool call renews the session's claims.
 
 The CLI and the tools use the board's precise terms (claim, release, handoff,
 lease), because agents act on them. The display uses plain words, so you can
@@ -386,6 +388,16 @@ In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
   `/board alarm off 7:30` removes one and `/board alarm off` clears all. Those
   are kept between sessions, until `alarm` is changed in `/config`. It rings
   only while a session is open.
+- **When something important is done.** Add a task with `--ring`
+  (`board add "Ship release" --ring`, or `board ring T-004` later): when it
+  turns done, whoever finished it (Claude, Codex or a person), the alarm
+  chimes three times and the clock shows `⏰ T-004 done · Ship release`.
+  Tasks already done when the session starts stay quiet.
+- **Agents can ring it too**, with the `board_alarm` tool and a note saying
+  why: now (`⏰ deploy is green`), or once at a time or in some minutes
+  (`⏰ 18:00 · check the deploy`), which `/board alarm` lists and
+  `/board alarm off` clears. Its description tells them to ring only when you
+  asked or something needs you, and it rings now at most once a minute.
 
 ### Model and effort
 

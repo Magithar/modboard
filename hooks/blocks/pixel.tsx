@@ -39,16 +39,18 @@ export const pixelClock: Block = {
   name: 'pixel-clock',
   about: 'big clock, weather, alarm',
   // The band is one line: the time plainly, then the alarm.
-  band: ({ ui: { Text }, now, alarms, ringing }) => {
-    if (ringing) return [words(Text, `⏰ ${ringing} ringing`, { color: 'warning', bold: true })]
-    const next = nextAlarm(alarms, now)
+  band: ({ ui: { Text }, now, alarms, reminders, ringing }) => {
+    if (ringing) return [words(Text, `⏰ ${ringing}`, { color: 'warning', bold: true })]
+    const next = nextAlarm([...alarms, ...reminders.map(r => r.at)], now)
     return [...(next ? [words(Text, `${hhmm(now)}  ⏰ ${next}`, { dimColor: true })] : []), words(Text, hhmm(now), { dimColor: true })]
   },
-  pane: ({ ui: { Box, Text, Button }, now, weather, alarms, ringing, width, act }) => {
+  pane: ({ ui: { Box, Text, Button }, now, weather, alarms, reminders, ringing, width, act }) => {
     const rows = pixels(hhmm(now))
     const lines = weather ? weatherLines(weather, now) : []
     const beside = weather && width >= WIDE + Math.max(...lines.map(l => [...l].length))
-    const next = nextAlarm(alarms, now)
+    const all = [...new Set([...alarms, ...reminders.map(r => r.at)])]
+    const next = nextAlarm(all, now)
+    const why = reminders.find(r => r.at === next)?.note
     return (
       <Box flexDirection="column">
         <Box gap={6}>
@@ -83,7 +85,7 @@ export const pixelClock: Block = {
           </Box>
         ) : next ? (
           <Box marginTop={1}>
-            <Text dimColor wrap="truncate">{`⏰ ${alarms.length > 1 ? `next ${next} · ${alarms.length} set` : next}`}</Text>
+            <Text dimColor wrap="truncate">{`⏰ ${all.length > 1 ? `next ${next}` : next}${why ? ` · ${why}` : ''}${all.length > 1 ? ` · ${all.length} set` : ''}`}</Text>
           </Box>
         ) : null}
       </Box>

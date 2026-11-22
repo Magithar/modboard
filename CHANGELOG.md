@@ -28,6 +28,13 @@ modboard was called agent-board until 0.5.0.
 - **An alarm**: set `alarm` in `/config`, or `/board alarm 7:30` from the
   prompt (`/board alarm off` clears it). At its minute: a toast, a
   notification, a chime for up to a minute, and a **stop** button on the clock.
+- **Ring when it's done**: `board add "…" --ring` (or `board ring T-004`,
+  `--off` to undo) flags a task, and the pixel clock's alarm chimes three
+  times when it turns done, whoever finished it: Claude, Codex or a person.
+  `board_add` takes `ring: true` for agents.
+- **`board_alarm`**, a tool for Claude agents: ring now with a note, or once
+  at a time or in some minutes. At most once a minute for ringing now;
+  `/board alarm` lists the ones it set and `/board alarm off` clears them.
 
 ### Changed
 

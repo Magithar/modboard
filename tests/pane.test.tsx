@@ -1210,7 +1210,7 @@ test('an alarm set for this minute rings: toast, notification, sound, and a stop
   expect(notes).toEqual(["It's 09:41."])
   expect(played).toHaveLength(1)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
-  expect(await texts(band)).toEqual(['⏰ 09:41 ringing'])
+  expect(await texts(band)).toEqual(['⏰ 09:41'])
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   await pane.press({ key: 'alarm-stop' })
   expect(await texts(band)).toEqual(['09:41  ⏰ 09:41'])
@@ -1230,4 +1230,83 @@ test('/board alarm sets, lists and clears alarms, kept between sessions', { opti
   expect((kept.get('alarms') as any).times).toEqual(['07:05', '19:30'])
   expect(await run('alarm off 19:30')).toBe('Alarm set for 07:05.')
   expect(await run('alarm off')).toBe('Alarm off.')
+})
+
+// What rang: toasts and notifications, and how many chimes played.
+function bell(on: On) {
+  const rung = { toasts: [] as string[], notes: [] as string[], chimes: 0 }
+  on('ui.toast', (_$, e: any) => (rung.toasts.push(e.text), { value: undefined }))
+  on('ui.notify', (_$, e: any) => (rung.notes.push(e.text), { value: { isSent: true, channel: 'test' } }))
+  on('audio.play', () => (rung.chimes++, { value: undefined }))
+  on('clock.sleep', () => new Promise(() => {}) as any)
+  return rung
+}
+
+test('a task flagged to ring rings when it turns done, whoever finished it; one done before stays quiet', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
+  const flagged = { ...task('T-004', 'claimed', 'codex 1'), title: 'Ship release', ring: true }
+  const before = { ...task('T-001', 'done'), ring: true }
+  const list = [flagged, before, task('T-002', 'claimed', 'codex 1')]
+  host(on, list)
+  store(on)
+  const rung = bell(on)
+  await $.session.start(START)
+  await settle()
+  expect(rung.toasts.filter(t => t.startsWith('⏰'))).toEqual([])
+  // Codex finishes both; only the flagged one rings.
+  list[0] = { ...flagged, status: 'done', claim: null, notes: [{ at: '', by: 'codex 1', text: 'VERIFIED: tagged v1.0' }] }
+  list[2] = { ...task('T-002', 'done') }
+  // Any board tool reads the board again, as the 3-second poll does.
+  await $.tool.call({ tool: 'mcp__modboard__board_list' } as any)
+  await settle()
+  expect(rung.toasts).toContain('⏰ T-004 done · Ship release')
+  expect(rung.notes).toEqual(['T-004 done: Ship release (by codex 1)'])
+  expect(rung.chimes).toBe(3)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  expect(await texts(band)).toEqual(['⏰ T-004 done · Ship release'])
+})
+
+test('board_add with ring flags the task on the board', async ($, on) => {
+  const calls = host(on, [])
+  await $.session.start(START)
+  await $.tool.call({ tool: 'mcp__modboard__board_add', title: 'Ship release', ring: true } as any)
+  expect(calls.find(argv => argv.includes('add'))?.slice(2)).toEqual(['add', 'Ship release', '--ring', '--as', 'claude 1'])
+})
+
+test('board_alarm rings now with its note, but not twice in a minute, and needs a note', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  store(on)
+  const rung = bell(on)
+  await $.session.start(START)
+  const alarm = async (input: object) => ((await $.tool.call({ tool: 'mcp__modboard__board_alarm', ...input } as any)) as any).result
+  expect(await alarm({ note: '' })).toMatch(/needs a note/)
+  expect(await alarm({ note: 'deploy is green' })).toBe('rang the alarm: deploy is green')
+  await settle()
+  expect(rung.notes).toEqual(['deploy is green'])
+  expect(await alarm({ note: 'again' })).toMatch(/not twice in a minute/)
+})
+
+test('board_alarm sets a one-off alarm at a time or in minutes, shown on the clock and in /board alarm', { options: { band: 'pixel-clock', pane: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  await $.session.start(START)
+  const alarm = async (input: object) => ((await $.tool.call({ tool: 'mcp__modboard__board_alarm', ...input } as any)) as any).result
+  expect(await alarm({ note: 'check the deploy', inMinutes: 20 })).toBe('the alarm rings once at 10:01: check the deploy')
+  expect(await alarm({ note: 'standup', at: '6pm' })).toBe('the alarm rings once at 18:00: standup')
+  expect(await alarm({ note: 'x', at: 'soon' })).toMatch(/is not a time/)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await texts(pane)).toContain('⏰ next 10:01 · check the deploy · 2 set')
+  expect((kept.get('reminders') as any).map((r: any) => r.at)).toEqual(['10:01', '18:00'])
+  const listed = ((await $.command.run({ command: 'board', args: 'alarm' } as any)) as any).text
+  expect(listed).toBe('Once at 10:01: check the deploy\nOnce at 18:00: standup')
+})
+
+test('a one-off alarm rings once at its minute with its note, then is gone', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  const kept = store(on, { reminders: [{ at: '09:41', note: 'check the deploy' }, { at: '18:00', note: 'standup' }] })
+  const rung = bell(on)
+  await $.session.start(START)
+  await settle()
+  expect(rung.toasts).toContain('⏰ 09:41 · check the deploy')
+  expect(rung.notes).toEqual(['check the deploy'])
+  expect(kept.get('reminders')).toEqual([{ at: '18:00', note: 'standup' }])
 })

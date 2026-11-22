@@ -103,6 +103,7 @@ function describe(t) {
   const out = [line(t), '']
   if (t.description) out.push(t.description, '')
   if (t.accept) out.push(`Accept when: ${t.accept}`, '')
+  if (t.ring) out.push('Rings an alarm when done.', '')
   if (t.claim) out.push(`claimed by ${t.claim.owner} until ${t.claim.expiresAt}`)
   for (const n of t.notes) {
     out.push(`- [${n.at.slice(0, 16)}] ${n.by}: ${n.text}${n.check ? (n.check.ran ? ' (run by the board, passed)' : ' (passed, as reported)') : ''}`)
@@ -120,7 +121,8 @@ const ids = list => (list.length ? list.join(', ') : 'nothing')
 // What each command says to a person. --json prints the data instead, and
 // view and events (for programs) always do.
 const SAY = {
-  add: t => `added ${line(t)}`,
+  add: t => `added ${line(t)}${t.ring ? '\nit rings an alarm when done' : ''}`,
+  ring: t => (t.ring ? `${t.id} rings an alarm when done` : `${t.id} no longer rings when done`),
   claim: t => `claimed ${t.id}  ${t.title}\nit's yours until ${hhmm(t.claim.expiresAt)}; a note or heartbeat renews it`,
   heartbeat: r => `renewed ${ids(r.renewed)}`,
   note: t => `noted on ${t.id}; yours until ${hhmm(t.claim.expiresAt)}`,
@@ -158,13 +160,20 @@ const commands = {
     return flags.json ? t : describe(t)
   },
   async add(board, [title], flags) {
-    if (!title) throw new BoardError(2, 'usage: board add "<title>" [--desc "..."] [--accept "how to tell it is done"]')
+    if (!title) throw new BoardError(2, 'usage: board add "<title>" [--desc "..."] [--accept "how to tell it is done"] [--ring]')
     const by = text(flags.as) ?? process.env.BOARD_AGENT ?? (process.env.CODEX_THREAD_ID ? await actorOf(board, flags) : 'human')
     return board.add(by, {
       title,
       description: text(flags.desc),
       accept: text(flags.accept),
+      ring: !!flags.ring,
     })
+  },
+  // board ring <id>: ring an alarm when it is done. --off takes that back.
+  async ring(board, [id], flags) {
+    if (!id) throw new BoardError(2, 'usage: board ring <id> [--off]')
+    const by = text(flags.as) ?? process.env.BOARD_AGENT ?? (process.env.CODEX_THREAD_ID ? await actorOf(board, flags) : 'human')
+    return board.ring(id, by, !flags.off)
   },
   claim: async (board, [id], flags) => board.claim(id, await actorOf(board, flags)),
   heartbeat: async (board, _, flags) => board.heartbeat(await actorOf(board, flags)),
@@ -219,7 +228,8 @@ const commands = {
 // would otherwise be dropped without a word, and the task saved without it.
 const FLAGS = {
   list: ['all'],
-  add: ['desc', 'accept'],
+  add: ['desc', 'accept', 'ring'],
+  ring: ['off'],
   release: ['handoff'],
   check: ['passed'],
   done: ['note'],

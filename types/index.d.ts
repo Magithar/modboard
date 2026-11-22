@@ -3,6 +3,8 @@ export type Task = {
   title: string
   description: string
   accept?: string
+  // Ring an alarm when it is done (board add --ring, board ring <id>).
+  ring?: boolean
   status: 'todo' | 'claimed' | 'done'
   claim: { owner: string; since: string; expiresAt: string } | null
   notes: Note[]
@@ -35,8 +37,11 @@ export type Usage = {
 // A weather reading from Open-Meteo: `at` is when it came in, in ms.
 export type Weather = { temp: number; high: number; code: number; place: string; at: number }
 
+// A one-off alarm an agent set with board_alarm: it rings once at `at`, then goes.
+export type Reminder = { at: string; note: string }
+
 declare module 'claude-code' {
   interface PluginState {
-    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean>; boardError: string; copied: string; home: string; paneView: string; paneBlocks: string[]; weather: Weather | null; alarms: string[]; ringing: string; minute: string }
+    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean>; boardError: string; copied: string; home: string; paneView: string; paneBlocks: string[]; weather: Weather | null; alarms: string[]; ringing: string; minute: string; reminders: Reminder[] }
   }
 }
