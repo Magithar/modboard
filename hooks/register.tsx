@@ -496,7 +496,7 @@ function changes(before: string[], after: string[]) {
   return parts.join(' · ')
 }
 
-// Leaving the list (the Board tab, or modBOARD on the band): the board shows,
+// Leaving the list (modBOARD on the band, the logo): the board shows,
 // in its new order. Every tick and move was saved as it was made.
 async function leaveList($: EngineInterface) {
   await update($, paneView, () => 'board')
@@ -1071,9 +1071,6 @@ export const register: Register = (on, options) => {
       const tabs = (
         <Box flexDirection="column">
           <Box gap={4}>
-            <Button key="tab-board" plain onPress={() => leaveList($)}>
-              <Text dimColor>Board</Text>
-            </Button>
             {tab('blocks', 'Blocks')}
             {tab('order', 'Order')}
             {changed ? (
@@ -1084,7 +1081,7 @@ export const register: Register = (on, options) => {
               </Box>
             ) : null}
           </Box>
-          <Text color={CAP}>{view === 'blocks' ? `${' '.repeat(9)}━━━━━━` : `${' '.repeat(19)}━━━━━`}</Text>
+          <Text color={CAP}>{view === 'blocks' ? '━━━━━━' : `${' '.repeat(10)}━━━━━`}</Text>
         </Box>
       )
       if (view === 'blocks') {

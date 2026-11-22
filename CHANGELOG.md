@@ -9,7 +9,7 @@ modboard was called agent-board until 0.5.0.
 
 - **`blocks` on the band, before `modBOARD`**, in the logo's orange. It opens
   the pane at a list of the blocks the board can show; click a row to tick it
-  on or off, then **Board** (or `modBOARD`) to see the board. A newly ticked
+  on or off, then `modBOARD` to see the board. A newly ticked
   block goes last. Pressed again while the list shows, `blocks` closes the
   pane. The choice is kept between sessions; a `pane` setting changed in
   `/config` since wins over it.
@@ -45,7 +45,7 @@ modboard was called agent-board until 0.5.0.
   for a moment. The order is
   kept between sessions. Each tick and move is saved as it's
   made; at the right of the tabs, in yellow: `saved · added agents · order
-  changed`. A **Board** tab replaces **Done**. The **Blocks** tab ticks, as before.
+  changed`. **Done** is gone: `modBOARD` shows the board. The **Blocks** tab ticks, as before.
 
 ### Changed
 

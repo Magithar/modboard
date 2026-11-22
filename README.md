@@ -354,7 +354,7 @@ can show. On **Blocks**, a click ticks one on or off. On **Order**, the
 ticked blocks are numbered in the board's order, and **▲** and **▼** move one
 a place (grey where there's no room to move). Each click is saved as it's
 made; at the right of the tabs, in yellow, is what changed:
-`saved · added agents · order changed`. **Board** (or `modBOARD`) shows the
+`saved · added agents · order changed`. `modBOARD` on the band shows the
 board. The choice is kept between sessions, until `pane` is changed in
 `/config`.
 
