@@ -67,7 +67,6 @@ it might be stale.
 
 ### Changed
 
-
 - **A crashed session's work shows as unfinished.** When the board frees a
   task because its session went silent, or its lease ran out, and its agent
   had recorded work on it (a note or a check), it writes a handoff for it:
