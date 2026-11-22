@@ -1087,7 +1087,8 @@ export const register: Register = (on, options) => {
       if (view === 'blocks') {
         const pad = Math.max(...offered.map(b => b.name.length)) + 2
         return (
-          <Box flexDirection="column" paddingX={1}>
+          // A blank line under the last row, on both tabs.
+          <Box flexDirection="column" paddingX={1} paddingBottom={1}>
             {tabs}
             <Box flexDirection="column" marginTop={1} paddingLeft={2}>
               {offered.map(b => (
@@ -1121,7 +1122,7 @@ export const register: Register = (on, options) => {
           <Text dimColor>{label}</Text>
         )
       return (
-        <Box flexDirection="column" paddingX={1}>
+        <Box flexDirection="column" paddingX={1} paddingBottom={1}>
           {tabs}
           <Box flexDirection="column" marginTop={1} paddingLeft={2}>
             {ticked.length ? (
