@@ -1507,11 +1507,13 @@ test('▲ and ▼ move a block a place; the board follows and the order is kept;
   expect(await pane.find({ key: 'tab-order' })).toBeFalsy()
 })
 
-test('every row\'s buttons line up: a missing button leaves a blank as wide', ORDER, async ($, on) => {
+test('every row shows ▲ and ▼; the first row\'s ▲ and the last row\'s ▼ are grey and do nothing', ORDER, async ($, on) => {
   host(on, [])
   store(on)
   const pane = await openOrder($, on)
-  const blanks = ((await texts(pane)) as string[]).filter(t => /^ +$/.test(t))
-  // work: no ▲; pixel-clock: no ▼. Each blank is as wide as the button.
-  expect(blanks).toEqual(['     ', '     '])
+  const arrows = ((await pane.findAll({ type: 'Text' })) as any[]).filter(t => /^\[ [▲▼] \]$/.test(t.text))
+  expect(arrows).toHaveLength(8)
+  expect(arrows.filter(t => t.props.dimColor).map(t => t.text)).toEqual(['[ ▲ ]', '[ ▼ ]'])
+  expect(await pane.find({ key: 'up-work' })).toBeFalsy()
+  expect(await pane.find({ key: 'down-pixel-clock' })).toBeFalsy()
 })

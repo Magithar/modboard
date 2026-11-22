@@ -1070,8 +1070,8 @@ export const register: Register = (on, options) => {
           </Box>
         )
       }
-      // ▲ and ▼ each fill a fixed column, or a blank as wide where they would
-      // do nothing (▲ on the first row, ▼ on the last), so the rows line up.
+      // ▲ and ▼ on every row, in two fixed columns; where one would do nothing
+      // (▲ on the first row, ▼ on the last) it is grey and can't be pressed.
       const pad = Math.max(0, ...ticked.map(n => n.length)) + 3
       const last = ticked.length - 1
       const slot = (key: string, label: string, show: boolean, to: number, name: string) =>
@@ -1082,7 +1082,8 @@ export const register: Register = (on, options) => {
             </Text>
           </Button>
         ) : (
-          <Text>{' '.repeat(label.length)}</Text>
+          // Grey and not pressable: ▲ on the first row, ▼ on the last.
+          <Text dimColor>{label}</Text>
         )
       return (
         <Box flexDirection="column" paddingX={1}>
