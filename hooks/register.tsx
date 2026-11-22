@@ -62,6 +62,8 @@ const ringing = atom({ plugin: 'modboard', key: 'ringing' } as const, '')
 // One-off alarms an agent set with board_alarm: each rings once, then goes.
 // Whether the weather has a place to be read for; the clock says how to give one when not.
 const located = atom({ plugin: 'modboard', key: 'located' } as const, false)
+// The tasks seen done at the last read, or null before the first (see ringFinished).
+const seenDone = atom({ plugin: 'modboard', key: 'seenDone' } as const, null as string[] | null)
 const reminders = atom({ plugin: 'modboard', key: 'reminders' } as const, [] as Reminder[])
 const TICK_MS = 5_000
 const WEATHER_MS = 20 * 60_000
@@ -523,15 +525,16 @@ async function loadReminders($: EngineInterface) {
 // A task flagged to ring (board add --ring, board ring <id>) that turned done
 // since the last read rings, whoever finished it: Claude, Codex or a person.
 // Null until the first read, so tasks done before this session stay quiet.
-let seenDone: Set<string> | null = null
-
+// Kept in the session's state, not the module: a reload (an edit, or a board
+// written inside a --plugin-dir folder) would otherwise forget it, and a task
+// done across the reload would never ring.
 async function ringFinished($: EngineInterface, list: Task[]) {
-  const done = new Set(list.filter(t => t.status === 'done').map(t => t.id))
-  const before = seenDone
-  seenDone = done
+  const done = list.filter(t => t.status === 'done').map(t => t.id)
+  const before = await read($, seenDone)
+  if (!before || !same(before, done)) await update($, seenDone, () => done)
   if (!before) return
   for (const t of list)
-    if (t.ring && t.status === 'done' && !before.has(t.id)) {
+    if (t.ring && t.status === 'done' && !before.includes(t.id)) {
       const by = t.notes.at(-1)?.by
       void ring($, `${t.id} done · ${t.title}`, `${t.id} done: ${t.title}${by ? ` (by ${by})` : ''}`, { loop: false })
     }

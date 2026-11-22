@@ -1393,3 +1393,17 @@ test('board_location lets Claude ask when the person says to add a location for 
   expect(out).toBe('Weather for Bengaluru. Change it with /board location.')
   expect((kept.get('location') as any).name).toBe('Bengaluru')
 })
+
+test('a task done while the mod reloads still rings: what was seen done outlives the reload', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
+  const list = [{ ...task('T-003', 'claimed', 'me'), title: 'Alarm demo', ring: true }]
+  host(on, list)
+  store(on)
+  const rung = bell(on)
+  await $.session.start(START)
+  await settle()
+  list[0] = { ...list[0]!, status: 'done', claim: null }
+  // A reload runs session.start again; the next read must still ring.
+  await $.session.start(START)
+  await settle()
+  expect(rung.toasts).toContain('⏰ T-003 done · Alarm demo')
+})
