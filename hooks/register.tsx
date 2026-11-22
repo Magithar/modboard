@@ -1063,7 +1063,8 @@ export const register: Register = (on, options) => {
           </Text>
         </Button>
       )
-      // What Done will change, in yellow beside the tabs, as you tick and move.
+      // What Done will change, in yellow at the right end of the tabs' line, as
+      // you tick and move.
       const changed = changes(await read($, listStart), chosen)
       const tabs = (
         <Box flexDirection="column">
@@ -1071,9 +1072,11 @@ export const register: Register = (on, options) => {
             {tab('blocks', 'Blocks')}
             {tab('order', 'Order')}
             {changed ? (
-              <Text color="warning" wrap="truncate">
-                {changed}
-              </Text>
+              <Box flexGrow={1} justifyContent="flex-end">
+                <Text color="warning" wrap="truncate">
+                  {changed}
+                </Text>
+              </Box>
             ) : null}
           </Box>
           <Text color={CAP}>{view === 'blocks' ? '━━━━━━' : `${' '.repeat(10)}━━━━━`}</Text>

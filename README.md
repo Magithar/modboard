@@ -352,7 +352,7 @@ names still work.
 Or click **blocks** on the band: the pane turns to a list of the blocks it
 can show, on two tabs. On **Blocks**, a click ticks one on or off. On
 **Order**, the ticked blocks are numbered in the board's order, and **▲**
-and **▼** move one a place (grey where there's no room to move). Beside the tabs, in yellow, is what
+and **▼** move one a place (grey where there's no room to move). At the right of the tabs, in yellow, is what
 **Done** will change: `added agents · order changed`. **Done** shows the board. The
 choice is kept between sessions, until `pane` is changed in `/config`.
 
