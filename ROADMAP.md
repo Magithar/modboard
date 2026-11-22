@@ -5,6 +5,30 @@ promised by a date. Shipped work goes in the [changelog](CHANGELOG.md).
 
 ## Next
 
+### Checks: command blocks that keep their last result
+
+Your command blocks (tests, CI, anything with an output) gathered under one
+heading, each keeping its last good result when the command stops working,
+and saying how old it is.
+
+```
+▾ Checks
+
+  tests   ✓ 42 passed · login · 12 min ago
+  ci      success · not updating since 14:02
+```
+
+- A `checks` block, ticked and moved like any other, shows every command
+  block under a **Checks** heading, in the order the `blocks` setting names
+  them. Folded, one line: `▸ Checks · tests ✓ · ci ✓`.
+- A command that fails keeps its last good output instead of going blank.
+- A result older than 5 minutes says its age in grey; one whose command has
+  failed for 5 minutes says `not updating since 14:02` in yellow, and the
+  folded heading turns yellow too. Both times are settings.
+- A command that has never succeeded says so in the pane, rather than
+  showing nothing.
+- In the pane only; the band stays as it is.
+
 ### Colours: `/board colours`
 
 Change the board's colours without touching a setting. `/board colours`
