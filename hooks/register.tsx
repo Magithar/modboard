@@ -480,8 +480,8 @@ async function askLocation($: EngineInterface): Promise<string> {
 
 // Done on the list of blocks with the pixel clock ticked asks once, while no
 // location is set and the person hasn't answered before.
-// What changed on the list since it opened, in one line for a toast:
-// "added agents · removed todo · order: pixel-clock, work, usage".
+// What changed on the list since it opened, in one line beside the tabs:
+// "added agents · removed todo · order changed", or '' for nothing.
 function changes(before: string[], after: string[]) {
   const added = after.filter(n => !before.includes(n))
   const removed = before.filter(n => !after.includes(n))
@@ -490,16 +490,15 @@ function changes(before: string[], after: string[]) {
   const parts = [
     added.length ? `added ${added.join(', ')}` : '',
     removed.length ? `removed ${removed.join(', ')}` : '',
-    reordered ? `order: ${after.join(', ')}` : '',
+    reordered ? 'order changed' : '',
   ].filter(Boolean)
-  return parts.length ? `board: ${parts.join(' · ')}` : 'board: no changes'
+  return parts.join(' · ')
 }
 
-// Leaving the list (Done, or modBOARD on the band): the board shows, a toast
-// says what changed, and a newly ticked pixel clock may ask for a location.
+// Leaving the list (Done, or modBOARD on the band): the board shows, in its
+// new order, and a newly ticked pixel clock may ask for a location.
 async function leaveList($: EngineInterface) {
   await update($, paneView, () => 'board')
-  $.ui.toast(changes(await read($, listStart), await read($, paneBlocks)))
   void askOnDone($)
 }
 
@@ -1064,11 +1063,18 @@ export const register: Register = (on, options) => {
           </Text>
         </Button>
       )
+      // What Done will change, in yellow beside the tabs, as you tick and move.
+      const changed = changes(await read($, listStart), chosen)
       const tabs = (
         <Box flexDirection="column">
           <Box gap={4}>
             {tab('blocks', 'Blocks')}
             {tab('order', 'Order')}
+            {changed ? (
+              <Text color="warning" wrap="truncate">
+                {changed}
+              </Text>
+            ) : null}
           </Box>
           <Text color={CAP}>{view === 'blocks' ? '━━━━━━' : `${' '.repeat(10)}━━━━━`}</Text>
         </Box>

@@ -43,8 +43,8 @@ modboard was called agent-board until 0.5.0.
 - **An Order tab on the list of blocks**: the ticked blocks, numbered in the
   board's order, with **▲ ▼** to move one a place. The moved row lights up
   for a moment. The order is
-  kept between sessions. **Done** says what changed: blocks added or removed,
-  the new order, or no changes. The **Blocks** tab ticks, as before.
+  kept between sessions. Beside the tabs, in yellow, what **Done** will
+  change: `added agents · removed todo · order changed`. The **Blocks** tab ticks, as before.
 
 ### Changed
 
