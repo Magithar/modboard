@@ -133,7 +133,8 @@ export const pixelClock: Block = {
           {!open ? <Text dimColor wrap="truncate">{` · ${brief.join(' · ')}`}</Text> : null}
         </Box>
         {open ? (
-          <Box marginTop={1} paddingLeft={2}>
+          // A blank line under the clock, so it doesn't sit on the pane's edge.
+          <Box marginTop={1} marginBottom={1} paddingLeft={2}>
             {content}
           </Box>
         ) : null}
