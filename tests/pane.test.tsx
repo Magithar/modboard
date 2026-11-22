@@ -1407,3 +1407,15 @@ test('a task done while the mod reloads still rings: what was seen done outlives
   await settle()
   expect(rung.toasts).toContain('⏰ T-003 done · Alarm demo')
 })
+
+test('stop is bold green, like Done, beside the yellow alarm line', { options: { pane: 'pixel-clock', alarm: '9:41' } } as any, async ($, on) => {
+  host(on, [])
+  store(on)
+  bell(on)
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const stop = (await pane.find({ type: 'Text', text: 'stop' }))?.props
+  expect([stop?.color, stop?.bold]).toEqual(['success', true])
+  expect((await pane.find({ type: 'Text', text: '⏰ 09:41  ' }))?.props.color).toBe('warning')
+})

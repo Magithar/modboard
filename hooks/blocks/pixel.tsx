@@ -85,7 +85,7 @@ export const pixelClock: Block = {
           <Box marginTop={1}>
             <Text bold color="warning">{`⏰ ${ringing}  `}</Text>
             <Button key="alarm-stop" plain onPress={() => act.stopAlarm()}>
-              <Text bold color="warning">stop</Text>
+              <Text bold color="success">stop</Text>
             </Button>
           </Box>
         ) : next ? (
