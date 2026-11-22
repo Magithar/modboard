@@ -60,6 +60,8 @@ const weather = atom({ plugin: 'modboard', key: 'weather' } as const, null as We
 const alarms = atom({ plugin: 'modboard', key: 'alarms' } as const, [] as string[])
 const ringing = atom({ plugin: 'modboard', key: 'ringing' } as const, '')
 // One-off alarms an agent set with board_alarm: each rings once, then goes.
+// Whether the weather has a place to be read for; the clock says how to give one when not.
+const located = atom({ plugin: 'modboard', key: 'located' } as const, false)
 const reminders = atom({ plugin: 'modboard', key: 'reminders' } as const, [] as Reminder[])
 const TICK_MS = 5_000
 const WEATHER_MS = 20 * 60_000
@@ -343,35 +345,64 @@ function after(cycle: string[], current: string) {
 }
 
 // ── The weather ─────────────────────────────────────────────────────────────
-// Open-Meteo needs no key. Only the location set in /config is sent, through
-// Claude Code's own fetch, so the organization's network policy holds.
+// Open-Meteo needs no key. Nothing is sent until there is a location: the one
+// set in /config, else the one the person gave when asked (kept between
+// sessions). Only that location is sent, through Claude Code's own fetch, so
+// the organization's network policy holds. "Use my location" asks ipapi.co
+// for the city of this machine's IP, once, and keeps that city.
 
 type Place = { latitude: number; longitude: number; name: string }
 let place: Place | null = null
-let weatherSetting = ''
+let configLocation = ''
 let fahrenheit = false
+const ASK_LOCATION = 'Show the weather beside the clock? Type your city under Other, or:'
+const FROM_IP = 'Use my location (from my IP)'
+const NOT_NOW = 'Not now'
+const LOCATION_TOOL =
+  "Ask the person where they are, for the weather beside modboard's pixel clock: a question with their location from their IP, " +
+  'or a city they type. Call it when they ask to add, set or change the weather location. It asks them itself; pass nothing.'
 
-// "Bengaluru" is looked up once a session; "12.97,77.59" is used as it is.
-async function locate($: EngineInterface): Promise<Place | null> {
-  if (place) return place
-  const coords = weatherSetting.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/)
-  if (coords) return (place = { latitude: Number(coords[1]), longitude: Number(coords[2]), name: weatherSetting.trim() })
-  const found = await $.http.fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(weatherSetting.trim())}`)
+// "Bengaluru" is looked up; "12.97,77.59" is used as it is.
+async function lookUp($: EngineInterface, text: string): Promise<Place | null> {
+  const coords = text.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/)
+  if (coords) return { latitude: Number(coords[1]), longitude: Number(coords[2]), name: text.trim() }
+  const found = await $.http.fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(text.trim())}`)
   if (!found.ok) return null
   const first = (JSON.parse(found.text) as { results?: Place[] }).results?.[0]
-  if (!first) {
-    $.ui.toast(`board: no place called "${weatherSetting.trim()}" for the weather`)
-    return null
+  return first ? { latitude: first.latitude, longitude: first.longitude, name: first.name } : null
+}
+
+async function fromIp($: EngineInterface): Promise<Place | null> {
+  const out = await $.http.fetch('https://ipapi.co/json/')
+  if (!out.ok) return null
+  const at = JSON.parse(out.text) as { city?: string; latitude?: number; longitude?: number }
+  return typeof at.latitude === 'number' && typeof at.longitude === 'number' ? { latitude: at.latitude, longitude: at.longitude, name: at.city || 'here' } : null
+}
+
+const weatherKey = () => `${place?.latitude},${place?.longitude}|${fahrenheit}`
+
+// The place to read the weather for: /config's, looked up once a session;
+// else the one kept from the question; else none, and nothing is fetched.
+async function loadPlace($: EngineInterface) {
+  if (configLocation.trim()) {
+    // Offline, the place this setting was found at last time.
+    const kept: any = await $.store.get('configPlace').catch(() => undefined)
+    const looked = await lookUp($, configLocation).catch(() => undefined)
+    place = looked ?? (kept && kept.from === configLocation ? (kept.place as Place) : null)
+    if (looked) await $.store.set('configPlace', { from: configLocation, place: looked }).catch(() => {})
+    if (looked === null) $.ui.toast(`board: no place called "${configLocation.trim()}" for the weather`)
+  } else {
+    const kept: any = await $.store.get('location').catch(() => undefined)
+    place = kept && typeof kept.latitude === 'number' ? (kept as Place) : null
   }
-  return (place = { latitude: first.latitude, longitude: first.longitude, name: first.name })
+  await update($, located, () => !!place)
 }
 
 // A failed fetch keeps the last reading; the block says how old it is.
 async function fetchWeather($: EngineInterface) {
-  if (!weatherSetting.trim()) return
+  if (!place) return
   try {
-    const at = await locate($)
-    if (!at) return
+    const at = place
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${at.latitude}&longitude=${at.longitude}` +
       `&current=temperature_2m,weather_code&daily=temperature_2m_max&forecast_days=1&timezone=auto` +
@@ -387,8 +418,41 @@ async function fetchWeather($: EngineInterface) {
       at: await $.clock.now(),
     }
     await update($, weather, () => reading)
-    await $.store.set('weather', { from: `${weatherSetting}|${fahrenheit}`, reading }).catch(() => {})
+    await $.store.set('weather', { from: weatherKey(), reading }).catch(() => {})
   } catch {}
+}
+
+// Asks where the person is: their IP's city, a city they type, or not now.
+// Esc or Not now: no weather, and Done doesn't ask again; /board location or
+// asking Claude does. Returns what to tell them.
+async function askLocation($: EngineInterface): Promise<string> {
+  if (configLocation.trim()) return `The weather location is set in /config: ${configLocation.trim()}. Change it there.`
+  let answer: string
+  try {
+    answer = await $.ui.ask(ASK_LOCATION, { header: 'Weather', options: [FROM_IP, NOT_NOW] })
+  } catch {
+    answer = NOT_NOW
+  }
+  if (answer === NOT_NOW || !answer.trim()) {
+    await $.store.set('locationAsked', true).catch(() => {})
+    return 'No weather for now. Type /board location, or ask Claude to add a location for the weather, when you want it.'
+  }
+  const found = await (answer === FROM_IP ? fromIp($) : lookUp($, answer)).catch(() => null)
+  if (!found) return answer === FROM_IP ? "board: couldn't tell your location from your IP; try /board location and type your city" : `board: no place called "${answer.trim()}"; try /board location again`
+  place = found
+  await $.store.set('location', found).catch(() => {})
+  await $.store.set('locationAsked', true).catch(() => {})
+  await update($, located, () => true)
+  await fetchWeather($)
+  return `Weather for ${found.name}. Change it with /board location.`
+}
+
+// Done on the list of blocks with the pixel clock ticked asks once, while no
+// location is set and the person hasn't answered before.
+async function askOnDone($: EngineInterface) {
+  if (place || configLocation.trim() || !(await read($, paneBlocks)).includes('pixel-clock')) return
+  if (await $.store.get('locationAsked').catch(() => false)) return
+  $.ui.toast(await askLocation($))
 }
 
 // ── The alarm ───────────────────────────────────────────────────────────────
@@ -651,7 +715,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
 // Everything a drawing reads, asked for at once: a pane is drawn again on
 // every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
-  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow] =
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow] =
     await Promise.all([
       $.clock.now(),
       read($, me),
@@ -671,6 +735,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
       read($, alarms),
       read($, ringing),
       read($, reminders),
+      read($, located),
       // Read so a drawing of the clock redraws when the minute turns.
       read($, minute),
     ])
@@ -695,6 +760,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     alarms: alarmsNow,
     ringing: ringingNow,
     reminders: remindersNow,
+    located: locatedNow,
     act,
   }
 }
@@ -712,7 +778,7 @@ export const register: Register = (on, options) => {
   paneChoosable = choosable.map(b => b.name)
   paneFromSetting = fromSetting
   reads(fromSetting)
-  weatherSetting = String(options.location ?? '')
+  configLocation = String(options.location ?? '')
   fahrenheit = /^f/i.test(String(options.units ?? ''))
   alarmSetting = String(options.alarm ?? '')
   place = null
@@ -760,7 +826,8 @@ export const register: Register = (on, options) => {
       },
       isDeferred: false,
     })
-    await $.command.register({ name: 'board', description: 'Open the modboard pane · /board alarm 7:30 sets an alarm, /board alarm off clears it' })
+    await $.tool.register({ name: 'board_location', description: LOCATION_TOOL, inputSchema: { type: 'object', properties: {}, required: [] }, isDeferred: false })
+    await $.command.register({ name: 'board', description: 'Open the modboard pane · /board alarm 7:30 sets an alarm, /board alarm off clears it · /board location sets the weather\'s' })
     await estimateContext($)
     await loadPane($)
 
@@ -768,14 +835,13 @@ export const register: Register = (on, options) => {
     await loadReminders($)
     await tick($)
     $.clock.every(TICK_MS, () => tick($).catch(() => {}))
-    // Weather, only once a location is set: the last reading at once, then
+    // Weather, only once there is a location: the last reading at once, then
     // a fresh one, then one every 20 minutes.
-    if (weatherSetting.trim()) {
-      const kept: any = await $.store.get('weather').catch(() => undefined)
-      if (kept && kept.from === `${weatherSetting}|${fahrenheit}` && kept.reading) await update($, weather, () => kept.reading as Weather)
-      void fetchWeather($)
-      $.clock.every(WEATHER_MS, () => fetchWeather($).catch(() => {}))
-    }
+    await loadPlace($)
+    const kept: any = await $.store.get('weather').catch(() => undefined)
+    if (place && kept && kept.from === weatherKey() && kept.reading) await update($, weather, () => kept.reading as Weather)
+    void fetchWeather($)
+    $.clock.every(WEATHER_MS, () => fetchWeather($).catch(() => {}))
 
     await refresh($)
     $.clock.every(POLL_MS, () => refresh($).catch(() => {}))
@@ -797,6 +863,10 @@ export const register: Register = (on, options) => {
       await refresh($)
       return { result: out.ok ? out.text : `error: ${out.text}` }
     }).catch(() => ({ result: 'error: the board CLI could not run (is node on PATH?)' }))
+
+  on('tool.call', { tool: 'mcp__modboard__board_location' } as any, async $ => ({ result: await askLocation($) })).catch(() => ({
+    result: 'error: could not ask for the location',
+  }))
 
   on('tool.call', { tool: 'mcp__modboard__board_alarm' } as any, async ($, e: any) => ({ result: await agentAlarm($, e) })).catch(() => ({
     result: 'error: the alarm could not be set',
@@ -846,6 +916,7 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'board' }, async ($, e) => {
     const [sub, ...rest] = (e.args ?? '').trim().split(/\s+/)
     if (sub === 'alarm') return { text: await alarmCommand($, rest.join(' ')) }
+    if (sub === 'location') return { text: await askLocation($) }
     const opened = await openBoard($)
     if (opened.isPlaced) return { text: 'Board pane opened.' }
     const list = (await read($, tasks)).filter(t => t.status !== 'done')
@@ -920,7 +991,7 @@ export const register: Register = (on, options) => {
             ))}
           </Box>
           <Box marginTop={1} paddingLeft={2}>
-            <Button key="blocks-done" plain onPress={() => update($, paneView, () => 'board')}>
+            <Button key="blocks-done" plain onPress={async () => (await update($, paneView, () => 'board'), void askOnDone($))}>
               <Text bold color="success">Done</Text>
             </Button>
           </Box>

@@ -184,7 +184,7 @@ board ring T-001                          # ring the alarm when it's done; --off
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
 `board_claim`, `board_note`, `board_check`, `board_release`, `board_done`
-and `board_alarm`. Any tool call renews the session's claims.
+`board_alarm` and `board_location`. Any tool call renews the session's claims.
 
 The CLI and the tools use the board's precise terms (claim, release, handoff,
 lease), because agents act on them. The display uses plain words, so you can
@@ -373,13 +373,21 @@ In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
 
 | Setting | Default | What it is |
 |---|---|---|
-| `location` | empty | a city (`Bengaluru`) or `latitude,longitude` for the weather |
+| `location` | empty | a city (`Bengaluru`) or `latitude,longitude` for the weather; empty, modboard asks |
 | `units` | `celsius` | `celsius` or `fahrenheit` |
 | `alarm` | empty | times to ring at, comma-separated: `07:30, 6:45pm` |
 
+- **Where you are**: tick `pixel-clock` and press **Done**, and modboard asks
+  once: *Use my location (from my IP)*, *Not now*, or type your city under
+  **Other**. Esc or *Not now* means no weather, and it doesn't ask again; the
+  clock says `weather: /board location` instead. Later, type
+  `/board location`, or ask Claude to add a location for the weather (it calls
+  `board_location`), and it asks again. Your answer is kept between sessions;
+  `location` in `/config`, when set, wins over it. *Use my location* sends
+  your IP to [ipapi.co](https://ipapi.co) once, for its city, and keeps that.
 - **Weather** comes from [Open-Meteo](https://open-meteo.com), which needs no
   key, through Claude Code's own fetch, so it follows your organization's
-  network policy. Nothing is sent until `location` is set, and only that
+  network policy. Nothing is sent until there's a location, and only that
   location is sent. It's read every 20 minutes; offline, the last reading
   stays and says how old it is.
 - **The alarm** rings at its minute: a toast, a notification, a chime for up

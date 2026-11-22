@@ -35,6 +35,11 @@ modboard was called agent-board until 0.5.0.
 - **`board_alarm`**, a tool for Claude agents: ring now with a note, or once
   at a time or in some minutes. At most once a minute for ringing now;
   `/board alarm` lists the ones it set and `/board alarm off` clears them.
+- **modboard asks where you are** for the weather, once, when you tick
+  `pixel-clock` and press **Done**: your IP's city, a city you type, or not
+  now. Esc means no weather; `/board location`, or asking Claude (the
+  `board_location` tool), asks again. Kept between sessions; `location` in
+  `/config` wins over it.
 
 ### Changed
 

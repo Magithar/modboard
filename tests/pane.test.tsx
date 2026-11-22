@@ -1144,7 +1144,9 @@ function openMeteo(on: On, { down = false } = {}) {
   on('http.fetch', (_$, e: any) => {
     urls.push(e.url)
     if (down) return { value: { status: 503, ok: false, headers: {}, text: '' } }
-    const text = e.url.includes('geocoding')
+    const text = e.url === 'https://ipapi.co/json/'
+      ? JSON.stringify({ city: 'Bengaluru', latitude: 12.97, longitude: 77.59 })
+      : e.url.includes('geocoding')
       ? JSON.stringify({ results: [{ latitude: 12.97, longitude: 77.59, name: 'Bengaluru' }] })
       : JSON.stringify({ current: { temperature_2m: 18.4, weather_code: 0 }, daily: { temperature_2m_max: [24.2] } })
     return { value: { status: 200, ok: true, headers: {}, text } }
@@ -1181,12 +1183,12 @@ test('with no location set, nothing is fetched and the clock stands alone', { op
   await settle()
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   expect(urls).toEqual([])
-  expect(await texts(pane)).toHaveLength(3)
+  expect((await texts(pane)).slice(3)).toEqual(['weather: /board location'])
 })
 
 test('offline, the weather keeps the last reading and says how old it is', PIXEL, async ($, on) => {
   host(on, [])
-  store(on, { weather: { from: 'Bengaluru|false', reading: { temp: 21, high: 26, code: 61, place: 'Bengaluru', at: NOW - 90 * 60_000 } } })
+  store(on, { configPlace: { from: 'Bengaluru', place: { latitude: 12.97, longitude: 77.59, name: 'Bengaluru' } }, weather: { from: '12.97,77.59|false', reading: { temp: 21, high: 26, code: 61, place: 'Bengaluru', at: NOW - 90 * 60_000 } } })
   openMeteo(on, { down: true })
   await $.session.start(START)
   await settle()
@@ -1309,4 +1311,85 @@ test('a one-off alarm rings once at its minute with its note, then is gone', { o
   expect(rung.toasts).toContain('⏰ 09:41 · check the deploy')
   expect(rung.notes).toEqual(['check the deploy'])
   expect(kept.get('reminders')).toEqual([{ at: '18:00', note: 'standup' }])
+})
+
+// The question dialog, answered with `answer`; undefined stands for Esc.
+function asks(on: On, answer: string | undefined) {
+  const asked: string[] = []
+  on('tool.call', { tool: 'AskUserQuestion' } as any, (_$, e: any) => {
+    const question = e.questions?.[0]?.question
+    asked.push(question)
+    if (answer === undefined) throw new Error('dismissed')
+    return { result: { questions: e.questions, answers: { [question]: answer } } } as any
+  })
+  return asked
+}
+
+const pickClock = async ($: any) => {
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await pane.press({ key: 'pick-pixel-clock' })
+  await pane.press({ key: 'blocks-done' })
+  await settle()
+  return pane
+}
+const CHOOSE = { options: { band: 'summary,board' } } as any
+
+test('ticking the pixel clock and pressing Done asks for a location; a typed city gets the weather', CHOOSE, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  openMeteo(on)
+  const asked = asks(on, 'Bengaluru')
+  const pane = await pickClock($)
+  expect(asked).toHaveLength(1)
+  expect(await texts(pane)).toContain('☀  18°')
+  expect((kept.get('location') as any).name).toBe('Bengaluru')
+})
+
+test('Use my location reads the city from the IP, once', CHOOSE, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  const urls = openMeteo(on)
+  asks(on, 'Use my location (from my IP)')
+  await $.session.start(START)
+  await pickClock($)
+  expect((kept.get('location') as any).name).toBe('Bengaluru')
+  expect(urls.filter(u => u === 'https://ipapi.co/json/')).toHaveLength(1)
+  expect(urls.some(u => u.startsWith('https://api.open-meteo.com/'))).toBe(true)
+})
+
+test('Esc means no weather and Done does not ask again; /board location asks again', CHOOSE, async ($, on) => {
+  host(on, [])
+  store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  const urls = openMeteo(on)
+  const asked = asks(on, undefined)
+  await $.session.start(START)
+  const pane = await pickClock($)
+  expect(asked).toHaveLength(1)
+  expect(urls).toEqual([])
+  expect(await texts(pane)).toContain('weather: /board location')
+  // Done again: no second question.
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  await pane.press({ key: 'blocks-done' })
+  await settle()
+  expect(asked).toHaveLength(1)
+  const said = ((await $.command.run({ command: 'board', args: 'location' } as any)) as any).text
+  expect(asked).toHaveLength(2)
+  expect(said).toMatch(/No weather for now/)
+})
+
+test('board_location lets Claude ask when the person says to add a location for the weather', async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  openMeteo(on)
+  asks(on, 'Bengaluru')
+  await $.session.start(START)
+  const out = ((await $.tool.call({ tool: 'mcp__modboard__board_location' } as any)) as any).result
+  expect(out).toBe('Weather for Bengaluru. Change it with /board location.')
+  expect((kept.get('location') as any).name).toBe('Bengaluru')
 })

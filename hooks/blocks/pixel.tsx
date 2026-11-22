@@ -44,7 +44,7 @@ export const pixelClock: Block = {
     const next = nextAlarm([...alarms, ...reminders.map(r => r.at)], now)
     return [...(next ? [words(Text, `${hhmm(now)}  ⏰ ${next}`, { dimColor: true })] : []), words(Text, hhmm(now), { dimColor: true })]
   },
-  pane: ({ ui: { Box, Text, Button }, now, weather, alarms, reminders, ringing, width, act }) => {
+  pane: ({ ui: { Box, Text, Button }, now, weather, alarms, reminders, located, ringing, width, act }) => {
     const rows = pixels(hhmm(now))
     const lines = weather ? weatherLines(weather, now) : []
     const beside = weather && width >= WIDE + Math.max(...lines.map(l => [...l].length))
@@ -71,6 +71,11 @@ export const pixelClock: Block = {
             </Box>
           ) : null}
         </Box>
+        {!weather && !located ? (
+          <Text dimColor wrap="truncate">
+            weather: /board location
+          </Text>
+        ) : null}
         {weather && !beside ? (
           <Text dimColor wrap="truncate">
             {lines.join('  ·  ')}

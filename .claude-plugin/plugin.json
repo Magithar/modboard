@@ -50,7 +50,7 @@
     "location": {
       "type": "string",
       "title": "Weather location",
-      "description": "A city (Bengaluru) or latitude,longitude (12.97,77.59) for the weather beside the pixel clock and the weather block. Empty: no weather, and nothing is sent. Only this location is sent, to Open-Meteo.",
+      "description": "A city (Bengaluru) or latitude,longitude (12.97,77.59) for the weather beside the pixel clock and the weather block. Empty: modboard asks you once when you tick the pixel clock (/board location asks again); nothing is sent before then. Only this location is sent, to Open-Meteo.",
       "default": ""
     },
     "units": {
@@ -69,7 +69,8 @@
   "network": {
     "hosts": [
       "api.open-meteo.com",
-      "geocoding-api.open-meteo.com"
+      "geocoding-api.open-meteo.com",
+      "ipapi.co"
     ]
   }
 }
