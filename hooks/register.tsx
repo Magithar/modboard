@@ -178,11 +178,15 @@ async function moveBlock($: EngineInterface, name: string, to: number, shown: st
   // Hidden blocks (named in `pane`, off the list) keep their places.
   let k = 0
   const names = now.map(n => (shown.includes(n) ? order[k++]! : n))
+  // The move and the light show at once; saving and the light's fading go on
+  // after the press returns, so the next press never waits for them.
   await update($, paneBlocks, () => names)
-  await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
   await update($, moved, () => name)
-  await $.clock.sleep(MOVED_MS)
-  await update($, moved, now => (now === name ? '' : now))
+  void $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
+  void (async () => {
+    await $.clock.sleep(MOVED_MS)
+    await update($, moved, now => (now === name ? '' : now))
+  })().catch(() => {})
 }
 
 // What went wrong, in one line: the board's own message, or the error line of
