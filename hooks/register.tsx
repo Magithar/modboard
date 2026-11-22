@@ -51,6 +51,9 @@ const boardError = atom({ plugin: 'modboard', key: 'boardError' } as const, '')
 const paneView = atom({ plugin: 'modboard', key: 'paneView' } as const, 'board')
 // The pane's blocks by name, in order: the `pane` setting, until the person
 // ticks blocks on the list; then their choice, kept between sessions.
+// The block just moved on the Order screen, lit for a moment.
+const moved = atom({ plugin: 'modboard', key: 'moved' } as const, '')
+const MOVED_MS = 1_500
 const paneBlocks = atom({ plugin: 'modboard', key: 'paneBlocks' } as const, [] as string[])
 
 // The pixel clock's minute, written when it turns, so the clock redraws then
@@ -163,17 +166,23 @@ async function toggleBlock($: EngineInterface, name: string) {
   if (name === 'todo' && names.includes('todo')) await refresh($)
 }
 
-// ↑ or ↓ beside a ticked block on the list: it swaps with the ticked block
-// above or below it that the list shows, and the board follows that order.
-// Kept between sessions, as the ticks are.
-async function moveBlock($: EngineInterface, name: string, by: -1 | 1, shown: string[]) {
+// On the Order screen: a ticked block moves to place `to` among the ticked
+// blocks the list shows (0 is the top), and the board follows that order. The
+// row lights up for a moment, so you can see where it landed. Kept between
+// sessions, as the ticks are.
+async function moveBlock($: EngineInterface, name: string, to: number, shown: string[]) {
   const now = await read($, paneBlocks)
-  const visible = now.filter(n => shown.includes(n))
-  const other = visible[visible.indexOf(name) + by]
-  if (other === undefined) return
-  const names = now.map(n => (n === name ? other : n === other ? name : n))
+  const visible = now.filter(n => shown.includes(n)).filter(n => n !== name)
+  const at = Math.max(0, Math.min(to, visible.length))
+  const order = [...visible.slice(0, at), name, ...visible.slice(at)]
+  // Hidden blocks (named in `pane`, off the list) keep their places.
+  let k = 0
+  const names = now.map(n => (shown.includes(n) ? order[k++]! : n))
   await update($, paneBlocks, () => names)
   await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
+  await update($, moved, () => name)
+  await $.clock.sleep(MOVED_MS)
+  await update($, moved, now => (now === name ? '' : now))
 }
 
 // What went wrong, in one line: the board's own message, or the error line of
@@ -691,7 +700,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     // blocks on the band: the pane, open at the list of blocks alone.
     // Pressed again while the list shows, it closes the pane.
     openBlocks: async () => {
-      if ((await read($, paneOpen)) && (await read($, paneView)) === 'blocks') {
+      if ((await read($, paneOpen)) && (await read($, paneView)) !== 'board') {
         await $.ui.close({ id: PANE }).catch(() => {})
         return void (await update($, paneOpen, () => false))
       }
@@ -751,7 +760,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
 // Everything a drawing reads, asked for at once: a pane is drawn again on
 // every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
-  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow] =
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow, movedNow] =
     await Promise.all([
       $.clock.now(),
       read($, me),
@@ -772,6 +781,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
       read($, ringing),
       read($, reminders),
       read($, located),
+      read($, moved),
       // Read so a drawing of the clock redraws when the minute turns.
       read($, minute),
     ])
@@ -797,6 +807,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     ringing: ringingNow,
     reminders: remindersNow,
     located: locatedNow,
+    moved: movedNow,
     act,
   }
 }
@@ -1007,51 +1018,96 @@ export const register: Register = (on, options) => {
     ])
     // The list of blocks, alone: each row ticks its block on or off; Done
     // turns the pane to the board, as modBOARD does.
-    if (view === 'blocks') {
-      // Ticked blocks first, in the board's order, each with ↑ and ↓; then the
-      // rest, in the list's own order.
+    // The list of blocks, alone, on two tabs. Blocks: each row ticks its block
+    // on or off. Order: the ticked blocks, numbered, with buttons to move them.
+    // Done turns the pane to the board, as modBOARD does.
+    if (view === 'blocks' || view === 'order') {
       const offered = choosable.filter(b => b.listed !== false)
       const names = offered.map(b => b.name)
       const ticked = chosen.filter(n => names.includes(n))
-      const listed = [...ticked.map(n => offered.find(b => b.name === n)!), ...offered.filter(b => !chosen.includes(b.name))]
-      const pad = Math.max(...listed.map(b => b.name.length)) + 2
-      const aboutPad = Math.max(...listed.map(b => (b.about ?? '').length)) + 2
-      const arrow = (b: Block, by: -1 | 1, at: number) =>
-        ticked[at + by] === undefined ? (
-          // One column, as wide as the arrow it stands for, so the arrows line up.
-          <Text>{' '}</Text>
-        ) : (
-          <Button key={`${by < 0 ? 'up' : 'down'}-${b.name}`} plain onPress={() => moveBlock($, b.name, by, names)}>
-            <Text color={CAP}>{by < 0 ? '↑' : '↓'}</Text>
+      const tab = (to: 'blocks' | 'order', label: string) => (
+        <Button key={`tab-${to}`} plain onPress={() => update($, paneView, () => to)}>
+          <Text bold={view === to} dimColor={view !== to}>
+            {label}
+          </Text>
+        </Button>
+      )
+      const tabs = (
+        <Box flexDirection="column">
+          <Box gap={4}>
+            {tab('blocks', 'Blocks')}
+            {tab('order', 'Order')}
+          </Box>
+          <Text color={CAP}>{view === 'blocks' ? '━━━━━━' : `${' '.repeat(10)}━━━━━`}</Text>
+        </Box>
+      )
+      const done = (
+        <Box marginTop={1} paddingLeft={2}>
+          <Button key="blocks-done" plain onPress={async () => (await update($, paneView, () => 'board'), void askOnDone($))}>
+            <Text bold color="success">Done</Text>
           </Button>
+        </Box>
+      )
+      if (view === 'blocks') {
+        const pad = Math.max(...offered.map(b => b.name.length)) + 2
+        return (
+          <Box flexDirection="column" paddingX={1}>
+            {tabs}
+            <Box flexDirection="column" marginTop={1} paddingLeft={2}>
+              {offered.map(b => (
+                <Box>
+                  <Button key={`pick-${b.name}`} plain onPress={() => toggleBlock($, b.name)}>
+                    {/* One Text in one colour, so the pointer lights the row as one
+                        bar: ticked rows orange, the rest grey. */}
+                    <Text color={chosen.includes(b.name) ? CAP : undefined} dimColor={!chosen.includes(b.name)} wrap="truncate">
+                      {`${chosen.includes(b.name) ? '[x]' : '[ ]'} ${b.name.padEnd(pad)}${b.about ?? ''}`}
+                    </Text>
+                  </Button>
+                </Box>
+              ))}
+            </Box>
+            {done}
+          </Box>
+        )
+      }
+      // Each button fills a fixed column, or a blank as wide where it would
+      // do nothing, so every row's buttons line up. top shows from the third
+      // row down, bottom down to the third from last: where they save a click.
+      const pad = Math.max(0, ...ticked.map(n => n.length)) + 3
+      const last = ticked.length - 1
+      const slot = (key: string, label: string, show: boolean, to: number, name: string) =>
+        show ? (
+          <Button key={key} plain onPress={() => moveBlock($, name, to, names)}>
+            <Text bold color={CAP}>
+              {label}
+            </Text>
+          </Button>
+        ) : (
+          <Text>{' '.repeat(label.length)}</Text>
         )
       return (
         <Box flexDirection="column" paddingX={1}>
-          <Text bold>What should the board show?</Text>
+          {tabs}
           <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-            {listed.map((b, at) => (
-              <Box>
-                <Button key={`pick-${b.name}`} plain onPress={() => toggleBlock($, b.name)}>
-                  {/* One Text in one colour, so the pointer lights the row as one
-                      bar: ticked rows orange, the rest grey. */}
-                  <Text color={chosen.includes(b.name) ? CAP : undefined} dimColor={!chosen.includes(b.name)} wrap="truncate">
-                    {`${chosen.includes(b.name) ? '[x]' : '[ ]'} ${b.name.padEnd(pad)}${chosen.includes(b.name) ? (b.about ?? '').padEnd(aboutPad) : (b.about ?? '')}`}
+            {ticked.length ? (
+              ticked.map((name, at) => (
+                <Box gap={1}>
+                  <Text color={c.moved === name ? CAP : undefined} bold={c.moved === name} wrap="truncate">
+                    {`${String(at + 1).padStart(2)}  ${name.padEnd(pad)}`}
                   </Text>
-                </Button>
-                {chosen.includes(b.name) ? (
                   <Box flexShrink={0} gap={1}>
-                    {arrow(b, -1, at)}
-                    {arrow(b, 1, at)}
+                    {slot(`up-${name}`, '[ ▲ ]', at > 0, at - 1, name)}
+                    {slot(`down-${name}`, '[ ▼ ]', at < last, at + 1, name)}
+                    {slot(`top-${name}`, '[ top ]', at > 1, 0, name)}
+                    {slot(`bottom-${name}`, '[ bottom ]', at < last - 1, last, name)}
                   </Box>
-                ) : null}
-              </Box>
-            ))}
+                </Box>
+              ))
+            ) : (
+              <Text dimColor>Nothing ticked yet: tick blocks on the Blocks tab.</Text>
+            )}
           </Box>
-          <Box marginTop={1} paddingLeft={2}>
-            <Button key="blocks-done" plain onPress={async () => (await update($, paneView, () => 'board'), void askOnDone($))}>
-              <Text bold color="success">Done</Text>
-            </Button>
-          </Box>
+          {done}
         </Box>
       )
     }

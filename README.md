@@ -350,9 +350,10 @@ pane: work,todo,compact,usage           (the default)
 names still work.
 
 Or click **blocks** on the band: the pane turns to a list of the blocks it
-can show, and a click ticks one on or off. Ticked blocks come first, in the
-board's order, each with **↑** and **↓** to move it up or down. **Done**
-shows the board. The
+can show, on two tabs. On **Blocks**, a click ticks one on or off. On
+**Order**, the ticked blocks are numbered in the board's order; **▲** and
+**▼** move one a place, **top** and **bottom** to either end. **Done** shows
+the board. The
 choice is kept between sessions, until `pane` is changed in `/config`.
 
 In a narrow window, the band's last blocks drop first, so put what matters

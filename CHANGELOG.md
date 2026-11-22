@@ -40,9 +40,10 @@ modboard was called agent-board until 0.5.0.
   now. Esc means no weather; `/board location`, or asking Claude (the
   `board_location` tool), asks again. Kept between sessions; `location` in
   `/config` wins over it.
-- **↑ and ↓ on the list of blocks** move a ticked block up or down the
-  board. Ticked blocks are listed first, in the board's order; the order is
-  kept between sessions.
+- **An Order tab on the list of blocks**: the ticked blocks, numbered in the
+  board's order, with **▲ ▼** to move one a place and **top**, **bottom** to
+  send it to either end. The moved row lights up for a moment. The order is
+  kept between sessions. The **Blocks** tab ticks, as before.
 
 ### Changed
 

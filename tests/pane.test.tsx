@@ -1018,7 +1018,7 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   let list = (await texts(pane)) as string[]
   // Only the list: no board under it.
-  expect(list[0]).toBe('What should the board show?')
+  expect(list[0]).toBe('Blocks')
   expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
   // The default pane: work, todo, compact, usage ticked; the rest not.
   expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
@@ -1104,7 +1104,7 @@ test('blocks pressed again while the list shows closes the pane; from the board 
   await band.press({ key: 'board' })
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect((await texts(pane))[0]).toBe('What should the board show?')
+  expect((await texts(pane))[0]).toBe('Blocks')
   expect(opened).toEqual(['modboard', 'modboard'])
   expect(closed).toEqual(['modboard'])
 })
@@ -1433,32 +1433,6 @@ test('an agent alarm at 1:30 with no am or pm rings at the next 1:30; 13:30 and 
   expect(await alarm('01:30')).toBe('the alarm rings once at 01:30: n')
 })
 
-test('on the list of blocks, ↑ and ↓ move a ticked block, the board follows, and the order is kept', { options: { band: 'summary,board', pane: 'work,usage,pixel-clock' } } as any, async ($, on) => {
-  host(on, [])
-  const kept = store(on)
-  on('ui.open', () => ({ value: { isPlaced: true } }))
-  await $.session.start(START)
-  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
-  await band.press({ key: 'blocks' })
-  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  // Ticked rows first, in the board's order; the first has no ↑, the last no ↓.
-  const rows = async () => ((await texts(pane)) as string[]).filter(t => /^\[[x ]\]/.test(t)).map(t => t.split(/\s+/)[1])
-  expect((await rows()).slice(0, 3)).toEqual(['work', 'usage', 'pixel-clock'])
-  expect(await pane.find({ key: 'up-work' })).toBeFalsy()
-  expect(await pane.find({ key: 'down-pixel-clock' })).toBeFalsy()
-  // The clock to the top, in two presses.
-  await pane.press({ key: 'up-pixel-clock' })
-  await pane.press({ key: 'up-pixel-clock' })
-  expect((await rows()).slice(0, 3)).toEqual(['pixel-clock', 'work', 'usage'])
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'work', 'usage'])
-  await pane.press({ key: 'down-work' })
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'usage', 'work'])
-  // Unticked blocks have no arrows.
-  expect(await pane.find({ key: 'up-agents' })).toBeFalsy()
-  await pane.press({ key: 'blocks-done' })
-  expect(((await texts(pane)) as string[])[0]).toBe('█▀█ █▀█   █ █ ▀█ ')
-})
-
 test('the alarm sits third in the column beside the digits, and a note that only repeats the time is left out', { options: { pane: 'pixel-clock', location: 'Bengaluru' } } as any, async ($, on) => {
   host(on, [])
   store(on, { reminders: [{ at: '14:00', note: 'Alarm set for 2 PM' }] })
@@ -1481,14 +1455,63 @@ test('a note that says more than the time stays', { options: { pane: 'pixel-cloc
   expect((await texts(pane)).slice(3)).toEqual(['weather: /board location', '⏰ 14:00 · check the deploy'])
 })
 
-test('the blank where an arrow is missing is one column, as wide as the arrow, so the arrows line up', { options: { band: 'summary,board', pane: 'work,usage' } } as any, async ($, on) => {
-  host(on, [])
-  store(on)
+// The logo's orange (CAP in hooks/blocks/board.tsx).
+const CAP_COLOR = '#F27238'
+const ORDER = { options: { band: 'summary,board', pane: 'work,usage,compact,pixel-clock' } } as any
+const openOrder = async ($: any, on: On) => {
   on('ui.open', () => ({ value: { isPlaced: true } }))
   await $.session.start(START)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  const blanks = ((await texts(pane)) as string[]).filter(t => /^\s+$/.test(t))
-  expect(blanks).toEqual([' ', ' '])
+  await pane.press({ key: 'tab-order' })
+  return pane
+}
+const order = async (pane: any) => ((await texts(pane)) as string[]).filter(t => /^ ?\d+  /.test(t)).map(t => t.trim().split(/\s+/)[1])
+
+test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbered, in the board order', ORDER, async ($, on) => {
+  host(on, [])
+  store(on)
+  const pane = await openOrder($, on)
+  expect(((await texts(pane)) as string[]).slice(0, 3)).toEqual(['Blocks', 'Order', '          ━━━━━'])
+  expect(await order(pane)).toEqual(['work', 'usage', 'compact', 'pixel-clock'])
+  // No ▲ on the first, no ▼ on the last; top from the third row, bottom to the third from last.
+  for (const [key, there] of [['up-work', false], ['down-pixel-clock', false], ['top-usage', false], ['top-compact', true], ['bottom-usage', true], ['bottom-compact', false]] as const)
+    expect(!!(await pane.find({ key }))).toBe(there)
+  await pane.press({ key: 'tab-blocks' })
+  expect(((await texts(pane)) as string[])[2]).toBe('━━━━━━')
+  expect(await pane.find({ key: 'pick-agents' })).toBeTruthy()
+})
+
+test('▲ ▼ top and bottom move a block; the board follows and the order is kept; the moved row lights up', ORDER, async ($, on) => {
+  host(on, [])
+  const kept = store(on)
+  let pass = () => {}
+  on('clock.sleep', () => new Promise(resolve => (pass = () => resolve({ value: undefined }))) as any)
+  const pane = await openOrder($, on)
+  const pressed = pane.press({ key: 'top-pixel-clock' })
+  await settle()
+  expect(await order(pane)).toEqual(['pixel-clock', 'work', 'usage', 'compact'])
+  expect((await pane.find({ type: 'Text', text: ' 1  pixel-clock   ' }))?.props.color).toBe(CAP_COLOR)
+  pass()
+  await pressed
+  expect((await pane.find({ type: 'Text', text: ' 1  pixel-clock   ' }))?.props.color).toBeUndefined()
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'work', 'usage', 'compact'])
+  const p2 = pane.press({ key: 'down-work' }); await settle(); pass(); await p2
+  expect(await order(pane)).toEqual(['pixel-clock', 'usage', 'work', 'compact'])
+  const p3 = pane.press({ key: 'bottom-pixel-clock' }); await settle(); pass(); await p3
+  expect(await order(pane)).toEqual(['usage', 'work', 'compact', 'pixel-clock'])
+  const p4 = pane.press({ key: 'up-compact' }); await settle(); pass(); await p4
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['usage', 'compact', 'work', 'pixel-clock'])
+  await pane.press({ key: 'blocks-done' })
+  expect(await pane.find({ key: 'tab-order' })).toBeFalsy()
+})
+
+test('every row\'s buttons line up: a missing button leaves a blank as wide', ORDER, async ($, on) => {
+  host(on, [])
+  store(on)
+  const pane = await openOrder($, on)
+  const blanks = ((await texts(pane)) as string[]).filter(t => /^ +$/.test(t))
+  // work: no ▲, no top; usage: no top; compact: no bottom; pixel-clock: no ▼, no bottom.
+  expect(blanks.sort()).toEqual(['     ', '     ', '       ', '       ', '          ', '          '].sort())
 })
