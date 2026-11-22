@@ -82,6 +82,9 @@ reorder without touching a setting.
 - The README and the tutorial cover the pixel clock, the weather, the alarm,
   `board ring`, `board_alarm`, `board_location` and the list of blocks. The
   roadmap's pixel clock and weather item is done and gone from the roadmap.
+- New pictures in the README: the Blocks and Order tabs, the pixel clock,
+  and the clock ringing (`node docs/pane.mjs` draws them); the band's picture
+  shows the **blocks** button.
 
 ## 0.7.1 — 2026-11-21
 

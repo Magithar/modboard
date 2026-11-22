@@ -205,7 +205,7 @@ needs you, and everything else waits until you ask.
 
 One line above the prompt, while there's work on the board:
 
-![The line above the prompt: 2 waiting · 1 active in green, T-005 in a yellow box, Sonnet 5.5, low, and modBOARD in green at the right end beside Claude Code's [-]](docs/band.png)
+![The line above the prompt: 2 waiting · 1 active in green, T-005 in a yellow box, Sonnet 5.5, low, and at the right end blocks in orange and modBOARD in green, beside Claude Code's [-]](docs/band.png)
 
 | Part | What it means | Click it to |
 |---|---|---|
@@ -358,6 +358,17 @@ made; at the right of the tabs, in yellow, is what changed:
 board. The choice is kept between sessions, until `pane` is changed in
 `/config`.
 
+<table>
+  <tr>
+    <td width="50%"><img src="docs/blocks-list.png" alt="The Blocks tab: work, todo, usage, compact and pixel-clock ticked in orange, agents unticked in grey, and saved · added pixel-clock in yellow at the right of the tabs"/></td>
+    <td width="50%"><img src="docs/blocks-order.png" alt="The Order tab: the ticked blocks numbered 1 to 5, pixel-clock just moved to the top and lit in orange, each row with ▲ and ▼, the first row's ▲ and the last row's ▼ in grey, and saved · order changed in yellow"/></td>
+  </tr>
+  <tr>
+    <td align="center">Blocks: tick what the board shows</td>
+    <td align="center">Order: move a block with ▲ ▼</td>
+  </tr>
+</table>
+
 In a narrow window, the band's last blocks drop first, so put what matters
 most first. To show something not in this list, [make your own
 block](#make-your-own-block).
@@ -365,13 +376,14 @@ block](#make-your-own-block).
 ### Pixel clock, weather and alarm
 
 Tick `pixel-clock` on the list of blocks, or name it in `pane`. It sits under
-a `▾ Clock` heading, which folds to one line (`▸ Clock · 13:46 · ☀ 31° · ⏰ 14:00`):
+a `▾ Clock` heading, which folds to one line (`▸ Clock · 13:46 · ☀ 31° · ⏰ 14:00`).
 
-```
-  █▀█ █▀█   ▀▀█ ▀▀█      ☀ 18°  Bengaluru
-  █ █ ▀▀█ ▀  ▀█ █▀▀      clear · H 24°
-  █▄█ ▄▄█ ▀ ▄▄█ █▄▄      ⏰ 07:30
-```
+<img src="docs/pane-clock.png" width="604" alt="The pane with the pixel clock on top under a Clock heading: 09:41 in large orange digits, and beside it ☁ 24° Bengaluru, partly cloudy · H 27°, and the next alarm, ⏰ 18:00 · check the deploy"/>
+
+Ringing, the digits turn yellow and the alarm's line says why, with **stop**
+beside it:
+
+<img src="docs/clock-ringing.png" width="604" alt="The clock ringing: 14:02 in yellow digits, and ⏰ T-004 done · Ship release in bold yellow with stop in green beside it"/>
 
 In the band it shows the time plainly, and the next alarm: `09:41  ⏰ 07:30`.
 
