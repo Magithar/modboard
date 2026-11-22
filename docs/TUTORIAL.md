@@ -522,14 +522,46 @@ Two settings list the display's blocks, in order:
 
 | Setting | Default | Also available |
 |---|---|---|
-| Band blocks (the line) | `summary,model,effort,board` | `usage`, `compact`, `clock`, `context` |
-| Pane blocks (`/board`) | `work,todo,compact,usage` | `agents`, `model`, `effort`, `clock`, `context` |
+| Band blocks (the line) | `summary,model,effort,board` | `usage`, `compact`, `clock`, `pixel-clock`, `weather`, `context` |
+| Pane blocks (`/board`) | `work,todo,compact,usage` | `agents`, `pixel-clock`, `model`, `effort`, `clock`, `context` |
 
 The band's order is its order of importance: when the line is short, the
 last blocks go first, so model and effort are the first to drop. Clicking
 them steps through the **Models to switch between** and **Effort levels to
 switch between** settings. Leave them out of the band if you'd rather not
 see them; Claude Code shows both in its own header too.
+
+For the pane there's a quicker way: click **blocks** on the band. The pane
+turns to a list with two tabs. On **Blocks**, a click ticks a block on or off.
+On **Order**, the ticked blocks are numbered in the board's order, and **▲**
+and **▼** move one a place. Each click is saved as it's made, and the right
+of the tabs says what changed (`saved · added agents · order changed`). Click
+`modBOARD` to see the board.
+
+### Clock, weather and an alarm
+
+Tick `pixel-clock` and the pane gets a big clock under a `▾ Clock` heading,
+the weather and the next alarm beside it:
+
+```
+  ▾ Clock
+
+    ▀█  ▀▀█   █ █ ▀▀█      ☀ 31°  Chennai
+     █   ▀█ ▀ ▀▀█ █▀▀      clear · H 31°
+    ▄█▄ ▄▄█ ▀   █ █▄▄      ⏰ 14:00
+```
+
+- **Weather.** Ticking the clock asks once where you are: your city from
+  your IP, a city you type, or not now. Nothing is sent before you answer.
+  `/board location` asks again, or set **Weather location** in `/config`.
+- **An alarm of your own**: `/board alarm 7:30` (every day), `/board alarm`
+  to list, `/board alarm off` to clear. Or ask Claude: "remind me at 6pm to
+  check the deploy" rings once, with that note.
+- **When important work is done**: `board add "Ship release" --ring`, or
+  `board ring T-004` for a task already on the board. When it turns done,
+  whoever finishes it, the clock chimes and shows `⏰ T-004 done · Ship release`.
+
+The alarm rings while a Claude Code session with the mod is open.
 
 ### Your own blocks, no code
 

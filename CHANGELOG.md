@@ -3,7 +3,11 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
-## Unreleased
+## 0.8.0 — 2026-11-22
+
+A clock for the board, with the weather beside it and an alarm that agents
+can ring when important work is done. And a list of blocks you can tick and
+reorder without touching a setting.
 
 ### Added
 
@@ -17,7 +21,6 @@ modboard was called agent-board until 0.5.0.
   blocks too (described by their command). `model`, `effort`, `clock` and
   `context` stay off it: the band or `compact` shows them already, and
   `pixel-clock` is the clock to tick. They still work when named in `pane`.
-
 - **`pixel-clock`**: the time in large pixel digits, three rows tall, with
   the weather beside it and the next alarm under it. In the band, the time
   plainly with the next alarm.
@@ -41,11 +44,10 @@ modboard was called agent-board until 0.5.0.
   `board_location` tool), asks again. Kept between sessions; `location` in
   `/config` wins over it.
 - **An Order tab on the list of blocks**: the ticked blocks, numbered in the
-  board's order, with **▲ ▼** to move one a place. The moved row lights up
-  for a moment. The order is
-  kept between sessions. Each tick and move is saved as it's
-  made; at the right of the tabs, in yellow: `saved · added agents · order
-  changed`. **Done** is gone: `modBOARD` shows the board. The **Blocks** tab ticks, as before.
+  board's order, with **▲ ▼** to move one a place (grey where there's no
+  room). The moved row lights up for a moment. Each tick and move is saved
+  as it's made, and kept between sessions; at the right of the tabs, in
+  yellow: `saved · added agents · order changed`. `modBOARD` shows the board.
 
 ### Changed
 
@@ -63,6 +65,21 @@ modboard was called agent-board until 0.5.0.
 - **Smoother scrolling.** The 3-second poll writes only what changed, so the
   pane is no longer redrawn for nothing; and each drawing reads what it needs
   at once, not one value after another.
+
+### Fixed
+
+- A task done while the mod reloaded never rang: what was seen done is kept
+  in the session's state now, not the module's.
+- An agent's alarm at a bare `1:30` rang at 01:30 at night; it now rings at
+  whichever 1:30 comes next. `13:30`, `01:30` and `1:30am` are taken as written.
+- Weather signs are one column wide (`☁` for partly cloudy, `☇` for thunder),
+  so no stray characters are left behind in terminals that draw `⛅` two wide.
+
+### Docs
+
+- The README and the tutorial cover the pixel clock, the weather, the alarm,
+  `board ring`, `board_alarm`, `board_location` and the list of blocks. The
+  roadmap's pixel clock and weather item is done and gone from the roadmap.
 
 ## 0.7.1 — 2026-11-21
 

@@ -1,6 +1,6 @@
 {
   "name": "modboard",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "One board for every agent and every person. You decide what's on it: tasks, handoffs, CI, any command's output. Open it with /board",
   "author": {
     "name": "Magithar",
