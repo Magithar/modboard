@@ -44,7 +44,12 @@ modboard was called agent-board until 0.5.0.
   board. Ticked blocks are listed first, in the board's order; the order is
   kept between sessions.
 
+### Changed
 
+- **The pixel clock's column**: beside the digits, one column of three rows:
+  the weather and place, the conditions, the next alarm. Too narrow, it goes
+  under the digits. An alarm note that only repeats the time ("Alarm set for
+  2 PM" at 14:00) is left out.
 - **`agents` is one line**: `Live  ● claude 1 (you)  ○ codex 1`, a green dot
   for an agent seen in the last 90 seconds, a grey one for the quiet. All of
   it grey but the dots, since none of it is pressable.
@@ -62,10 +67,6 @@ it might be stale.
 
 ### Changed
 
-- **The pixel clock's column**: beside the digits, one column of three rows:
-  the weather and place, the conditions, the next alarm. Too narrow, it goes
-  under the digits. An alarm note that only repeats the time ("Alarm set for
-  2 PM" at 14:00) is left out.
 
 - **A crashed session's work shows as unfinished.** When the board frees a
   task because its session went silent, or its lease ran out, and its agent
