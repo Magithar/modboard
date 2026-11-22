@@ -1480,3 +1480,15 @@ test('a note that says more than the time stays', { options: { pane: 'pixel-cloc
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   expect((await texts(pane)).slice(3)).toEqual(['weather: /board location', '⏰ 14:00 · check the deploy'])
 })
+
+test('the blank where an arrow is missing is one column, as wide as the arrow, so the arrows line up', { options: { band: 'summary,board', pane: 'work,usage' } } as any, async ($, on) => {
+  host(on, [])
+  store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const blanks = ((await texts(pane)) as string[]).filter(t => /^\s+$/.test(t))
+  expect(blanks).toEqual([' ', ' '])
+})

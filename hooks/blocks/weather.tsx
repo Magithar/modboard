@@ -1,16 +1,18 @@
 import type { Weather } from '../../types'
 import { words, type Block } from './types'
 
-// Open-Meteo's weather codes (WMO), as a sign and a word or two.
+// Open-Meteo's weather codes (WMO), as a sign and a word or two. Every sign
+// is one column wide in every terminal: emoji like ⛅ and ⚡ are drawn two
+// wide by some and counted as one by others, which leaves stray characters.
 export function conditions(code: number): { sign: string; word: string } {
   if (code === 0) return { sign: '☀', word: 'clear' }
-  if (code <= 2) return { sign: '⛅', word: 'partly cloudy' }
+  if (code <= 2) return { sign: '☁', word: 'partly cloudy' }
   if (code === 3) return { sign: '☁', word: 'cloudy' }
   if (code === 45 || code === 48) return { sign: '≋', word: 'fog' }
   if (code >= 51 && code <= 57) return { sign: '☂', word: 'drizzle' }
   if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return { sign: '☂', word: 'rain' }
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return { sign: '❄', word: 'snow' }
-  if (code >= 95) return { sign: '⚡', word: 'thunderstorm' }
+  if (code >= 95) return { sign: '☇', word: 'thunderstorm' }
   return { sign: '·', word: 'unknown' }
 }
 

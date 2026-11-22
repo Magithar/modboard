@@ -1018,7 +1018,8 @@ export const register: Register = (on, options) => {
       const aboutPad = Math.max(...listed.map(b => (b.about ?? '').length)) + 2
       const arrow = (b: Block, by: -1 | 1, at: number) =>
         ticked[at + by] === undefined ? (
-          <Text>{'  '}</Text>
+          // One column, as wide as the arrow it stands for, so the arrows line up.
+          <Text>{' '}</Text>
         ) : (
           <Button key={`${by < 0 ? 'up' : 'down'}-${b.name}`} plain onPress={() => moveBlock($, b.name, by, names)}>
             <Text color={CAP}>{by < 0 ? '↑' : '↓'}</Text>
