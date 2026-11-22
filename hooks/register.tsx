@@ -54,6 +54,9 @@ const paneView = atom({ plugin: 'modboard', key: 'paneView' } as const, 'board')
 // The block just moved on the Order screen, lit for a moment.
 const moved = atom({ plugin: 'modboard', key: 'moved' } as const, '')
 const MOVED_MS = 1_500
+// The board's blocks, in order, when the list of blocks opened: Done says
+// what changed since.
+const listStart = atom({ plugin: 'modboard', key: 'listStart' } as const, [] as string[])
 const paneBlocks = atom({ plugin: 'modboard', key: 'paneBlocks' } as const, [] as string[])
 
 // The pixel clock's minute, written when it turns, so the clock redraws then
@@ -477,6 +480,29 @@ async function askLocation($: EngineInterface): Promise<string> {
 
 // Done on the list of blocks with the pixel clock ticked asks once, while no
 // location is set and the person hasn't answered before.
+// What changed on the list since it opened, in one line for a toast:
+// "added agents · removed todo · order: pixel-clock, work, usage".
+function changes(before: string[], after: string[]) {
+  const added = after.filter(n => !before.includes(n))
+  const removed = before.filter(n => !after.includes(n))
+  const kept = (list: string[]) => list.filter(n => before.includes(n) && after.includes(n))
+  const reordered = !same(kept(before), kept(after))
+  const parts = [
+    added.length ? `added ${added.join(', ')}` : '',
+    removed.length ? `removed ${removed.join(', ')}` : '',
+    reordered ? `order: ${after.join(', ')}` : '',
+  ].filter(Boolean)
+  return parts.length ? `board: ${parts.join(' · ')}` : 'board: no changes'
+}
+
+// Leaving the list (Done, or modBOARD on the band): the board shows, a toast
+// says what changed, and a newly ticked pixel clock may ask for a location.
+async function leaveList($: EngineInterface) {
+  await update($, paneView, () => 'board')
+  $.ui.toast(changes(await read($, listStart), await read($, paneBlocks)))
+  void askOnDone($)
+}
+
 async function askOnDone($: EngineInterface) {
   if (place || configLocation.trim() || !(await read($, paneBlocks)).includes('pixel-clock')) return
   if (await $.store.get('locationAsked').catch(() => false)) return
@@ -697,7 +723,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     // Open at the list of blocks, it turns the pane to the board instead.
     openBoard: async () => {
       if (!(await read($, paneOpen))) return void (await openBoard($))
-      if ((await read($, paneView)) !== 'board') return void (await update($, paneView, () => 'board'))
+      if ((await read($, paneView)) !== 'board') return void (await leaveList($))
       await $.ui.close({ id: PANE }).catch(() => {})
       await update($, paneOpen, () => false)
     },
@@ -708,6 +734,8 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
         await $.ui.close({ id: PANE }).catch(() => {})
         return void (await update($, paneOpen, () => false))
       }
+      const shown = await read($, paneBlocks)
+      await update($, listStart, () => shown)
       await update($, paneView, () => 'blocks')
       if (await read($, paneOpen)) return
       // Straight to the list: it needs no fresh read of the board, and the
@@ -1047,7 +1075,7 @@ export const register: Register = (on, options) => {
       )
       const done = (
         <Box marginTop={1} paddingLeft={2}>
-          <Button key="blocks-done" plain onPress={async () => (await update($, paneView, () => 'board'), void askOnDone($))}>
+          <Button key="blocks-done" plain onPress={() => leaveList($)}>
             <Text bold color="success">Done</Text>
           </Button>
         </Box>

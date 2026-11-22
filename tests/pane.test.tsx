@@ -1555,3 +1555,38 @@ test('every ▲ and every ▼ moves its block one place, on the terminal and the
     await pane.unmount()
   }
 })
+
+test('Done says what changed on the list: added, removed, the new order, or no changes', ORDER, async ($, on) => {
+  host(on, [])
+  store(on)
+  const toasts: string[] = []
+  on('ui.toast', (_$, e: any) => (toasts.push(e.text), { value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.sleep', () => ({ value: undefined }))
+  // The pixel clock is ticked and a location is not set: answer the question with Esc.
+  asks(on, undefined)
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const round = async (acts: () => Promise<void>) => {
+    toasts.length = 0
+    await band.press({ key: 'blocks' })
+    await acts()
+    await pane.press({ key: 'blocks-done' })
+    await settle()
+    return toasts.find(t => t.startsWith('board:'))
+  }
+  expect(await round(async () => {})).toBe('board: no changes')
+  expect(
+    await round(async () => {
+      await pane.press({ key: 'pick-agents' })
+      await pane.press({ key: 'pick-usage' })
+    }),
+  ).toBe('board: added agents · removed usage')
+  expect(
+    await round(async () => {
+      await pane.press({ key: 'tab-order' })
+      await pane.press({ key: 'up-pixel-clock' })
+    }),
+  ).toBe('board: order: work, pixel-clock, compact, agents')
+})
