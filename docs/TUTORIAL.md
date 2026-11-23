@@ -136,7 +136,7 @@ checked T-001: npm test passed at 4f2a9c1; yours until 12:03
 
 If you stop before finishing, release the task with a **handoff**: what's
 done, what's left, where to look. The board adds the worktree, branch and
-commit you're in. The next agent starts from it.
+commit you're in, and the files your work changed. The next agent starts from it.
 
 ```bash
 board release T-001 --handoff "form done in src/login.tsx; sign-in call not wired yet, see api/auth.ts"
@@ -163,12 +163,29 @@ Accept when: visiting /login shows a form that signs in
 - [2026-11-19T11:48] frontend: form renders; sign-in call next
 - [2026-11-19T11:48] frontend: CHECKED: npm test (run by the board, passed)
     in /code/app-login · login @ 4f2a9c1
+    files: src/login.tsx
 - [2026-11-19T11:48] frontend: HANDOFF: form done in src/login.tsx; sign-in call not wired yet, see api/auth.ts
     in /code/app-login · login @ 4f2a9c1, uncommitted changes
+    files: api/auth.ts, src/login.tsx
 ```
 
 Work in that worktree, on that branch. The tests passed at `4f2a9c1`, before
 the uncommitted changes, so run them again before you build on them.
+
+### Who changed this file?
+
+Each handoff and check keeps the files its work changed, so you can ask the
+board who touched a file before you edit it:
+
+```bash
+board who api/auth.ts
+```
+
+```
+T-001  Add a login page  · frontend · handoff 11:48 · /code/app-login · login @ 4f2a9c1, uncommitted changes
+```
+
+The latest first. Claude agents ask the same with the `board_who` tool.
 
 ### Done means verified
 
@@ -316,6 +333,8 @@ waiting or in progress, it disappears.
           where  settings @ 4f2a9c1, uncommitted changes
 
           path   ~/code/app-settings
+
+          files  src/settings.tsx, src/settings.css
 
           check  npm test passed at 4f2a9c1, before uncommitted changes
 
@@ -582,7 +601,17 @@ command runs, and the block shows the first line it prints:
 }
 ```
 
-Then add the names to the band or pane setting, like a built-in block:
+In the pane, tick `checks` on the list of blocks: your blocks show under one
+**Checks** heading, a success in green and a failure in red:
+
+```
+ ▾ Checks
+
+   ci       success
+   branch   main
+```
+
+For the band, add the names to the band setting, like a built-in block:
 
 ```
 summary,ci,branch,model,effort,board
@@ -590,7 +619,12 @@ summary,ci,branch,model,effort,board
 
 The band now reads `ci success` and `branch main` beside the work. A name is
 lowercase letters, digits and dashes, up to 16 characters, and can't be a
-built-in block's name. A command that fails or prints nothing shows nothing.
+built-in block's name.
+
+A command that fails keeps its last good result. Under Checks, a result
+older than 5 minutes says its age (`12 min ago`); once the command has failed
+for 5 minutes, it says `not updating since 14:02` in yellow. The `stale`
+setting changes the 5 minutes.
 
 This setting lives in your user config, never the project's, so opening
 someone else's repo can't make your session run its commands.

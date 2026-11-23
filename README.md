@@ -552,14 +552,9 @@ That's it. Every 30 seconds the command runs, and the block shows the first
 line it prints, cut to 60 characters. In the band it reads `ci success`, or
 just `success` when the line is short.
 
-Under Checks, each block says how fresh it is:
+Under Checks, each block says how it went and how fresh it is:
 
-```
-▾ Checks
-
-  tests   ✓ 42 passed · login · 12 min ago
-  ci      success · not updating since 14:02
-```
+<img src="docs/pane-checks.png" width="604" alt="The Checks heading with three blocks: tests, 1 failed, 41 passed · login, in red; ci, success in green, then 12 min ago in grey; deploy, live · v0.9.0 in green, then not updating since 14:02 in yellow"/>
 
 - A result that reads as a success (`success`, `passed`, `ok`, `✓`) is green,
   and one that reads as a failure (`failed`, `error`, `✗`) red; `42 passed,
@@ -812,8 +807,8 @@ and a board of two tasks, one already held by `alice`. Codex was told only
 
 **`npm test`** runs the CLI tests and the store contract:
 
-- a 20-way claim race, ownership, handoffs and the worktree they record,
-  checks (recorded only when they pass), lease expiry, heartbeats,
+- a 20-way claim race, ownership, handoffs and the worktree and files they
+  record, `board who`, checks (recorded only when they pass), lease expiry, heartbeats,
   rejected-claim logging, verified done, release-all, automatic names,
   refused flags
 - the store contract against the file block and an in-memory block
@@ -822,8 +817,9 @@ and a board of two tasks, one already held by `alice`. Codex was told only
 - that `board taskfile` reads each way a task file keeps items and priorities
 
 **`claude plugin test .`** runs the mod's tests: the band and how it fits a
-line, the pane's groups and what folds, handoff points and the where, path
-and check rows under them (and copying the path), the task file and its
+line, the pane's groups and what folds, handoff points and the where, path,
+files and check rows under them (and copying the path), Checks (the last
+result kept, its age, not updating, green and red), the task file and its
 priority button, the Limits heading, the error line, names, the tools, release
 on session end, and choosing blocks.
 
@@ -894,9 +890,10 @@ modboard/
     ├── blocks.txt  .png     # how blocks work
     ├── render.mjs           # rebuilds each diagram from its .txt
     ├── band.mjs    .png     # the band image
-    ├── pane.mjs             # draws blocks-*.png, pane-clock.png, clock-ringing.png
+    ├── pane.mjs             # draws blocks-*.png, pane-clock.png, clock-ringing.png, pane-checks.png
     ├── blocks-*.png         # the list of blocks: the Blocks and Order tabs
     ├── pane-clock.png       # the pixel clock, and clock-ringing.png as it rings
+    ├── pane-checks.png      # Checks: a failure, a success with its age, one not updating
     ├── board-live.gif       # the live demo
     ├── pane-*.png           # screenshots of the /board pane
     ├── taskfile-*.png       # the To do list, at P0 and at all

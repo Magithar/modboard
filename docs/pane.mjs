@@ -1,7 +1,7 @@
 // Draws pictures of the /board pane for the README with headless Chrome, in
 // the look of the pane screenshots (pane-board.png): the same background,
 // font and colours, and the text each block draws, as the mod lays it out.
-//   node docs/pane.mjs [blocks-list] [blocks-order] [pane-clock] [clock-ringing]
+//   node docs/pane.mjs [blocks-list] [blocks-order] [pane-clock] [clock-ringing] [pane-checks]
 //
 // The pixel clock's digits are drawn as cells, not font glyphs, so the half
 // blocks meet as they do in a terminal.
@@ -116,6 +116,16 @@ const PAGES = {
     line([['▸ Done', 'bold'], [' · 6', 'dim']]),
     blank(),
   ],
+  'pane-checks': [
+    line([['▾ Checks', 'bold']]),
+    blank(),
+    line([['  '], ['tests   ', 'dim'], ['✗ 1 failed, 41 passed · login', 'err']]),
+    blank(),
+    line([['  '], ['ci      ', 'dim'], ['success', 'ok'], [' · 12 min ago', 'dim']]),
+    blank(),
+    line([['  '], ['deploy  ', 'dim'], ['✓ live · v0.9.0', 'ok'], [' · not updating since 14:02', 'warn']]),
+    blank(),
+  ],
   'clock-ringing': [
     line([['▾ Clock', 'bold']]),
     blank(),
@@ -145,7 +155,7 @@ font:13.5px/${LINE}px Menlo,"SF Mono",monospace;color:#e6e6e6;white-space:pre}
 .l{height:${LINE}px}
 .dim{color:#9a9a9a} .bold{font-weight:700;color:#f2f2f2} .ok{color:#5fd068} .okbold{color:#5fd068;font-weight:700}
 .cap{color:#F27238} .capbold{color:#F27238;font-weight:700} .warn{color:#f2c200} .warnbold{color:#f2c200;font-weight:700}
-.rule{color:#6a6a6a}
+.rule{color:#6a6a6a} .err{color:#ff6b6b}
 .px{display:inline-block;width:1ch;height:${LINE}px;vertical-align:top}
 .px.t{background:linear-gradient(currentColor 50%,transparent 50%)}
 .px.b{background:linear-gradient(transparent 50%,currentColor 50%)}

@@ -3,7 +3,7 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
-## Unreleased
+## 0.9.0 — 2026-11-23
 
 Two ideas from readers: command blocks that say when their result is old,
 and which agent changed which file.
@@ -28,6 +28,12 @@ and which agent changed which file.
   row under a handoff, as many as fit, then `+3`.
 - **`board who <file>`**: which agents changed a file, on which task, the
   latest first, with where the work was. Claude Code gets a `board_who` tool.
+
+### Docs
+
+- The README and the tutorial cover Checks, the `stale` setting, the `files`
+  row and `board who`; the README has a picture of Checks
+  (`node docs/pane.mjs pane-checks` draws it).
 
 ## 0.8.1 — 2026-11-22
 

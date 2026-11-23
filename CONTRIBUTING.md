@@ -43,7 +43,7 @@ Then:
   `node docs/render.mjs` to rebuild the images. Never edit the `.png` by hand.
 - **If you change what the band or the pane draws**, update the pictures
   that show it: `node docs/band.mjs` for the band, `node docs/pane.mjs` for
-  the list of blocks and the pixel clock. Both need Google Chrome.
+  the list of blocks, the pixel clock and Checks. Both need Google Chrome.
 
 ## Where things go
 
