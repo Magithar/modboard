@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-import type { Task, TaskFile } from '../types'
+import type { Task, TaskFile, Where } from '../types'
 
 const task = (id: string, status: Task['status'], owner?: string): Task => ({
   id,
@@ -193,7 +193,7 @@ test('a handoff written with semicolons shows one point a line', async ($, on) =
 })
 
 const WHERE = { worktree: '/Users/me/code/app-login', branch: 'login', commit: 'a1b2c3d', dirty: true }
-const checked = (where: object) => ({ at: '', by: 'claude 1', text: 'CHECKED: npm test', check: { cmd: 'npm test', ran: true }, where })
+const checked = (where: Where) => ({ at: '', by: 'claude 1', text: 'CHECKED: npm test', check: { cmd: 'npm test', ran: true }, where })
 
 test('under a handoff, where the work is, its path from ~, and the last check that passed', async ($, on) => {
   host(on, [
