@@ -3,6 +3,29 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+Two ideas from readers: command blocks that say when their result is old,
+and which agent changed which file.
+
+### Added
+
+- **`checks`**, a block for the pane: every command block under one
+  **Checks** heading, folding like Clock and Limits. On the list of blocks it
+  stands for them all, so the list stays short; a command block named in
+  `pane` or `band` still shows by itself.
+- **Command blocks keep their last good result.** A command that fails no
+  longer goes blank. A result older than 5 minutes says its age in grey
+  (`12 min ago`); one whose command has failed for 5 minutes says `not
+  updating since 14:02` in yellow, and the folded heading names it in yellow.
+  The `stale` setting changes the 5 minutes.
+- **Handoffs and checks record the files the work changed**: those the
+  worktree's branch changed since it left the main line, and those changed
+  and not committed. `board show` lists them, and the pane shows a `files`
+  row under a handoff, as many as fit, then `+3`.
+- **`board who <file>`**: which agents changed a file, on which task, the
+  latest first, with where the work was. Claude Code gets a `board_who` tool.
+
 ## 0.8.1 — 2026-11-22
 
 Agents can turn the alarm off as well as on.

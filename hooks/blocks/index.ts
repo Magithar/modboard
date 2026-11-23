@@ -5,6 +5,7 @@
 
 import { agents } from './agents'
 import { board } from './board'
+import { checks } from './checks'
 import { clock } from './clock'
 import { compact } from './compact'
 import { context } from './context'
@@ -18,6 +19,6 @@ import { usage } from './usage'
 import { weather } from './weather'
 import type { Block } from './types'
 
-export const BLOCKS: Block[] = [summary, board, tasks, taskfile, usage, compact, model, effort, clock, pixelClock, weather, context, agents]
+export const BLOCKS: Block[] = [summary, board, tasks, checks, taskfile, usage, compact, model, effort, clock, pixelClock, weather, context, agents]
 
 export type { BandForm, Block, Ctx } from './types'

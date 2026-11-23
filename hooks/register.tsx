@@ -3,6 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Agent, Reminder, Task, TaskFile, Weather } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
+import type { CommandState } from './blocks/types'
 import { CAP } from './blocks/board'
 import { hhmm } from './blocks/clock'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
@@ -23,6 +24,10 @@ const POLL_MS = 3_000
 // Pane blocks that draw a bar; together they make one section.
 const BARS = new Set(['compact', 'usage', 'context'])
 const COMMAND_MS = 30_000
+// How old a command block's result gets before it says its age, and how long
+// its command fails before it says it is not updating: the `stale` setting, in minutes.
+let staleMs = 5 * 60_000
+let commandNames: string[] = []
 const NAME_TRIES = 9
 
 const tasks = atom({ plugin: 'modboard', key: 'tasks' } as const, [])
@@ -32,6 +37,8 @@ const usage = atom({ plugin: 'modboard', key: 'usage' } as const, { limits: [] }
 const model = atom({ plugin: 'modboard', key: 'model' } as const, '')
 const effort = atom({ plugin: 'modboard', key: 'effort' } as const, '')
 const custom = atom({ plugin: 'modboard', key: 'custom' } as const, {} as Record<string, string>)
+// When each command block last succeeded, and since when it has failed.
+const commandState = atom({ plugin: 'modboard', key: 'commandState' } as const, {} as Record<string, CommandState>)
 const taskfile = atom({ plugin: 'modboard', key: 'taskfile' } as const, { file: null, items: [] } as TaskFile)
 const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, false)
 // Whether the pane is open now: set when it is placed, cleared when it closes,
@@ -299,6 +306,15 @@ const TOOLS = [
     args: (i: any) => ['check', i.id, i.command, '--passed'],
   },
   {
+    name: 'board_who',
+    description:
+      'Which agents changed a file, and on which task: from the files each handoff and check recorded (committed or not, in that agent\'s worktree). ' +
+      'The latest first. Use it before editing a file another agent may be working on.',
+    schema: { file: { type: 'string' } },
+    required: ['file'],
+    args: (i: any) => ['who', i.file],
+  },
+  {
     name: 'board_done',
     description:
       'Mark a task you hold as done. Only after you have checked it against its acceptance criteria (board_show lists them). ' +
@@ -327,14 +343,25 @@ const pick = (all: Block[], setting: unknown, fallback: string) =>
     .map(name => all.find(b => b.name === (RENAMED[name] ?? name)))
     .filter(b => b !== undefined)
 
-// Each command block's first line of output; a failing command shows nothing.
+// Each command block's first line of output. A failing command keeps its last
+// good line, and the time it last succeeded and since when it has failed are
+// kept beside it, so the block can say how old its result is.
 async function runCommands($: EngineInterface, commands: Record<string, string>) {
+  const [before, was, now] = await Promise.all([read($, custom), read($, commandState), $.clock.now()])
   const out: Record<string, string> = {}
+  const state: Record<string, CommandState> = {}
   for (const [name, command] of Object.entries(commands)) {
     const run = await $.process.run(['sh', '-c', command]).catch(() => undefined)
-    if (run && run.exitCode === 0) out[name] = firstLine(run.stdout)
+    if (run && run.exitCode === 0) {
+      out[name] = firstLine(run.stdout)
+      state[name] = { ok: now, failing: null }
+    } else {
+      if (before[name]) out[name] = before[name]
+      state[name] = { ok: was[name]?.ok ?? null, failing: was[name]?.failing ?? now }
+    }
   }
-  if (!same(await read($, custom), out)) await update($, custom, () => out)
+  if (!same(before, out)) await update($, custom, () => out)
+  if (!same(was, state)) await update($, commandState, () => state)
 }
 
 const GAP = 3
@@ -793,7 +820,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
 // Everything a drawing reads, asked for at once: a pane is drawn again on
 // every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
-  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow, movedNow] =
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, commandStateNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow, movedNow] =
     await Promise.all([
       $.clock.now(),
       read($, me),
@@ -803,6 +830,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
       read($, model),
       read($, effort),
       read($, custom),
+      read($, commandState),
       read($, taskfile),
       read($, taskfileOpen),
       read($, taskfileTier),
@@ -829,6 +857,9 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     model: modelNow,
     effort: effortNow,
     custom: customNow,
+    commands: commandNames,
+    commandState: commandStateNow,
+    staleMs,
     taskfile: taskfileNow,
     taskfileOpen: taskfileOpenNow,
     taskfileTier: taskfileTierNow,
@@ -848,6 +879,9 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
 export const register: Register = (on, options) => {
   const { commands, problems } = parseCommandBlocks(options.blocks, [...BLOCKS.map(b => b.name), ...Object.keys(RENAMED)])
   const all = [...BLOCKS, ...Object.entries(commands).map(([name, command]) => commandBlock(name, command))]
+  commandNames = Object.keys(commands)
+  const minutes = Number(options.stale)
+  staleMs = (Number.isFinite(minutes) && minutes > 0 ? minutes : 5) * 60_000
   const band = pick(all, options.band, 'summary,model,effort,board').filter(b => b.band)
   // Every block the pane can show, and the `pane` setting's own choice of them.
   const choosable = all.filter(b => b.pane)

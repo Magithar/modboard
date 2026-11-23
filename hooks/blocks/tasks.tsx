@@ -78,6 +78,21 @@ const cutStart = (text: string, room: number) => {
   return chars.length <= room ? text : `…${chars.slice(chars.length - Math.max(1, room - 1)).join('')}`
 }
 
+// The files the work changed, as many as fit, then how many more:
+// "src/login.tsx, api/auth.ts +3".
+function fileList(files: string[], room: number) {
+  let shown = ''
+  let n = 0
+  for (const f of files) {
+    const more = files.length - n - 1
+    const next = shown ? `${shown}, ${f}` : f
+    if ([...next].length + (more ? ` +${more}`.length : 0) > room && n > 0) break
+    shown = next
+    n++
+  }
+  return n < files.length ? `${shown} +${files.length - n}` : shown
+}
+
 // A fact under a handoff: a grey label, then its value in plain text, so the
 // label recedes and the fact stands out; lined up as the Limits rows are.
 const LABEL = 7
@@ -136,6 +151,7 @@ function Facts(c: Ctx, t: Task, note: Note) {
           </Box>
         </Box>
       )}
+      {where?.files?.length ? <Box marginTop={1}>{Fact(c, 'files', fileList(where.files, c.width - INDENT))}</Box> : null}
       {/* A blank line between the rows, so each reads on its own. */}
       {check && <Box marginTop={where ? 1 : 0}>{Fact(c, 'check', passed)}</Box>}
     </Box>
@@ -155,6 +171,8 @@ export const GROUPS = {
   limits: { title: 'Limits', open: true },
   // The pixel clock, with its weather and alarm (see pixel.tsx).
   clock: { title: 'Clock', open: true },
+  // Your command blocks, with their age (see checks.tsx).
+  checks: { title: 'Checks', open: true },
 } as const
 export type GroupName = keyof typeof GROUPS
 

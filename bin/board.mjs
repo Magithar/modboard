@@ -40,9 +40,12 @@ function projectDir() {
 }
 
 // Where the work is: the worktree this command runs in, its branch, the commit
-// it is at, and whether anything is uncommitted. Nothing outside a git repo.
+// it is at, whether anything is uncommitted, and the files the work changed.
+// Nothing outside a git repo.
+const FILES_KEPT = 50
 function whereNow() {
-  const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const raw = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  const git = (...args) => raw(...args).trim()
   const or = (f, fallback) => {
     try {
       return f()
@@ -57,7 +60,26 @@ function whereNow() {
     branch: or(() => git('symbolic-ref', '--short', '-q', 'HEAD'), ''),
     commit: or(() => git('rev-parse', '--short', 'HEAD'), ''),
     dirty: or(() => git('status', '--porcelain').length > 0, false),
+    files: or(() => changedFiles(raw, or), []),
   }
+}
+
+// The files this worktree's work changed: those its branch changed since it
+// left the main line (origin's default branch, else main or master), and
+// those changed and not yet committed. Each worktree is one agent's, so this
+// is what that agent touched.
+function changedFiles(raw, or) {
+  const files = new Set()
+  const branch = or(() => raw('symbolic-ref', '--short', '-q', 'HEAD').trim(), '')
+  const base = ['origin/HEAD', 'main', 'master']
+    .filter(ref => ref !== branch)
+    .map(ref => or(() => raw('merge-base', 'HEAD', ref).trim(), ''))
+    .find(Boolean)
+  if (base) for (const f of or(() => raw('diff', '--name-only', base, 'HEAD'), '').split('\n')) if (f.trim()) files.add(f.trim())
+  // Porcelain lines are "XY path" or "XY old -> new"; their leading space matters.
+  for (const l of or(() => raw('status', '--porcelain', '--untracked-files=all'), '').split('\n'))
+    if (l.length > 3) files.add(l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''))
+  return [...files].sort().slice(0, FILES_KEPT)
 }
 
 // "/repo/wt-login · login @ a1b2c3d, uncommitted changes"
@@ -108,6 +130,7 @@ function describe(t) {
   for (const n of t.notes) {
     out.push(`- [${n.at.slice(0, 16)}] ${n.by}: ${n.text}${n.check ? (n.check.ran ? ' (run by the board, passed)' : ' (passed, as reported)') : ''}`)
     if (n.where) out.push(`    in ${place(n.where)}`)
+    if (n.where?.files?.length) out.push(`    files: ${n.where.files.join(', ')}`)
   }
   return out.join('\n')
 }
@@ -131,6 +154,10 @@ const SAY = {
     const handoff = n?.text.startsWith('HANDOFF:')
     return `released ${t.id}${handoff ? ' with a handoff' : ''}; it's back to todo${handoff && n.where ? `\nthe work is in ${place(n.where)}` : ''}`
   },
+  who: r =>
+    r.hits.length
+      ? r.hits.map(h => `${h.task}  ${h.title}  · ${h.by} · ${h.kind} ${hhmm(h.at)} · ${place(h.where)}`).join('\n')
+      : `no handoff or check recorded a change to ${r.file}`,
   check: t => {
     const n = t.notes.at(-1)
     return `checked ${t.id}: ${n.check.cmd} passed${n.where ? ` at ${at(n.where)}` : ''}; yours until ${hhmm(t.claim.expiresAt)}`
@@ -182,6 +209,24 @@ const commands = {
     return board.note(id, await actorOf(board, flags), note)
   },
   release: async (board, [id], flags) => board.release(id, await actorOf(board, flags), text(flags.handoff), whereNow()),
+  // Which agents changed a file, from the files each handoff and check
+  // recorded: the latest first, with the task and where the work was.
+  async who(board, [file]) {
+    if (!file) throw new BoardError(2, 'usage: board who <file>')
+    const rel = path.relative(projectDir(), path.resolve(file))
+    const wanted = rel && !rel.startsWith('..') ? rel : file
+    const hits = []
+    for (const t of await board.list({ all: true })) {
+      // Each task once: its latest note that changed the file.
+      const at = t.notes.findLastIndex(n => n.where?.files?.some(f => f === wanted || f.endsWith(`/${wanted}`)))
+      if (at < 0) continue
+      const n = t.notes[at]
+      // A handoff the board wrote for a session that went away names that agent.
+      const by = n.by === 'board' ? (t.notes.slice(0, at).findLast(m => m.by !== 'board')?.by ?? 'board') : n.by
+      hits.push({ task: t.id, title: t.title, by, at: n.at, kind: n.check ? 'check' : 'handoff', where: n.where })
+    }
+    return { file: wanted, hits: hits.sort((a, b) => b.at.localeCompare(a.at)) }
+  },
   // Run a check on a task you hold, in this checkout; record it only if it
   // passes. --passed records a check you ran yourself, without running it.
   async check(board, [id, cmd], flags) {

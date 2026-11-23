@@ -35,6 +35,12 @@
       "description": "Blocks that show a shell command's first line of output, refreshed every 30 seconds, as JSON: {\"ci\": \"gh run list -L1 --json conclusion -q '.[0].conclusion'\"}. Then name them in Band blocks or Pane blocks.",
       "default": ""
     },
+    "stale": {
+      "type": "string",
+      "title": "When a command block is old",
+      "description": "Minutes. A command block's result older than this says its age (12 min ago); one whose command has failed this long says it is not updating, in yellow, and keeps its last good result.",
+      "default": "5"
+    },
     "models": {
       "type": "string",
       "title": "Models to switch between",

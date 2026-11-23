@@ -29,7 +29,9 @@ function host(
     broken = { now: false },
     home,
     live = [{ name: 'codex', lastSeen: '' }],
-  }: { live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
+    time,
+    shell,
+  }: { time?: { now: number }; shell?: { failing: Set<string> }; live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -53,7 +55,7 @@ function host(
   on('session.start', (_$, e: any) => ({ cwd: e.cwd }))
   on('tool.register', (_$, e: any) => ({ value: { tool: `mcp__modboard__${e.name}` } }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
-  on('clock.now', () => ({ value: NOW }))
+  on('clock.now', () => ({ value: time?.now ?? NOW }))
   on('session.id', () => ({ value: 'aaaa1111-2222-3333-4444-555566667777' }))
   on('env.get', (_$, e: any) => ({ value: e.name === 'HOME' ? home : e.name === 'BOARD_AGENT' ? agent : e.name === 'CLAUDE_CODE_EFFORT_LEVEL' ? envEffort : undefined }))
   // The effortLevel setting, which /effort saves: where a session starts.
@@ -68,7 +70,7 @@ function host(
     // A command block's shell: `echo x` prints x, `false` fails.
     if (argv[0] === 'sh') {
       const cmd = argv[2]!
-      const failed = cmd === 'false'
+      const failed = cmd === 'false' || (shell?.failing.has(cmd) ?? false)
       return { value: { exitCode: failed ? 1 : 0, stdout: failed ? '' : `\n${cmd.replace(/^echo /, '')}\nsecond line`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     }
     const stdout =
@@ -1106,7 +1108,7 @@ test('blocks pressed again while the list shows closes the pane; from the board 
   expect(closed).toEqual(['modboard'])
 })
 
-test('a block of your own shows on the list by itself, with the command it runs', { options: { blocks: '{"ci": "echo green"}' } } as any, async ($, on) => {
+test('blocks of your own are on the list as one, checks, which shows them under a Checks heading', { options: { blocks: '{"ci": "echo green"}' } } as any, async ($, on) => {
   host(on, [])
   store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -1114,10 +1116,74 @@ test('a block of your own shows on the list by itself, with the command it runs'
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect(await texts(pane)).toContain('[ ] ci           echo green')
-  await pane.press({ key: 'pick-ci' })
+  const listed = (await texts(pane)) as string[]
+  expect(listed.some(t => t.startsWith('[ ] checks'))).toBe(true)
+  expect(listed.some(t => / ci /.test(t))).toBe(false)
+  await pane.press({ key: 'pick-checks' })
   await band.press({ key: 'board' })
-  expect(await texts(pane)).toContain('green')
+  expect(await label(pane, 'group-checks')).toBe('▾ Checks')
+  expect(await texts(pane)).toEqual(expect.arrayContaining(['ci', 'green']))
+})
+
+test('a command block that fails keeps its last result, says its age, then that it is not updating', { options: { blocks: '{"tests": "echo 42 passed"}', pane: 'checks' } } as any, async ($, on) => {
+  const time = { now: NOW }
+  const shell = { failing: new Set<string>() }
+  host(on, [], { time, shell })
+  // The commands' 30-second timer, run when the test says.
+  let tick = () => {}
+  on('clock.every', (_$, e: any) => (e.ms === 30_000 ? new Promise(resolve => (tick = () => resolve({ value: undefined }))) : new Promise(() => {})) as any)
+  const run = async () => {
+    tick()
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  await $.session.start(START)
+  let pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await texts(pane)).toEqual(expect.arrayContaining(['tests', '42 passed']))
+  expect(((await texts(pane)) as string[]).some(t => /ago|updating/.test(t))).toBe(false)
+  // It fails: the last result stays, and once it is old, it says how old, in grey.
+  shell.failing.add('echo 42 passed')
+  time.now = NOW + 6 * 60_000
+  await run()
+  expect(await texts(pane)).toContain('42 passed')
+  expect((await pane.find({ type: 'Text', text: ' · 6 min ago' }))?.props.dimColor).toBe(true)
+  // Failing for 5 minutes: not updating since its last success, in yellow.
+  // (The state is as before, so nothing redraws on its own; in a session the
+  // turning minute redraws the pane. Here a fresh drawing reads the new time.)
+  time.now = NOW + 12 * 60_000
+  await run()
+  await pane.unmount()
+  pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const stale = await pane.find({ type: 'Text', text: ' · not updating since 09:41' })
+  expect(stale?.props.color).toBe('warning')
+  expect(await texts(pane)).toContain('42 passed')
+  // Folded, the heading names it in yellow.
+  await pane.press({ key: 'group-checks' })
+  expect((await pane.find({ type: 'Text', text: 'tests not updating' }))?.props.color).toBe('warning')
+  await pane.press({ key: 'group-checks' })
+  // It works again: fresh, nothing after it.
+  shell.failing.clear()
+  await run()
+  expect(((await texts(pane)) as string[]).some(t => /ago|updating/.test(t))).toBe(false)
+})
+
+test('a handoff lists the files its work changed, as many as fit, then how many more', async ($, on) => {
+  const files = ['api/auth.ts', 'src/login.tsx', 'src/form.css', 'src/routes.ts', 'test/login.test.ts']
+  host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done', where: { ...WHERE, files } }] }], { home: '/Users/me' })
+  await $.session.start(START)
+  const wide = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 120 } } as any)
+  expect(await texts(wide)).toContain('files')
+  expect(await texts(wide)).toContain(files.join(', '))
+  await wide.unmount()
+  const narrow = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 60 } } as any)
+  expect(await texts(narrow)).toContain('api/auth.ts, src/login.tsx +3')
+  await narrow.unmount()
+})
+
+test('checks with no blocks of your own says where to add one', { options: { pane: 'checks' } } as any, async ($, on) => {
+  host(on, [])
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await texts(pane)).toContain('No command blocks yet: add one under Your own blocks in /config.')
 })
 
 test('agents is one line: Live, then a green dot for each agent seen lately and a grey one for the quiet', { options: { pane: 'agents' } } as any, async ($, on) => {

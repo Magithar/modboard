@@ -1,4 +1,4 @@
-import type { Block } from './types'
+import type { Block, Ctx } from './types'
 import { words } from './types'
 
 // A block of your own, with no code: the `blocks` setting names it and the
@@ -10,26 +10,71 @@ import { words } from './types'
 export function commandBlock(name: string, command = ''): Block {
   return {
     name,
-    // On the list of blocks: the command it runs.
+    // On the list of blocks: the command it runs. The checks block lists them
+    // all under one heading, so each one is off the list by itself.
     about: command || 'your command',
+    listed: false,
     band: ({ ui: { Text }, custom }) => {
       const text = custom[name]
       if (!text) return null
       return [words(Text, `${name} ${text}`, { dimColor: true }), words(Text, text, { dimColor: true })]
     },
-    pane: ({ ui: { Box, Text }, custom }) => {
-      const text = custom[name]
-      if (!text) return null
-      return (
-        <Box>
-          <Box width={8}>
-            <Text dimColor>{name}</Text>
-          </Box>
-          <Text wrap="truncate">{text}</Text>
-        </Box>
-      )
-    },
+    pane: c => commandRow(c, name),
   }
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const clock = (ms: number) => `${pad2(new Date(ms).getHours())}:${pad2(new Date(ms).getMinutes())}`
+
+// "12 min ago", "3 h ago", "2 d ago".
+export function ago(ms: number) {
+  const min = Math.max(1, Math.floor(ms / 60_000))
+  if (min < 60) return `${min} min ago`
+  const h = Math.floor(min / 60)
+  return h < 24 ? `${h} h ago` : `${Math.floor(h / 24)} d ago`
+}
+
+// Where a command block stands: fresh; old (its last success was a while ago);
+// not updating (its command has failed for a while, the last good result is
+// kept); or failing with nothing to show yet.
+export type Standing = { text: string; note: string; stale: boolean } | null
+export function standing(c: Ctx, name: string): Standing {
+  const text = c.custom[name] ?? ''
+  const st = c.commandState[name]
+  if (!st) return text ? { text, note: '', stale: false } : null
+  if (st.failing !== null && c.now - st.failing >= c.staleMs) {
+    if (!text) return { text: '', note: 'not updating · the command fails', stale: true }
+    return { text, note: `not updating since ${clock(st.ok ?? st.failing)}`, stale: true }
+  }
+  if (!text) return null
+  if (st.ok !== null && c.now - st.ok >= c.staleMs) return { text, note: ago(c.now - st.ok), stale: false }
+  return { text, note: '', stale: false }
+}
+
+// One command block as a row: its name, its last good result, and, when it
+// is old, its age in grey, or, when its command keeps failing, a yellow
+// "not updating since 14:02".
+export function commandRow(c: Ctx, name: string) {
+  const { Box, Text } = c.ui
+  const s = standing(c, name)
+  if (!s) return null
+  return (
+    <Box>
+      <Box width={8} flexShrink={0}>
+        <Text dimColor>{name}</Text>
+      </Box>
+      <Box flexShrink={1}>
+        <Text wrap="truncate">{s.text}</Text>
+      </Box>
+      {s.note ? (
+        <Box flexShrink={0}>
+          <Text color={s.stale ? 'warning' : undefined} dimColor={!s.stale}>
+            {s.text ? ` · ${s.note}` : s.note}
+          </Text>
+        </Box>
+      ) : null}
+    </Box>
+  )
 }
 
 const NAME = /^[a-z][a-z0-9-]{0,15}$/

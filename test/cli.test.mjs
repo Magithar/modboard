@@ -266,7 +266,7 @@ test('a handoff records the worktree, branch and commit the work is in', () => {
   fs.writeFileSync(path.join(wt, 'form.tsx'), '')
   const said = b.run(['release', 'T-001', '--as', 'alice', '--handoff', 'form done; api left'], {}, wt)
   assert.match(said.out, new RegExp(`the work is in ${wt} · login @ ${commit}, uncommitted changes`))
-  assert.deepEqual(b.json(['show', 'T-001']).notes.at(-1).where, { worktree: wt, branch: 'login', commit, dirty: true })
+  assert.deepEqual(b.json(['show', 'T-001']).notes.at(-1).where, { worktree: wt, branch: 'login', commit, dirty: true, files: ['form.tsx'] })
   // Outside a git repo there is nowhere to record.
   b.run(['claim', 'T-001', '--as', 'bob'])
   b.run(['release', 'T-001', '--as', 'bob', '--handoff', 'nothing'])
@@ -285,7 +285,7 @@ test('check runs the command and records it only when it passes, with where it r
   // Its output goes to stderr; stdout stays the board's JSON.
   const passed = b.json(['check', 'T-001', 'echo running; test -d .git', '--as', 'alice'], {}, wt)
   assert.deepEqual(passed.notes.at(-1).check, { cmd: 'echo running; test -d .git', ran: true })
-  assert.deepEqual(passed.notes.at(-1).where, { worktree: wt, branch: 'login', commit, dirty: false })
+  assert.deepEqual(passed.notes.at(-1).where, { worktree: wt, branch: 'login', commit, dirty: false, files: [] })
   // --passed records a check the agent ran itself, without running it.
   const reported = b.json(['check', 'T-001', 'exit 1', '--passed', '--as', 'alice'], {}, wt)
   assert.deepEqual(reported.notes.at(-1).check, { cmd: 'exit 1', ran: false })
@@ -321,7 +321,7 @@ test('a session that went away after doing work leaves a handoff, with where it 
   const left = t1.notes.at(-1)
   assert.equal(left.by, 'board')
   assert.match(left.text, /^HANDOFF: ghost stopped responding \(its session went silent\); read the notes above$/)
-  assert.deepEqual(left.where, { worktree: wt, branch: 'login', commit, dirty: false, stale: true })
+  assert.deepEqual(left.where, { worktree: wt, branch: 'login', commit, dirty: false, files: [], stale: true })
   assert.match(b.run(['show', 'T-001'], quick).out, /login @ .*\(last known, may be stale\)/)
   // Claimed and gone with nothing recorded: back to not started, no handoff.
   assert.doesNotMatch(b.json(['show', 'T-002'], quick).notes.at(-1).text, /^HANDOFF/)
@@ -350,4 +350,45 @@ test('a task flagged to ring says so, and the flag can be set and taken off late
   assert.match(b.run(['ring', 'T-002', '--off', '--as', 'lead']).out, /no longer rings/)
   assert.equal(b.json(['show', 'T-002']).ring, undefined)
   assert.equal(b.run(['ring', 'T-404', '--as', 'lead']).code !== 0, true)
+})
+
+// A repo on main with two files, and a worktree on its own branch, as an
+// agent's is: the branch commits one change and leaves another uncommitted.
+function worktree(b) {
+  const main = path.join(b.dir, 'app')
+  fs.mkdirSync(path.join(main, 'src'), { recursive: true })
+  fs.mkdirSync(path.join(main, 'api'))
+  const env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' }
+  const git = (cwd, ...args) => execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: 'pipe' }).trim()
+  git(main, 'init', '-q', '-b', 'main')
+  fs.writeFileSync(path.join(main, 'src', 'login.tsx'), 'a')
+  fs.writeFileSync(path.join(main, 'api', 'auth.ts'), 'b')
+  fs.writeFileSync(path.join(main, 'README.md'), 'c')
+  git(main, 'add', '.')
+  git(main, 'commit', '-q', '-m', 'start')
+  const wt = path.join(b.dir, 'app-login')
+  git(main, 'worktree', 'add', '-q', '-b', 'login', wt)
+  fs.appendFileSync(path.join(wt, 'src', 'login.tsx'), 'x')
+  git(wt, 'commit', '-qam', 'form')
+  fs.appendFileSync(path.join(wt, 'api', 'auth.ts'), 'y')
+  return fs.realpathSync(wt)
+}
+
+test('a handoff records the files the work changed, committed or not, and board who finds who changed a file', () => {
+  const b = fresh()
+  const wt = worktree(b)
+  b.run(['add', 'login page'])
+  b.run(['add', 'docs'])
+  b.run(['claim', 'T-001', '--as', 'claude 2'])
+  b.run(['release', 'T-001', '--as', 'claude 2', '--handoff', 'form done; api left'], {}, wt)
+  // The branch's commit and the uncommitted change; not README.md, which nobody touched.
+  assert.deepEqual(b.json(['show', 'T-001']).notes.at(-1).where.files, ['api/auth.ts', 'src/login.tsx'])
+  assert.match(b.run(['show', 'T-001']).out, /files: api\/auth\.ts, src\/login\.tsx/)
+  const who = b.json(['who', 'src/login.tsx'], {}, wt)
+  assert.equal(who.hits.length, 1)
+  assert.deepEqual([who.hits[0].task, who.hits[0].by, who.hits[0].kind], ['T-001', 'claude 2', 'handoff'])
+  // Asked from inside src/, the path is taken from there.
+  assert.equal(b.json(['who', 'login.tsx'], {}, path.join(wt, 'src')).hits[0].task, 'T-001')
+  assert.match(b.run(['who', 'README.md'], {}, wt).out, /no handoff or check recorded a change to README\.md/)
+  assert.equal(b.run(['who']).code, 2)
 })

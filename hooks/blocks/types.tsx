@@ -11,8 +11,16 @@ export type Ctx = {
   usage: Usage
   model: string
   effort: string
-  // The last line each command block printed, by block name.
+  // The last good line each command block printed, by block name: kept when
+  // its command fails, so the result doesn't go blank. `commands` names the
+  // command blocks in the order the setting gives them; `commandState` says
+  // when each last succeeded and since when it has failed (ms, or null); a
+  // result older than `staleMs` says its age, and one whose command has failed
+  // that long says it is not updating.
   custom: Record<string, string>
+  commands: string[]
+  commandState: Record<string, CommandState>
+  staleMs: number
   // The project's task.md, and whether its list is open in the pane.
   taskfile: TaskFile
   taskfileOpen: boolean
@@ -40,6 +48,8 @@ export type Ctx = {
   // matching slash command would.
   act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; openBlocks: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void>; stopAlarm: () => Promise<void> }
 }
+
+export type CommandState = { ok: number | null; failing: number | null }
 
 // One way a block can draw in the band, and how many columns it takes.
 // `end`: the part sits at the line's right end, by Claude Code's own control.

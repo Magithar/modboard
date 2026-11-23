@@ -152,8 +152,9 @@ Each command answers in a line or two (`claimed T-001 … it's yours until
 14:05`). Add `--json` for the data instead.
 
 A handoff and a check record the worktree, branch and commit they were made
-in, and whether anything was uncommitted, so the next agent knows where the
-work is and what last passed there. `board check --passed` records a check you
+in, whether anything was uncommitted, and the files the work changed, so the
+next agent knows where the work is and what last passed there. `board who
+<file>` reads those back: which agents changed a file, and on which task. `board check --passed` records a check you
 already ran yourself, without running it again.
 
 <details>
@@ -170,6 +171,7 @@ board view                                # every task and live agent, as JSON
 board doctor                              # check the ledger against the state
 board taskfile                            # the project's task.md, read only
 board ring T-001                          # ring the alarm when it's done; --off takes it back
+board who src/login.tsx                   # which agents changed a file, on which task
 ```
 
 | Exit code | Meaning |
@@ -183,7 +185,7 @@ board ring T-001                          # ring the alarm when it's done; --off
 | 8 | the check failed; nothing was recorded |
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
-`board_claim`, `board_note`, `board_check`, `board_release`, `board_done`
+`board_claim`, `board_note`, `board_check`, `board_who`, `board_release`, `board_done`,
 `board_alarm`, `board_alarm_off` and `board_location`. Any tool call renews the session's claims.
 
 The CLI and the tools use the board's precise terms (claim, release, handoff,
@@ -260,7 +262,7 @@ right end.
 | Section | What it shows |
 |---|---|
 | **In progress** | who is on what. `codex 1 · idle` in yellow: no note or heartbeat for most of its claim's time |
-| **Unfinished** | work stopped partway: the handoff as points, then `where` (branch and commit), `path` (the worktree; press it to put a `cd` to it on the clipboard) and `check` (the last check that passed) |
+| **Unfinished** | work stopped partway: the handoff as points, then `where` (branch and commit), `path` (the worktree; press it to put a `cd` to it on the clipboard), `files` (what the work changed) and `check` (the last check that passed) |
 | **Not started** | everything waiting |
 | **Done** | what's finished, and who finished it |
 | **To do** | what's left in [your task.md](#your-taskmd) |
@@ -338,6 +340,7 @@ pane: work,todo,compact,usage           (the default)
 | `board` | ✓ | | the `blocks` and `modBOARD` buttons |
 | `work` | | ✓ | who's doing what: In progress, Unfinished, Not started and Done |
 | `todo` | | ✓ | your task.md under To do |
+| `checks` | | ✓ | your command blocks under a Checks heading, each with its age, or `not updating` when its command keeps failing |
 | `compact` | ✓ | ✓ | the context window as a bar, and a button that compacts the conversation |
 | `usage` | ✓ | ✓ | the 5-hour limit as a bar (in the band, only once it passes 50%) |
 | `model` | ✓ | ✓ | the model; click to switch |
@@ -471,7 +474,7 @@ the CLI directly.
 | **Claims expire** | A claim lasts 15 minutes; a note or heartbeat renews it. An expired claim goes back to waiting. If its agent had recorded work (a note or a check), the board writes a handoff for it, so the task shows under Unfinished with the last place the work was seen, marked *last known, may be stale*. |
 | **Crashes recover fast** | An open Claude session pings the board every minute. If it's killed, its claims go back after 3 minutes of silence. |
 | **Names** | The board numbers sessions as they join: `claude 1`, `codex 1`. A session keeps its name while it's open; a new one takes the lowest free number. |
-| **Handoffs** | `release --handoff` leaves a note the next agent reads first, with the worktree, branch and commit the work is in. A Claude session that ends releases what it holds, with a handoff of its own. |
+| **Handoffs** | `release --handoff` leaves a note the next agent reads first, with the worktree, branch and commit the work is in, and the files it changed (`board who` finds them). A Claude session that ends releases what it holds, with a handoff of its own. |
 | **Checks** | `board check` runs a command in your checkout and records it only if it passes, with the commit it ran at; the next agent sees the last check that passed. `--passed` (and the `board_check` tool) records one an agent ran itself, marked as reported. |
 | **Done means verified** | `done` needs a `--note` on how the task was checked, against its `--accept` criteria if it has any. |
 | **A ledger** | Every change, lost claims included, is appended to `ledger.jsonl`. `board doctor` checks it against the board. |
@@ -537,7 +540,9 @@ The quickest way. Two steps, both in the plugin's settings (`/config`):
 }
 ```
 
-**2. Add the name** to `band` or `pane`, like a built-in block:
+**2. Show it.** In the pane, tick `checks` on the list of blocks: every
+command block shows under one **Checks** heading. In the band, add the name to
+`band`, like a built-in block:
 
 ```
 band: summary,ci,model,effort,board
@@ -547,12 +552,28 @@ That's it. Every 30 seconds the command runs, and the block shows the first
 line it prints, cut to 60 characters. In the band it reads `ci success`, or
 just `success` when the line is short.
 
+Under Checks, each block says how fresh it is:
+
+```
+▾ Checks
+
+  tests   ✓ 42 passed · login · 12 min ago
+  ci      success · not updating since 14:02
+```
+
+- A result older than 5 minutes says its age, in grey.
+- A command that fails keeps its last good result; once it has failed for 5
+  minutes, it says `not updating since 14:02` in yellow, and the folded
+  heading names it in yellow too: `▸ Checks · tests · ci not updating`.
+- The `stale` setting changes the 5 minutes.
+
 Good to know:
 
 - Names are lowercase letters, digits and dashes, up to 16 characters, and
   can't reuse a built-in block's name. A bad entry is skipped, with a toast
   saying why.
-- A command that fails (non-zero exit) or prints nothing shows nothing.
+- A command that fails (non-zero exit) keeps its last good result; one that
+  has never succeeded shows nothing in the band, and says it fails under Checks.
 - The setting lives in your user config, not in the project, so opening
   someone else's repo can never make your session run its commands.
 
