@@ -935,6 +935,15 @@ modboard/
 
 ---
 
+## Support
+
+modBOARD is free and MIT-licensed. If it saves you time, you can buy me a coffee:
+
+- [Ko-fi](https://ko-fi.com/magithar)
+- [PayPal](https://www.paypal.me/magithar)
+
+---
+
 ## License
 
 MIT
