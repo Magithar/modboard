@@ -1191,6 +1191,28 @@ test('under Checks a success is green, a failure red, anything else plain', { op
   expect(await colour('login')).toBeUndefined()
 })
 
+test('a command that keeps working is not written again every run, so the pane is not redrawn for nothing', { options: { blocks: '{"ci": "echo success"}', pane: 'checks' } } as any, async ($, on) => {
+  const time = { now: NOW }
+  host(on, [], { time })
+  let tick = () => {}
+  on('clock.every', (_$, e: any) => (e.ms === 30_000 ? new Promise(resolve => (tick = () => resolve({ value: undefined }))) : new Promise(() => {})) as any)
+  const writes: string[] = []
+  on('state.set', (_$, e: any, next: any) => {
+    if (String(e.key ?? e.name ?? '').includes('commandState')) writes.push(String(time.now))
+    return next(e)
+  })
+  await $.session.start(START)
+  const before = writes.length
+  // The first run is written: the test sees writes.
+  expect(before).toBeGreaterThan(0)
+  for (const after of [30, 60, 90]) {
+    time.now = NOW + after * 1000
+    tick()
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  expect(writes.length).toBe(before)
+})
+
 test('checks with no blocks of your own says where to add one', { options: { pane: 'checks' } } as any, async ($, on) => {
   host(on, [])
   await $.session.start(START)

@@ -354,7 +354,12 @@ async function runCommands($: EngineInterface, commands: Record<string, string>)
     const run = await $.process.run(['sh', '-c', command]).catch(() => undefined)
     if (run && run.exitCode === 0) {
       out[name] = firstLine(run.stdout)
-      state[name] = { ok: now, failing: null }
+      // A success keeps its time until it is half way to stale: the age never
+      // shows while the command keeps working, and the pane isn't redrawn
+      // every 30 seconds for a time nobody sees (a redraw mid-scroll jolts it).
+      const prev = was[name]
+      const fresh = prev && prev.failing === null && prev.ok !== null && now - prev.ok < staleMs / 2
+      state[name] = fresh ? prev : { ok: now, failing: null }
     } else {
       if (before[name]) out[name] = before[name]
       state[name] = { ok: was[name]?.ok ?? null, failing: was[name]?.failing ?? now }
