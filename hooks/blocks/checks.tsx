@@ -30,12 +30,17 @@ export const checks: Block = {
         {open ? (
           <Box flexDirection="column" marginTop={1} paddingLeft={2}>
             {c.commands.length ? (
-              c.commands.map(name => commandRow(c, name) ?? (
-                <Box>
-                  <Box width={8} flexShrink={0}>
-                    <Text dimColor>{name}</Text>
-                  </Box>
-                  <Text dimColor>waiting for its first run</Text>
+              // A blank line between the rows, as between a handoff's facts.
+              c.commands.map((name, i) => (
+                <Box marginTop={i ? 1 : 0}>
+                  {commandRow(c, name) ?? (
+                    <Box>
+                      <Box width={8} flexShrink={0}>
+                        <Text dimColor>{name}</Text>
+                      </Box>
+                      <Text dimColor>waiting for its first run</Text>
+                    </Box>
+                  )}
                 </Box>
               ))
             ) : (
