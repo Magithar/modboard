@@ -261,6 +261,8 @@ const TOOLS = [
       description: { type: 'string' },
       accept: { type: 'string' },
       ring: { type: 'boolean', description: 'Ring the person\'s alarm when this task is done, whoever finishes it. Only for what they asked to hear about, or a milestone worth interrupting them for.' },
+      after: { type: 'array', items: { type: 'string' }, description: 'Task ids this one waits on: nobody can claim it until they are done. For work that needs another task finished first.' },
+      labels: { type: 'array', items: { type: 'string' }, description: 'Labels to sort work by, as key=value ("kind=bug", "area=api") or a plain word.' },
     },
     required: ['title'],
     args: (i: any) => [
@@ -269,15 +271,22 @@ const TOOLS = [
       ...(i.description ? ['--desc', i.description] : []),
       ...(i.accept ? ['--accept', i.accept] : []),
       ...(i.ring ? ['--ring'] : []),
+      ...(i.after?.length ? ['--after', i.after.join(',')] : []),
+      ...(i.labels?.length ? ['--label', i.labels.join(',')] : []),
     ],
   },
   {
     name: 'board_claim',
     description:
-      'Claim a task before working on it. Fails if another agent holds it — then pick another task. Your lease renews automatically while you work.',
-    schema: { id: { type: 'string' } },
-    required: ['id'],
-    args: (i: any) => ['claim', i.id],
+      'Claim a task before working on it. Fails if another agent holds it, or if it waits on a task not yet done: then pick another. ' +
+      'Leave out id to take the next ready task instead (with labels, one carrying them): picked and claimed in one step, so agents never pick the same one. ' +
+      'Your lease renews automatically while you work.',
+    schema: {
+      id: { type: 'string' },
+      labels: { type: 'array', items: { type: 'string' }, description: 'With no id: only a task carrying every one of these labels.' },
+    },
+    required: [],
+    args: (i: any) => (i.id ? ['claim', i.id] : ['claim', '--next', ...(i.labels?.length ? ['--label', i.labels.join(',')] : [])]),
   },
   {
     name: 'board_note',
@@ -318,10 +327,11 @@ const TOOLS = [
     name: 'board_done',
     description:
       'Mark a task you hold as done. Only after you have checked it against its acceptance criteria (board_show lists them). ' +
-      'The note says how you verified it: what you ran or checked and what you saw.',
-    schema: { id: { type: 'string' }, note: { type: 'string' } },
+      'The note says how you verified it: what you ran or checked and what you saw. ' +
+      'review: true also adds a task to review it, which another agent or a person picks up; never you.',
+    schema: { id: { type: 'string' }, note: { type: 'string' }, review: { type: 'boolean' } },
     required: ['id', 'note'],
-    args: (i: any) => ['done', i.id, '--note', i.note ?? ''],
+    args: (i: any) => ['done', i.id, '--note', i.note ?? '', ...(i.review ? ['--review'] : [])],
   },
 ]
 

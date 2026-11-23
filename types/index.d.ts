@@ -5,8 +5,17 @@ export type Task = {
   accept?: string
   // Ring an alarm when it is done (board add --ring, board ring <id>).
   ring?: boolean
+  // Tasks this one waits on (board add --after); it can't be claimed until
+  // they are done. `waitingOn`, worked out on each read, is those still open.
+  after?: string[]
+  waitingOn?: string[]
+  // "kind=bug", "area=api" or a plain word (board add --label).
+  labels?: string[]
+  // A review task (board done --review) names the task it reviews.
+  reviewOf?: string
   status: 'todo' | 'claimed' | 'done'
-  claim: { owner: string; since: string; expiresAt: string } | null
+  // `leaseMs`: a lease length the claim asked for (claim --lease 1h).
+  claim: { owner: string; since: string; expiresAt: string; leaseMs?: number } | null
   notes: Note[]
 }
 

@@ -392,3 +392,106 @@ test('a handoff records the files the work changed, committed or not, and board 
   assert.match(b.run(['who', 'README.md'], {}, wt).out, /no handoff or check recorded a change to README\.md/)
   assert.equal(b.run(['who']).code, 2)
 })
+
+test('a task that waits on another can be claimed only once that one is done', () => {
+  const b = fresh()
+  b.run(['add', 'fix'])
+  b.run(['add', 'ship', '--after', 'T-001'])
+  assert.match(b.run(['list']).out, /T-002 {2}ship {2}waits on T-001/)
+  assert.deepEqual(b.json(['show', 'T-002']).waitingOn, ['T-001'])
+  assert.equal(b.run(['claim', 'T-002', '--as', 'alice']).code, 9)
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  b.run(['done', 'T-001', '--as', 'alice', '--note', 'ran it'])
+  assert.equal(b.json(['show', 'T-002']).waitingOn, undefined)
+  assert.equal(b.run(['claim', 'T-002', '--as', 'alice']).code, 0)
+  // Waiting on a task that doesn't exist is refused when it's added.
+  assert.equal(b.run(['add', 'orphan', '--after', 'T-099']).code, 4)
+})
+
+test('claim --next picks and claims the first ready task, and racers never get the same one', async () => {
+  const b = fresh()
+  for (const t of ['one', 'two', 'three']) b.run(['add', t])
+  b.run(['add', 'later', '--after', 'T-001'])
+  const results = await Promise.all(
+    Array.from({ length: 5 }, (_, i) =>
+      new Promise(resolve =>
+        execFile('node', [BOARD, 'claim', '--next', '--json', '--as', `a${i}`], { env: b.env }, (err, out) => resolve(err ? err.code : JSON.parse(out).id)),
+      ),
+    ),
+  )
+  const won = results.filter(r => typeof r === 'string')
+  assert.deepEqual([...won].sort(), ['T-001', 'T-002', 'T-003'])
+  assert.deepEqual(results.filter(r => typeof r !== 'string'), [10, 10])
+  assert.equal(b.json(['doctor']).ok, true)
+})
+
+test('labels filter list and claim --next', () => {
+  const b = fresh()
+  b.run(['add', 'docs', '--label', 'kind=docs'])
+  b.run(['add', 'bug', '--label', 'kind=bug', '--label', 'area=api'])
+  assert.match(b.run(['list']).out, /bug {2}\[kind=bug area=api\]/)
+  assert.deepEqual(b.json(['list', '--label', 'kind=bug']).map(t => t.id), ['T-002'])
+  assert.equal(b.json(['claim', '--next', '--label', 'kind=bug,area=api', '--as', 'alice']).id, 'T-002')
+  assert.equal(b.run(['claim', '--next', '--label', 'kind=bug', '--as', 'bob']).code, 10)
+  assert.deepEqual(b.json(['list', '--ready']).map(t => t.id), ['T-001'])
+})
+
+test('claim --next --wait takes a task that comes ready while it waits', async () => {
+  const b = fresh()
+  b.run(['add', 'fix'])
+  b.run(['add', 'ship', '--after', 'T-001'])
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  const waiting = new Promise(resolve =>
+    execFile('node', [BOARD, 'claim', '--next', '--wait', '10s', '--json', '--as', 'bob'], { env: b.env }, (err, out) => resolve(err ? err.code : JSON.parse(out).id)),
+  )
+  await new Promise(resolve => setTimeout(resolve, 800))
+  b.run(['done', 'T-001', '--as', 'alice', '--note', 'ran it'])
+  assert.equal(await waiting, 'T-002')
+})
+
+test('a claim keeps the lease length it asked for, through renewals', () => {
+  const b = fresh()
+  b.run(['add', 'long build'])
+  const t = b.json(['claim', 'T-001', '--as', 'alice', '--lease', '2h'])
+  assert.equal(t.claim.leaseMs, 2 * 3600_000)
+  const left = iso => Date.parse(iso) - Date.now()
+  assert.ok(left(t.claim.expiresAt) > 110 * 60_000)
+  const noted = b.json(['note', 'T-001', 'still building', '--as', 'alice'])
+  assert.ok(left(noted.claim.expiresAt) > 110 * 60_000)
+  b.run(['heartbeat', '--as', 'alice', '--lease', '30m'])
+  const after = b.json(['show', 'T-001'])
+  assert.ok(left(after.claim.expiresAt) < 31 * 60_000 && left(after.claim.expiresAt) > 25 * 60_000)
+  assert.equal(b.run(['claim', 'T-001', '--as', 'alice', '--lease', 'soon']).code, 2)
+})
+
+test('done --review adds a review task that the finisher is never handed', () => {
+  const b = fresh()
+  b.run(['add', 'fix login', '--accept', 'login works'])
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  const done = b.json(['done', 'T-001', '--as', 'alice', '--note', 'ran e2e', '--review'])
+  assert.equal(done.review, 'T-002')
+  const r = b.json(['show', 'T-002'])
+  assert.equal(r.reviewOf, 'T-001')
+  assert.deepEqual(r.labels, ['kind=review'])
+  assert.match(r.accept, /login works/)
+  assert.equal(b.run(['claim', '--next', '--as', 'alice']).code, 10)
+  assert.equal(b.json(['claim', '--next', '--label', 'kind=review', '--as', 'bob']).id, 'T-002')
+})
+
+test('tail follows the board as it changes', async () => {
+  const b = fresh()
+  b.run(['add', 'before'])
+  const { spawn } = await import('node:child_process')
+  const tail = spawn('node', [BOARD, 'tail'], { env: b.env })
+  let out = ''
+  tail.stdout.on('data', d => (out += d))
+  await new Promise(resolve => setTimeout(resolve, 700))
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  await new Promise(resolve => setTimeout(resolve, 1200))
+  tail.kill()
+  // From now on: what came before isn't repeated.
+  assert.doesNotMatch(out, /added T-001/)
+  assert.match(out, /alice {2}claimed T-001/)
+  const all = execFileSync('node', [BOARD, 'events', '0'], { env: b.env, encoding: 'utf8' })
+  assert.equal(JSON.parse(all).length, 2)
+})

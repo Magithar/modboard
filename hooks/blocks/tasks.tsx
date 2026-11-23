@@ -17,6 +17,8 @@ function status(t: Task, { now, who }: Ctx): { text: string; warn: boolean } {
     return { text: name, warn: false }
   }
   if (handoffWaiting(t)) return { text: handedOffBy(t), warn: true }
+  // Not ready yet: what it waits on. Nobody can take it until that is done.
+  if (t.waitingOn?.length) return { text: `waits on ${t.waitingOn.join(', ')}`, warn: false }
   return { text: '', warn: false }
 }
 
@@ -38,6 +40,8 @@ function Row(c: Ctx, t: Task) {
       <Box flexGrow={1} flexShrink={1}>
         <Text bold={isMine} wrap="truncate">
           {t.title}
+          {/* Labels after the title, grey: what kind of work it is. */}
+          {t.labels?.length ? <Text dimColor>{`  ${t.labels.join(' ')}`}</Text> : null}
         </Text>
       </Box>
       {text && (

@@ -99,13 +99,26 @@ function parseArgs(argv) {
     const a = argv[i]
     if (a.startsWith('--')) {
       const val = argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') ? argv[++i] : true
-      flags[a.slice(2)] = val
+      const name = a.slice(2)
+      // A flag given twice (--label a --label b) keeps both.
+      flags[name] = name in flags ? [flags[name], val].flat() : val
     } else pos.push(a)
   }
   return { pos, flags }
 }
 
-const text = v => (typeof v === 'string' ? v : undefined)
+const text = v => (typeof v === 'string' ? v : Array.isArray(v) ? text(v.at(-1)) : undefined)
+
+// A list flag, given twice or comma-separated: --label kind=bug,area=api.
+const many = v => [v ?? []].flat().filter(x => typeof x === 'string').flatMap(x => x.split(',')).map(x => x.trim()).filter(Boolean)
+
+// A length of time: 90s, 10m, 1h, or a bare number of minutes.
+function duration(v, flag) {
+  if (v === undefined) return undefined
+  const m = /^(\d+(?:\.\d+)?)\s*(s|m|h)?$/.exec(String(text(v) ?? ''))
+  if (!m || Number(m[1]) <= 0) throw new BoardError(2, `--${flag} takes a length of time: 90s, 10m, 1h`)
+  return Number(m[1]) * { s: 1000, m: 60_000, h: 3_600_000 }[m[2] ?? 'm']
+}
 
 // Who is asking: --as, else BOARD_AGENT, else a Codex thread (Codex marks every
 // shell it runs with CODEX_THREAD_ID), named "codex 1", "codex 2" by when it
@@ -119,13 +132,17 @@ async function actorOf(board, flags) {
 }
 
 const SYMBOL = { todo: '○', claimed: '◐', done: '●' }
-const line = t => `${SYMBOL[t.status]} ${t.id}  ${t.title}${t.claim ? `  ${t.claim.owner}` : ''}`
+const line = t =>
+  `${SYMBOL[t.status]} ${t.id}  ${t.title}${t.labels?.length ? `  [${t.labels.join(' ')}]` : ''}${t.claim ? `  ${t.claim.owner}` : ''}${t.waitingOn?.length ? `  waits on ${t.waitingOn.join(', ')}` : ''}`
 
 function describe(t) {
   const out = [line(t), '']
   if (t.description) out.push(t.description, '')
   if (t.accept) out.push(`Accept when: ${t.accept}`, '')
   if (t.ring) out.push('Rings an alarm when done.', '')
+  if (t.labels?.length) out.push(`Labels: ${t.labels.join(', ')}`, '')
+  if (t.reviewOf) out.push(`Reviews ${t.reviewOf}.`, '')
+  if (t.after?.length) out.push(`Waits on ${t.after.join(', ')}${t.waitingOn?.length ? `; still open: ${t.waitingOn.join(', ')}` : '; all done'}`, '')
   if (t.claim) out.push(`claimed by ${t.claim.owner} until ${t.claim.expiresAt}`)
   for (const n of t.notes) {
     out.push(`- [${n.at.slice(0, 16)}] ${n.by}: ${n.text}${n.check ? (n.check.ran ? ' (run by the board, passed)' : ' (passed, as reported)') : ''}`)
@@ -147,6 +164,7 @@ const SAY = {
   add: t => `added ${line(t)}${t.ring ? '\nit rings an alarm when done' : ''}`,
   ring: t => (t.ring ? `${t.id} rings an alarm when done` : `${t.id} no longer rings when done`),
   claim: t => `claimed ${t.id}  ${t.title}\nit's yours until ${hhmm(t.claim.expiresAt)}; a note or heartbeat renews it`,
+  tail: () => '',
   heartbeat: r => `renewed ${ids(r.renewed)}`,
   note: t => `noted on ${t.id}; yours until ${hhmm(t.claim.expiresAt)}`,
   release: t => {
@@ -162,7 +180,7 @@ const SAY = {
     const n = t.notes.at(-1)
     return `checked ${t.id}: ${n.check.cmd} passed${n.where ? ` at ${at(n.where)}` : ''}; yours until ${hhmm(t.claim.expiresAt)}`
   },
-  done: t => `done ${line(t)}\n${t.notes.at(-1).text}`,
+  done: t => `done ${line(t)}\n${t.notes.at(-1).text}${t.review ? `\nadded ${t.review} to review it` : ''}`,
   'release-all': r => `released ${ids(r.released)}`,
   register: r => `you are ${r.name}`,
   join: r => `you are ${r.name}`,
@@ -176,24 +194,35 @@ const SAY = {
     [`storage block: ${r.block}`, ...(r.tasks !== undefined ? [`${r.tasks} ${r.tasks === 1 ? 'task' : 'tasks'}, ${r.events ?? '?'} events`] : []), r.ok ? 'ok: the ledger and the state agree' : 'problems:', ...r.problems.map(p => `- ${p}`)].join('\n'),
 }
 
+// What each ledger event says, for tail: "claimed T-004".
+const DID = {
+  add: 'added', claim: 'claimed', 'claim-rejected': 'lost the claim on', note: 'noted on', check: 'checked',
+  release: 'released', done: 'finished', expire: 'took back', ring: 'set to ring', unring: 'stopped the ring on', register: 'joined',
+}
+const said = e => `${hhmm(e.at)}  ${e.actor}  ${DID[e.type] ?? e.type}${e.task ? ` ${e.task}` : ''}${e.holder ? ` (held by ${e.holder})` : ''}${e.reason === 'silent' ? ' (its session went silent)' : ''}`
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
 const commands = {
   async list(board, _, flags) {
-    const tasks = await board.list({ all: !!flags.all })
+    const tasks = await board.list({ all: !!flags.all, ready: !!flags.ready, labels: many(flags.label) })
     if (flags.json) return tasks
-    return tasks.length ? tasks.map(line).join('\n') : '(no open tasks)'
+    return tasks.length ? tasks.map(line).join('\n') : flags.ready || flags.label ? '(nothing matches)' : '(no open tasks)'
   },
   async show(board, [id], flags) {
     const t = await board.show(id)
     return flags.json ? t : describe(t)
   },
   async add(board, [title], flags) {
-    if (!title) throw new BoardError(2, 'usage: board add "<title>" [--desc "..."] [--accept "how to tell it is done"] [--ring]')
+    if (!title) throw new BoardError(2, 'usage: board add "<title>" [--desc "..."] [--accept "how to tell it is done"] [--after T-001] [--label kind=bug] [--ring]')
     const by = text(flags.as) ?? process.env.BOARD_AGENT ?? (process.env.CODEX_THREAD_ID ? await actorOf(board, flags) : 'human')
     return board.add(by, {
       title,
       description: text(flags.desc),
       accept: text(flags.accept),
       ring: !!flags.ring,
+      after: many(flags.after),
+      labels: many(flags.label),
     })
   },
   // board ring <id>: ring an alarm when it is done. --off takes that back.
@@ -202,8 +231,27 @@ const commands = {
     const by = text(flags.as) ?? process.env.BOARD_AGENT ?? (process.env.CODEX_THREAD_ID ? await actorOf(board, flags) : 'human')
     return board.ring(id, by, !flags.off)
   },
-  claim: async (board, [id], flags) => board.claim(id, await actorOf(board, flags)),
-  heartbeat: async (board, _, flags) => board.heartbeat(await actorOf(board, flags)),
+  // board claim <id>, or --next: the first ready task (with --label, carrying
+  // them), picked and claimed in one step. --wait 10m waits for one to come
+  // ready. --lease 1h holds it that long between renewals.
+  async claim(board, [id], flags) {
+    const actor = await actorOf(board, flags)
+    const leaseMs = duration(flags.lease, 'lease')
+    if (!flags.next) {
+      if (!id || flags.label || flags.wait) throw new BoardError(2, 'usage: board claim <id> [--lease 1h], or board claim --next [--label kind=bug] [--wait 10m] [--lease 1h]')
+      return board.claim(id, actor, { leaseMs })
+    }
+    if (id) throw new BoardError(2, 'claim --next picks the task itself; leave out the id')
+    const labels = many(flags.label)
+    const until = Date.now() + (duration(flags.wait, 'wait') ?? 0)
+    for (;;) {
+      const t = await board.claimNext(actor, { labels, leaseMs })
+      if (t) return t
+      if (Date.now() >= until) throw new BoardError(10, `nothing ready to claim${labels.length ? ` with ${labels.join(', ')}` : ''}`)
+      await sleep(Math.min(1000, until - Date.now()))
+    }
+  },
+  heartbeat: async (board, _, flags) => board.heartbeat(await actorOf(board, flags), { leaseMs: duration(flags.lease, 'lease') }),
   async note(board, [id, note], flags) {
     if (!note) throw new BoardError(2, 'usage: board note <id> "<text>"')
     return board.note(id, await actorOf(board, flags), note)
@@ -244,7 +292,7 @@ const commands = {
     }
     return board.check(id, actor, { cmd, ran, where: whereNow() })
   },
-  done: async (board, [id], flags) => board.done(id, await actorOf(board, flags), text(flags.note)),
+  done: async (board, [id], flags) => board.done(id, await actorOf(board, flags), text(flags.note), { review: !!flags.review }),
   'release-all': async (board, _, flags) => board.releaseAll(await actorOf(board, flags), { handoff: text(flags.handoff), session: text(flags.session), where: whereNow() }),
   register(board, [name], flags) {
     const session = text(flags.session)
@@ -262,6 +310,22 @@ const commands = {
   // Everything a display needs, in one call: every task and the live agents.
   view: async board => ({ tasks: await board.list({ all: true }), agents: await board.agents() }),
   events: (board, [since]) => board.events(Number(since ?? 0)),
+  // Follow the board as it changes, one line an event (--json: one JSON
+  // object a line), until stopped. From now on, or from --since <seq> (0 for
+  // everything). For scripts that act on what happens: post to a chat, start
+  // an agent. The board itself never does.
+  async tail(board, _, flags) {
+    const all = await board.events(0)
+    let since = flags.since === undefined ? (all.at(-1)?.seq ?? 0) : Number(text(flags.since))
+    if (!Number.isInteger(since) || since < 0) throw new BoardError(2, '--since takes an event number: 0 for everything')
+    for (;;) {
+      for (const e of await board.events(since)) {
+        console.log(flags.json ? JSON.stringify(e) : said(e))
+        since = e.seq
+      }
+      await sleep(500)
+    }
+  },
   doctor: async (board, _, __, store) => ({ block: store, ...(await board.doctor()) }),
   where: () => DIR,
   // The project's own task.md, for display; it never touches the board.
@@ -272,12 +336,15 @@ const commands = {
 // takes. Anything else is refused: a guessed flag (--description for --desc)
 // would otherwise be dropped without a word, and the task saved without it.
 const FLAGS = {
-  list: ['all'],
-  add: ['desc', 'accept', 'ring'],
+  list: ['all', 'ready', 'label'],
+  add: ['desc', 'accept', 'ring', 'after', 'label'],
+  claim: ['next', 'label', 'wait', 'lease'],
+  heartbeat: ['lease'],
+  tail: ['since'],
   ring: ['off'],
   release: ['handoff'],
   check: ['passed'],
-  done: ['note'],
+  done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],
   join: ['session'],

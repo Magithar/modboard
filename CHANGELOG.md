@@ -3,6 +3,43 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+Running many agents at once, with ideas from Vercel's Board: agents take the
+next ready task in one step, tasks can wait on others, and finished work can
+ask for a review.
+
+### Added
+
+- **`board claim --next`** picks the first ready task and claims it in the
+  same locked step, so agents racing for work each get a different one.
+  `--label` limits it to tasks with those labels; `--wait 10m` waits for one
+  to come ready. Exit 10 when nothing is ready. `board_claim` with no id does
+  the same in Claude Code.
+- **Tasks that wait on others:** `board add --after T-001,T-002`. Such a task
+  can't be claimed until those are done (exit 9). `board list` and the pane
+  say `waits on T-001`.
+- **Labels:** `board add --label kind=bug`, shown beside the title in
+  `board list` and the pane. `list --label` and `claim --next --label` filter
+  by them; `list --ready` shows only what can be claimed now.
+- **`board done --review`** also adds a review task that waits on the work,
+  labelled `kind=review`. `claim --next` never hands it to whoever finished
+  the work.
+- **Lease length per claim:** `claim --lease 1h`, and `heartbeat --lease 1h`
+  for every claim you hold. A claim keeps its length through renewals.
+- **`board tail`** follows the board as it changes, one line an event
+  (`--json` for scripts; `--since 0` from the start).
+- **An agent skill** (`skills/modboard`), for agents that load skills:
+  `npx skills add Magithar/modboard`.
+
+### Docs
+
+- **`docs/AGENT-SETUP.md`**, a setup page written for agents: point any
+  coding agent at it and it installs the CLI, ignores `.modboard/` and adds
+  the protocol to `AGENTS.md`.
+- The README covers the new commands, exit codes 9 and 10, and the new tool
+  inputs.
+
 ## 0.9.0 — 2026-11-23
 
 Two ideas from readers: command blocks that say when their result is old,

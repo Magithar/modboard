@@ -111,6 +111,11 @@ The protocol, for any agent's instructions:
 > (`board check`). If you stop without finishing, release it with a handoff.
 > Never touch a task another agent holds.
 
+**Or let an agent set it up.** Tell any coding agent: *Read
+https://github.com/Magithar/modboard/blob/main/docs/AGENT-SETUP.md and set up
+modBOARD here.* Agents that load skills can also learn the protocol with
+`npx skills add Magithar/modboard`.
+
 Claude Code gets the board's tools, a line above the prompt and the `/board`
 pane. Names are automatic: the board numbers sessions as they join. To pick
 one yourself, start Claude Code with `BOARD_AGENT=frontend`.
@@ -140,6 +145,7 @@ want in `band` and `pane`, or name a command to make your own. See
 board list                                # ○ todo  ◐ claimed  ● done
 board show T-001                          # description, notes, handoffs
 board claim T-001                         # exit 6 if another agent holds it
+board claim --next                        # the next ready task, picked and claimed in one step
 board note T-001 "what changed"           # also renews your claim
 board check T-001 "npm test"              # runs it; records it only if it passes
 board release T-001 --handoff "done X; left Y; see Z"
@@ -147,6 +153,24 @@ board done T-001 --note "ran X, saw Y"    # required: how you checked it
 board add "title" --desc "..." --accept "how to tell it is done"
 board add "Ship release" --ring           # ring the alarm when it's done
 ```
+
+**Running several agents at once.** Give each the same loop: `board claim
+--next`, work, `board done`. They never get the same task. Tasks can wait on
+others, carry labels, and ask for a review:
+
+```bash
+board add "Ship" --after T-001,T-002      # can't be claimed until both are done
+board add "Fix login" --label kind=bug    # key=value, or a plain word
+board claim --next --label kind=bug       # only tasks with that label
+board claim --next --wait 10m             # wait for one to come ready
+board claim T-001 --lease 1h              # long work: hold it an hour between renewals
+board done T-001 --note "..." --review    # also adds a review task, never handed back to you
+board tail                                # follow the board as it changes; --json for scripts
+```
+
+`board tail` prints one line an event (`14:05  claude 1  claimed T-004`) until
+you stop it. Pipe it into your own script to post to a chat or start an agent
+when something happens; the board itself never does.
 
 Each command answers in a line or two (`claimed T-001 … it's yours until
 14:05`). Add `--json` for the data instead.
@@ -163,7 +187,8 @@ already ran yourself, without running it again.
 <br/>
 
 ```bash
-board heartbeat                           # renew all your claims
+board heartbeat                           # renew all your claims; --lease 1h changes their length
+board list --ready                        # only what can be claimed now; --label to filter
 board release-all                         # free everything you hold
 board whoami                              # the name the board gave you
 board agents                              # who is live
@@ -183,10 +208,14 @@ board who src/login.tsx                   # which agents changed a file, on whic
 | 6 | held by another agent |
 | 7 | name in use |
 | 8 | the check failed; nothing was recorded |
+| 9 | the task waits on another that isn't done |
+| 10 | `claim --next`: nothing ready to claim |
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
 `board_claim`, `board_note`, `board_check`, `board_who`, `board_release`, `board_done`,
 `board_alarm`, `board_alarm_off` and `board_location`. Any tool call renews the session's claims.
+`board_claim` with no id takes the next ready task; `board_add` takes `after`
+and `labels`, and `board_done` takes `review`.
 
 The CLI and the tools use the board's precise terms (claim, release, handoff,
 lease), because agents act on them. The display uses plain words, so you can
@@ -476,7 +505,9 @@ the CLI directly.
 | **Names** | The board numbers sessions as they join: `claude 1`, `codex 1`. A session keeps its name while it's open; a new one takes the lowest free number. |
 | **Handoffs** | `release --handoff` leaves a note the next agent reads first, with the worktree, branch and commit the work is in, and the files it changed (`board who` finds them). A Claude session that ends releases what it holds, with a handoff of its own. |
 | **Checks** | `board check` runs a command in your checkout and records it only if it passes, with the commit it ran at; the next agent sees the last check that passed. `--passed` (and the `board_check` tool) records one an agent ran itself, marked as reported. |
-| **Done means verified** | `done` needs a `--note` on how the task was checked, against its `--accept` criteria if it has any. |
+| **Done means verified** | `done` needs a `--note` on how the task was checked, against its `--accept` criteria if it has any. `--review` also adds a task to review it, labelled `kind=review`, which `claim --next` never hands to whoever finished the work. |
+| **Ready work** | A task added `--after` other tasks waits until they are done; `claim` refuses it until then. `claim --next` picks the first ready task (lowest id, with every `--label` asked for) and claims it in the same locked step, so racing agents each get a different one. |
+| **Lease lengths** | `--lease 1h` on `claim` or `heartbeat` sets how long that claim lasts between renewals; the claim keeps it until it ends. |
 | **A ledger** | Every change, lost claims included, is appended to `ledger.jsonl`. `board doctor` checks it against the board. |
 
 <details>
