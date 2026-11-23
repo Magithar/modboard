@@ -561,6 +561,9 @@ Under Checks, each block says how fresh it is:
   ci      success · not updating since 14:02
 ```
 
+- A result that reads as a success (`success`, `passed`, `ok`, `✓`) is green,
+  and one that reads as a failure (`failed`, `error`, `✗`) red; `42 passed,
+  0 failed` is green. Anything else stays plain.
 - A result older than 5 minutes says its age, in grey.
 - A command that fails keeps its last good result; once it has failed for 5
   minutes, it says `not updating since 14:02` in yellow, and the folded

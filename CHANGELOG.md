@@ -19,6 +19,9 @@ and which agent changed which file.
   (`12 min ago`); one whose command has failed for 5 minutes says `not
   updating since 14:02` in yellow, and the folded heading names it in yellow.
   The `stale` setting changes the 5 minutes.
+- **Under Checks, a success is green and a failure red**, read from the
+  result's words (`success`, `passed`, `✓`; `failed`, `error`, `✗`). A failure
+  wins (`1 failed, 41 passed` is red), and `0 failed` is no failure.
 - **Handoffs and checks record the files the work changed**: those the
   worktree's branch changed since it left the main line, and those changed
   and not committed. `board show` lists them, and the pane shows a `files`

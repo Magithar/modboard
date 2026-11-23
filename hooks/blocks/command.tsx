@@ -51,6 +51,17 @@ export function standing(c: Ctx, name: string): Standing {
   return { text, note: '', stale: false }
 }
 
+// A result read as good or bad by its words: a failure in red, a success in
+// green, anything else plain. A failure wins, so "1 failed, 41 passed" is red.
+const BAD = /(^|[^a-z])(fail(s|ed|ure|ing)?|errors?|broken|red)([^a-z]|$)|[✗✘❌]/i
+const GOOD = /(^|[^a-z])(success(ful)?|succeeded|pass(es|ed|ing)?|ok|green)([^a-z]|$)|[✓✔✅]/i
+// "0 failed" and "0 errors" are no failure: "42 passed, 0 failed" is green.
+const NONE = /(^|[^0-9])0 (fail(s|ed|ures?|ing)?|errors?)/gi
+export const outcome = (text: string) => {
+  const read = text.replace(NONE, ' ')
+  return BAD.test(read) ? 'error' : GOOD.test(read) ? 'success' : undefined
+}
+
 // One command block as a row: its name, its last good result, and, when it
 // is old, its age in grey, or, when its command keeps failing, a yellow
 // "not updating since 14:02".
@@ -64,7 +75,9 @@ export function commandRow(c: Ctx, name: string) {
         <Text dimColor>{name}</Text>
       </Box>
       <Box flexShrink={1}>
-        <Text wrap="truncate">{s.text}</Text>
+        <Text color={outcome(s.text)} wrap="truncate">
+          {s.text}
+        </Text>
       </Box>
       {s.note ? (
         <Box flexShrink={0}>

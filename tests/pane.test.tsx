@@ -1179,6 +1179,18 @@ test('a handoff lists the files its work changed, as many as fit, then how many 
   await narrow.unmount()
 })
 
+test('under Checks a success is green, a failure red, anything else plain', { options: { blocks: '{"ci": "echo success", "tests": "echo 1 failed, 41 passed", "unit": "echo ✓ 42 passed", "lint": "echo 42 passed, 0 failed", "branch": "echo login"}', pane: 'checks' } } as any, async ($, on) => {
+  host(on, [])
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const colour = async (text: string) => (await pane.find({ type: 'Text', text }))?.props.color
+  expect(await colour('success')).toBe('success')
+  expect(await colour('1 failed, 41 passed')).toBe('error')
+  expect(await colour('✓ 42 passed')).toBe('success')
+  expect(await colour('42 passed, 0 failed')).toBe('success')
+  expect(await colour('login')).toBeUndefined()
+})
+
 test('checks with no blocks of your own says where to add one', { options: { pane: 'checks' } } as any, async ($, on) => {
   host(on, [])
   await $.session.start(START)
