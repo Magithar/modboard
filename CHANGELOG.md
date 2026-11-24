@@ -3,6 +3,18 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+### Fixed
+
+- **A killed Codex or shell agent no longer holds its work for 15 minutes.**
+  These agents send no presence ping, so each claim now records the agent's
+  own process. Once that process has exited, the next board read frees the
+  claim, with a handoff if the agent had recorded work. `board tail` says
+  `(its process exited)`. When the board can't tell, it still waits for the
+  lease: no `ps`, calls under one name from unrelated processes, or another
+  machine. A Claude session is still followed by its presence ping.
+
 ## 0.10.0 — 2026-11-24
 
 Running many agents at once, with ideas from Vercel's Board: agents take the

@@ -513,7 +513,7 @@ the CLI directly.
 | **Old finished tasks** | Done more than 14 days ago, a task moves whole to `.modboard/archive.jsonl`; the board keeps a stub with its last note, so every write stays small. `board show` and `board who` still read all of it. `BOARD_ARCHIVE_DAYS` (or `archiveDays` in `config.json`) changes the 14; `off` keeps everything in `board.json`. |
 | **One claim wins** | Each change takes a lock and replaces the board in one step, so exactly one claimant wins. Only the holder can note, release or finish a task. |
 | **Claims expire** | A claim lasts 15 minutes; a note or heartbeat renews it. An expired claim goes back to waiting. If its agent had recorded work (a note or a check), the board writes a handoff for it, so the task shows under Unfinished with the last place the work was seen, marked *last known, may be stale*. |
-| **Crashes recover fast** | An open Claude session pings the board every minute. If it's killed, its claims go back after 3 minutes of silence. |
+| **Crashes recover fast** | An open Claude session pings the board every minute. If it's killed, its claims go back after 3 minutes of silence. Codex and other CLI agents send no ping, so each claim records the agent's own process instead; once that process has exited, the next board read frees its claims. |
 | **Names** | The board numbers sessions as they join: `claude 1`, `codex 1`. A session keeps its name while it's open; a new one takes the lowest free number. |
 | **Handoffs** | `release --handoff` leaves a note the next agent reads first, with the worktree, branch and commit the work is in, and the files it changed (`board who` finds them). A Claude session that ends releases what it holds, with a handoff of its own. |
 | **Checks** | `board check` runs a command in your checkout and records it only if it passes, with the commit it ran at; the next agent sees the last check that passed. `--passed` (and the `board_check` tool) records one an agent ran itself, marked as reported. |
@@ -535,8 +535,15 @@ the CLI directly.
   atomic rename.
 - **Names you choose:** if another live session already holds the name you
   ask for, the new one becomes `frontend-2` and a toast says why.
-- **Codex** sends no presence ping, so its name and claims last only as long
-  as its leases. An agent that never registered (a plain shell) is the same.
+- **Codex** sends no presence ping, and neither does an agent that never
+  registered (a plain shell). On each `board` call the board walks up the
+  process tree to the agent's own process: the nearest one that isn't a shell
+  and has run for at least 10 seconds. Later calls keep only the processes
+  every call shared, so a wrapper like `npx` or `make` drops out. When in
+  doubt, it falls back to the lease and never frees work early. That
+  includes calls under one name from unrelated processes or other machines,
+  a system with no `ps` (Windows), or a sandbox that blocks it. The machine
+  is stored as a hash, not its name.
 - **A board made before the rename**, in `.agent-board/`, keeps working where
   it is.
 
@@ -959,9 +966,10 @@ with the latest Claude Code.
   built keeps the board in local files.
 - **Usage is per session.** The usage bar shows this session's own plan usage,
   not the other agents'.
-- **A killed CLI agent's claims wait out their lease.** A killed Claude session frees its
-  claims after 3 minutes of silence; a plain CLI agent that never registered
-  waits out the full 15.
+- **A CLI agent is followed on its own machine only.** A killed Claude
+  session frees its claims after 3 minutes of silence, and a killed CLI agent
+  as soon as its process has exited. Without `ps` (Windows), or for a board
+  shared across machines, a CLI agent's claims wait out the 15-minute lease.
 - **A verification note is the agent's word.** The board requires one but
   doesn't run the check itself.
 - **The task file is read-only.** Add an item with `board add` to work it

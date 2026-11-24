@@ -14,6 +14,7 @@ import path from 'node:path'
 import readline from 'node:readline/promises'
 
 import { BoardError, createEngine } from '../lib/engine.mjs'
+import { createHolder } from '../lib/holder.mjs'
 import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock, storeStatus } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
 import { blockById, registry, runBlock, setEnabled, enabledIds } from '../lib/ready-blocks.mjs'
@@ -146,7 +147,8 @@ function duration(v, flag) {
 
 // Who is asking: --as, else BOARD_AGENT, else a Codex thread (Codex marks every
 // shell it runs with CODEX_THREAD_ID), named "codex 1", "codex 2" by when it
-// joined. Codex sends no presence ping, so only its leases end its claims.
+// joined. Codex sends no presence ping, so its leases end its claims, or
+// sooner the end of the process that holds them (lib/holder.mjs).
 async function actorOf(board, flags) {
   const a = text(flags.as) ?? process.env.BOARD_AGENT
   if (a) return a
@@ -238,7 +240,7 @@ const DID = {
   add: 'added', claim: 'claimed', 'claim-rejected': 'lost the claim on', note: 'noted on', check: 'checked',
   release: 'released', done: 'finished', expire: 'took back', ring: 'set to ring', unring: 'stopped the ring on', register: 'joined',
 }
-const said = e => `${hhmm(e.at)}  ${e.actor}  ${DID[e.type] ?? e.type}${e.task ? ` ${e.task}` : ''}${e.holder ? ` (held by ${e.holder})` : ''}${e.reason === 'silent' ? ' (its session went silent)' : ''}`
+const said = e => `${hhmm(e.at)}  ${e.actor}  ${DID[e.type] ?? e.type}${e.task ? ` ${e.task}` : ''}${e.holder ? ` (held by ${e.holder})` : ''}${e.reason === 'silent' ? ' (its session went silent)' : e.reason === 'exited' ? ' (its process exited)' : ''}`
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -532,6 +534,7 @@ async function main() {
       createEngine(store, {
         leaseMs: LEASE_MS,
         presenceMs: Number(process.env.BOARD_PRESENCE_MS ?? 3 * 60 * 1000),
+        holder: createHolder(),
       })
     const out = await run(board, pos, flags, name)
     const say = !flags.json && SAY[cmd]

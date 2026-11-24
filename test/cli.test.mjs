@@ -81,7 +81,7 @@ test('a registered session that goes silent loses its claims before the lease ru
   b.run(['register', 'alive', '--session', 's2'], quick)
   b.run(['claim', 'T-001', '--as', 'ghost'], quick)
   b.run(['claim', 'T-002', '--as', 'alive'], quick)
-  // A plain CLI agent that never registered keeps its lease alone.
+  // A plain CLI agent that never registered keeps its claim while its process lives.
   b.run(['claim', 'T-003', '--as', 'codex'], quick)
   await new Promise(resolve => setTimeout(resolve, 1000))
   b.run(['register', 'alive', '--session', 's2'], quick)
@@ -92,6 +92,57 @@ test('a registered session that goes silent loses its claims before the lease ru
   assert.match(by('T-001').notes.at(-1).text, /ghost stopped responding/)
   assert.equal(by('T-002').claim.owner, 'alive')
   assert.equal(by('T-003').claim.owner, 'codex')
+})
+
+// A fake CLI agent: its own process runs board commands, without a shell, and
+// stays alive until it is killed.
+function agent(b, calls, extra = {}) {
+  const code = `
+    const { execFileSync } = require('node:child_process')
+    for (const args of ${JSON.stringify(calls)}) execFileSync('node', [${JSON.stringify(BOARD)}, ...args], { stdio: 'ignore' })
+    console.log('ready')
+    setInterval(() => {}, 1000)`
+  const child = execFile('node', ['-e', code], { env: { ...b.env, BOARD_HOLDER_AGE_MS: '0', ...extra }, cwd: b.dir })
+  const ready = new Promise((resolve, reject) => {
+    child.stdout.on('data', d => String(d).includes('ready') && resolve())
+    child.on('exit', code => reject(new Error(`agent exited (${code}) before it was ready`)))
+  })
+  const kill = () => new Promise(resolve => (child.on('exit', resolve), child.kill('SIGKILL')))
+  return { ready, kill }
+}
+
+test('a CLI agent whose process ends frees its claims at once, not at the end of its lease', async () => {
+  const b = fresh()
+  for (const title of ['worked', 'untouched', 'codex']) b.run(['add', title])
+  const plain = agent(b, [['claim', 'T-001', '--as', 'shell'], ['note', 'T-001', 'form done', '--as', 'shell'], ['claim', 'T-002', '--as', 'shell']])
+  const codex = agent(b, [['claim', 'T-003']], { CODEX_THREAD_ID: 'thread-a' })
+  await Promise.all([plain.ready, codex.ready])
+  // Alive, they keep their claims.
+  assert.deepEqual(b.json(['list']).map(t => t.claim?.owner), ['shell', 'shell', 'codex 1'])
+  await Promise.all([plain.kill(), codex.kill()])
+  const tasks = b.json(['list'])
+  assert.deepEqual(tasks.map(t => t.status), ['todo', 'todo', 'todo'])
+  // Work recorded before it died comes back as a handoff, like a silent session's.
+  assert.match(tasks[0].notes.at(-1).text, /^HANDOFF: shell stopped responding \(its process, node, exited\); read the notes above/)
+  assert.match(tasks[1].notes.at(-1).text, /^shell stopped responding/)
+  assert.ok(b.json(['events']).some(e => e.type === 'expire' && e.task === 'T-003' && e.reason === 'exited'))
+  assert.equal(b.json(['doctor']).ok, true)
+})
+
+test('a claim whose holder is unsure, or that has a presence ping, is not freed by a process ending', async () => {
+  const b = fresh()
+  for (const title of ['two trees', 'registered']) b.run(['add', title])
+  // Calls under one name from two processes: what they share is the parent, which lives on.
+  const first = agent(b, [['claim', 'T-001', '--as', 'pair']])
+  await first.ready
+  const second = agent(b, [['note', 'T-001', 'more', '--as', 'pair']])
+  await second.ready
+  // A Claude session's own presence ping, not its process, says when it is gone.
+  b.run(['register', 'claude 1', '--session', 's1'])
+  const claude = agent(b, [['claim', 'T-002', '--as', 'claude 1']])
+  await claude.ready
+  await Promise.all([first.kill(), second.kill(), claude.kill()])
+  assert.deepEqual(b.json(['list']).map(t => t.claim?.owner), ['pair', 'claude 1'])
 })
 
 test('a heartbeat keeps a lease alive', async () => {
