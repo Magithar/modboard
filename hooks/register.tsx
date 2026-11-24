@@ -8,6 +8,7 @@ import { CAP } from './blocks/board'
 import { hhmm } from './blocks/clock'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 import { groupOpen, type GroupName } from './blocks/tasks'
+import { Problem } from './blocks/problem'
 import { tone } from './blocks/meter'
 import { nextTier, openItems } from './blocks/taskfile'
 
@@ -833,16 +834,22 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       const now = await $.session.model()
       await update($, model, () => now || to)
     },
+    // The band shows the new level at once; it goes back if /effort refuses.
     nextEffort: async () => {
-      const to = after(cycles.efforts, await read($, effort))
-      await $.command.run({ command: 'effort', args: to }).catch(() => $.ui.toast(`board: could not set effort to ${to}`))
+      const from = await read($, effort)
+      const to = after(cycles.efforts, from)
       await update($, effort, () => to)
+      await $.command.run({ command: 'effort', args: to }).catch(async () => {
+        $.ui.toast(`board: could not set effort to ${to}`)
+        await update($, effort, now => (now === to ? from : now))
+      })
     },
     // modBOARD on the band: opens the pane, or closes it when it is already open.
     // Open at the list of blocks, it turns the pane to the board instead.
     openBoard: async () => {
-      if (!(await read($, paneOpen))) return void (await openBoard($))
-      if ((await read($, paneView)) !== 'board') return void (await leaveList($))
+      const [isOpen, viewNow] = await Promise.all([read($, paneOpen), read($, paneView)])
+      if (!isOpen) return void (await openBoard($))
+      if (viewNow !== 'board') return void (await leaveList($))
       await $.ui.close({ id: PANE }).catch(() => {})
       await update($, paneOpen, () => false)
     },
@@ -890,19 +897,20 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     toggleGroup: async (name: string) => {
       await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
     },
-    // A press reads the file again first, so what was just added is there.
+    // A press opens or folds at once on what the 3-second poll last read; a
+    // fresh read of the file follows, so what was just added shows a moment later.
     toggleTaskfile: async () => {
-      await refresh($)
       await update($, taskfileOpen, open => !open)
+      void refresh($).catch(() => {})
     },
     // Turn to the next priority the file has, wrapping through "all", and
     // show it: like effort, one press, one step.
+    // Turned at once on what the poll last read; a fresh read follows.
     nextTier: async () => {
-      await refresh($)
-      const items = openItems((await read($, taskfile)).items)
-      const to = nextTier(items, await read($, taskfileTier))
-      await update($, taskfileTier, () => to)
-      await update($, taskfileOpen, () => true)
+      const [file, tier] = await Promise.all([read($, taskfile), read($, taskfileTier)])
+      const to = nextTier(openItems(file.items), tier)
+      await Promise.all([update($, taskfileTier, () => to), update($, taskfileOpen, () => true)])
+      void refresh($).catch(() => {})
     },
   }
 }
@@ -1339,12 +1347,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column" paddingX={1}>
         {/* In red when the board stopped answering: what is below is old. Under
             the work block's title when work comes first; else first of all. */}
-        {c.problem && !workFirst ? (
-          <Box marginBottom={1}>
-            {/* Wrapped, not cut: the end may say what to do. */}
-            <Text color="error">{`board not updating: ${c.problem}`}</Text>
-          </Box>
-        ) : null}
+        {workFirst ? null : Problem(c)}
         {sections.map((section, i) =>
           i === 0 ? (
             body(section)

@@ -1,5 +1,6 @@
 import type { Note, Task } from '../../types'
 import type { Block, Ctx } from './types'
+import { Problem } from './problem'
 import { branchOf, commitOf, goingQuiet, handedOffBy, handoffWaiting, lastCheck, tilde } from './attention'
 
 // Who a row is about. The group's heading says what they did ("In progress",
@@ -249,13 +250,9 @@ export const tasks: Block = {
         </Box>
       </Box>
     )
-    // When the board stopped answering, right under the title, in red: what
-    // is below is old. Wrapped, not cut: the end may say what to do.
-    const problem = c.problem ? (
-      <Box marginBottom={1}>
-        <Text color="error">{`board not updating: ${c.problem}`}</Text>
-      </Box>
-    ) : null
+    // When the board stopped answering, right under the title: what is
+    // below is old.
+    const problem = Problem(c)
     if (!c.tasks.length)
       return (
         <Box flexDirection="column">

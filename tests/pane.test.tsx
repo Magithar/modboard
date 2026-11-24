@@ -1,5 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
+import { splitProblem } from '../hooks/blocks/problem'
 
 import type { Task, TaskFile, Where } from '../types'
 
@@ -316,8 +317,9 @@ test('when the board cannot be read, the pane says so in red, until it can again
   broken.now = true
   await $.tool.call({ tool: 'mcp__modboard__board_list' } as any)
   let ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  const line = await ui.find({ type: 'Text', text: 'board not updating: cannot read .modboard/board.json' })
-  expect(line?.props.color).toBe('error')
+  const heading = await ui.find({ type: 'Text', text: 'board not updating' })
+  expect(heading?.props.color).toBe('error')
+  expect((await ui.find({ type: 'Text', text: 'cannot read .modboard/board.json' }))?.props.color).toBe('error')
   // The tasks it last read are still there below it.
   expect(await texts(ui)).toContain('modBOARD')
   await ui.unmount()
@@ -1816,10 +1818,13 @@ test('an untrusted storage block is named in words, not JSON, in the toast and t
   expect(toast).toBe('board: storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json')
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const shown = (await texts(ui)) as string[]
-  expect(shown.some(t => t.startsWith('board not updating: storage block "./cloned.mjs" runs code'))).toBe(true)
+  // A heading, the reason in words, then the files on rows of their own.
+  const at = shown.indexOf('board not updating')
+  expect(shown[at + 1]).toBe('storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet: read it, then run board trust at a terminal.')
+  expect(shown.slice(at + 2, at + 6)).toEqual(['block', '/repo/.modboard/cloned.mjs', 'config', '/repo/.modboard/config.json'])
   expect(shown.some(t => t.includes('{"error"'))).toBe(false)
-  // The whole line, not cut short: it ends with what to do.
-  const line = await ui.find({ type: 'Text', text: `board not updating: storage block "./cloned.mjs" runs code on this machine and isn't trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json` })
+  // The reason wraps, never cut: it says what to do.
+  const line = await ui.find({ type: 'Text', text: `storage block "./cloned.mjs" runs code on this machine and isn't trusted yet: read it, then run board trust at a terminal.` })
   expect(line?.props.wrap).toBeUndefined()
 })
 
@@ -1828,7 +1833,7 @@ test('the board error sits under the work title when work comes first, and on to
   host(on, [task('T-001', 'todo')], { broken })
   const kept = store(on)
   await $.session.start(START)
-  const ERROR = 'board not updating: cannot read .modboard/board.json'
+  const ERROR = 'board not updating'
   const first = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   let shown = (await texts(first)) as string[]
   await first.unmount()
@@ -1850,6 +1855,18 @@ test('a board that cannot be read is not called empty', { options: {} } as any, 
   bell(on)
   await $.session.start(START)
   const shown = (await texts(await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any))) as string[]
-  expect(shown.some(t => t.startsWith('board not updating: storage block'))).toBe(true)
+  expect(shown).toContain('board not updating')
   expect(shown.some(t => t.startsWith('No tasks yet'))).toBe(false)
+})
+
+test('a long path in the board error is cut from the start to fit the pane', async ($, on) => {
+  host(on, [], { untrusted: true })
+  bell(on)
+  await $.session.start(START)
+  expect(splitProblem('cannot read it')).toEqual({ message: 'cannot read it', files: [] })
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 30 } } as any)
+  const shown = (await texts(ui)) as string[]
+  const path = shown[shown.indexOf('block') + 1]!
+  expect(path.startsWith('…')).toBe(true)
+  expect(path.endsWith('cloned.mjs')).toBe(true)
 })
