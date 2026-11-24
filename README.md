@@ -393,7 +393,8 @@ pane: work,todo,compact,usage           (the default)
 names still work.
 
 Or click **blocks** on the band: the pane turns to a list of the blocks it
-can show. On **Blocks**, a click ticks one on or off. On **Order**, the
+can show. On **Blocks**, a click ticks one on or off; below them sit the
+groups, `▶ Project` and `▶ Limits`, which a click opens or folds. On **Order**, the
 ticked blocks are numbered in the board's order, and **▲** and **▼** move one
 a place (grey where there's no room to move). Each click is saved as it's
 made; at the right of the tabs, in yellow, is what changed:
@@ -403,8 +404,8 @@ board. The choice is kept between sessions, until `pane` is changed in
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/blocks-list.png" alt="The Blocks tab: work, todo, usage, compact and pixel-clock ticked in orange, agents unticked in grey, and saved · added pixel-clock in yellow at the right of the tabs"/></td>
-    <td width="50%"><img src="docs/blocks-order.png" alt="The Order tab: the ticked blocks numbered 1 to 5, pixel-clock just moved to the top and lit in orange, each row with ▲ and ▼, the first row's ▲ and the last row's ▼ in grey, and saved · order changed in yellow"/></td>
+    <td width="50%"><img src="docs/blocks-list.png" alt="The Blocks tab: Work, Todo and Pixel-clock ticked in orange, Agents unticked in grey; below them the Project group open, Branch, Changes and Ci ticked, Prs and Tests not, and the Limits group folded; saved · added pixel-clock in yellow at the right of the tabs"/></td>
+    <td width="50%"><img src="docs/blocks-order.png" alt="The Order tab: the ticked blocks numbered 1 to 5, Pixel-clock, Work, Todo, Project and Limits, Pixel-clock just moved to the top and lit in orange, each row with ▲ and ▼, the first row's ▲ and the last row's ▼ in grey, and saved · order changed in yellow"/></td>
   </tr>
   <tr>
     <td align="center">Blocks: tick what the board shows</td>
@@ -577,10 +578,10 @@ tests    npm test passed · 4 min ago · T-004
 | `prs` | your open pull requests and the ones waiting for your review | git, gh |
 | `tests` | the last check an agent recorded with `board check`; it never runs your tests | nothing |
 
-On the blocks list they sit under the `project` row, as the bars sit under
-`limits`: the group's row shows or hides the group, and the rows under it
-pick what's in it. They start folded: the group's `▶` opens them and `▼`
-folds them; ticking the group never does. With `project` off the pane, Claude Code runs none of them.
+On the blocks list the groups sit below the single blocks, folded: `▶ Project`
+holds these, `▶ Limits` the bars. Press a group's row to open or fold it. A
+group has no tick of its own: it's on the pane while any row in it is ticked,
+and with every row in `project` unticked, Claude Code runs none of them.
 
 Which are on is yours, kept in `~/.config/modboard/settings.json`: a project
 can't turn one on. Each runs in the folder it's shown for, so two sessions in
@@ -629,10 +630,10 @@ The quickest way. Two steps, both in the plugin's settings (`/config`):
 }
 ```
 
-**2. Show it.** In the pane, tick `project` on the list of blocks: every
-command block shows under one **Project** heading, next to the ready-made
-blocks you turned on. On the list, your blocks sit under `project`, marked
-`your own · /config`. In the band, add the name to
+**2. Show it.** There's nothing to tick: with a command block set, the pane
+shows the **Project** group, every command block under it, next to the
+ready-made blocks you turned on. On the list, your blocks sit in the
+`▶ Project` group, marked `your own · /config`. In the band, add the name to
 `band`, like a built-in block:
 
 ```
@@ -645,7 +646,7 @@ just `success` when the line is short.
 
 Under Project, each block says how it went and how fresh it is:
 
-<img src="docs/pane-checks.png" width="604" alt="The Checks heading with three blocks: tests, 1 failed, 41 passed · login, in red; ci, success in green, then 12 min ago in grey; deploy, live · v0.9.0 in green, then not updating since 14:02 in yellow"/>
+<img src="docs/pane-checks.png" width="604" alt="The Project heading with three blocks: tests, 1 failed, 41 passed · login, in red; ci, success in green, then 12 min ago in grey; deploy, live · v0.9.0 in green, then not updating since 14:02 in yellow"/>
 
 - A result that reads as a success (`success`, `passed`, `ok`, `✓`) is green,
   and one that reads as a failure (`failed`, `error`, `✗`) red; `42 passed,
@@ -941,7 +942,7 @@ and a board of two tasks, one already held by `alice`. Codex was told only
 
 **`claude plugin test .`** runs the mod's tests: the band and how it fits a
 line, the pane's groups and what folds, handoff points and the where, path,
-files and check rows under them (and copying the path), Checks (the last
+files and check rows under them (and copying the path), Project (the last
 result kept, its age, not updating, green and red), the task file and its
 priority button, the Limits heading, the error line, names, the tools, release
 on session end, and choosing blocks.
@@ -1017,7 +1018,7 @@ modboard/
     ├── pane.mjs             # draws blocks-*.png, pane-clock.png, clock-ringing.png, pane-checks.png
     ├── blocks-*.png         # the list of blocks: the Blocks and Order tabs
     ├── pane-clock.png       # the pixel clock, and clock-ringing.png as it rings
-    ├── pane-checks.png      # Checks: a failure, a success with its age, one not updating
+    ├── pane-checks.png      # Project: a failure, a success with its age, one not updating
     ├── board-live.gif       # the live demo
     ├── pane-*.png           # screenshots of the /board pane
     ├── taskfile-*.png       # the To do list, at P0 and at all

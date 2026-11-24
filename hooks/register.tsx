@@ -48,8 +48,7 @@ const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, 
 const paneOpen = atom({ plugin: 'modboard', key: 'paneOpen' } as const, false)
 const taskfileTier = atom({ plugin: 'modboard', key: 'taskfileTier' } as const, '')
 const groupsOpen = atom({ plugin: 'modboard', key: 'groupsOpen' } as const, {} as Record<string, boolean>)
-// On the Blocks tab, the groups whose ▶ was pressed to open their rows. Only
-// the arrow opens or folds them: ticking a group leaves this alone.
+// On the Blocks tab, the groups whose ▶ was pressed to open their rows.
 const listOpen = atom({ plugin: 'modboard', key: 'listOpen' } as const, {} as Record<string, boolean>)
 // The task whose worktree path was just copied, for a moment; and the home
 // directory, so a path reads ~/code/app.
@@ -242,25 +241,27 @@ async function runReady($: EngineInterface, force = false) {
 // agent (your own settings). Turned on, it shows under Checks, which the pane
 // gains if it hadn't it, and it runs at once.
 async function toggleReady($: EngineInterface, id: string) {
-  const on = !(await read($, readyList)).find(b => b.id === id)?.enabled
-  const out = await cli($, ['blocks', on ? 'on' : 'off', id])
-  if (!out.ok) return void $.ui.toast(`board: ${reason(out.text) || `could not turn ${id} ${on ? 'on' : 'off'}`}`)
+  const turnOn = !(await read($, readyList)).find(b => b.id === id)?.enabled
+  const out = await cli($, ['blocks', turnOn ? 'on' : 'off', id])
+  if (!out.ok) return void $.ui.toast(`board: ${reason(out.text) || `could not turn ${id} ${turnOn ? 'on' : 'off'}`}`)
   await loadReady($)
-  if (on) {
-    const shown = await read($, paneBlocks)
-    if (!shown.includes('project')) await toggleBlock($, 'project')
-    await runReady($, true)
-  }
+  await syncProject($)
+  if (turnOn) await runReady($, true)
 }
 
-// The limits row on the Blocks tab: with any bar shown, hides them all; with
-// none, shows them all, side by side at the end.
-async function toggleBars($: EngineInterface, bars: string[]) {
+// The Project group is on the pane while any block in it is on. It has no tick of its own, so
+// the list can't say a group is off while its rows say on. At session start
+// it only adds the group: a list that failed to load must not take it away.
+async function syncProject($: EngineInterface, addOnly = false) {
   const now = await read($, paneBlocks)
-  const names = now.some(n => bars.includes(n)) ? now.filter(n => !bars.includes(n)) : [...now, ...bars]
-  await update($, paneBlocks, () => names)
-  reads(names)
-  await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
+  const shown = now.includes('project')
+  // Your own blocks count, unless the pane already shows them by name (a
+  // pane set before the Project group).
+  const mine = commandNames.length > 0 && !commandNames.some(n => now.includes(n))
+  const ready = (await read($, readyList)).some(b => b.enabled)
+  // A block on adds the group; it goes only when nothing is left in it.
+  if ((ready || mine) && !shown) await toggleBlock($, 'project')
+  else if (!ready && shown && !addOnly && commandNames.length === 0) await toggleBlock($, 'project')
 }
 
 async function toggleBlock($: EngineInterface, name: string) {
@@ -1187,7 +1188,7 @@ export const register: Register = (on, options) => {
     // schedule. The list is read again now and then, so one turned on or off
     // through the CLI shows here too. Not awaited: nothing here may hold up
     // the session's start.
-    void loadReady($).then(() => runReady($)).catch(() => {})
+    void loadReady($).then(() => syncProject($, true)).then(() => runReady($)).catch(() => {})
     $.clock.every(READY_TICK_MS, () => runReady($).catch(() => {}))
     $.clock.every(60_000, () => loadReady($).catch(() => {}))
     // Presence: keeps this session's name while it is open, so no other
@@ -1363,28 +1364,20 @@ export const register: Register = (on, options) => {
       if (view === 'blocks') {
         // Grouped as the pane draws them: the bars under one `limits` row, and
         // the ready-made blocks and your own command blocks under `project`.
-        // A group's row shows or hides the group; the rows under it pick
-        // what's in it. Only the group's ▶ opens or folds them; its tick
-        // never does.
+        // A group has no tick of its own: it is on the pane while any row
+        // in it is ticked. Its ▶ opens or folds its rows.
         const [ready, unfolded] = await Promise.all([read($, readyList), read($, listOpen)])
         const bars = offered.filter(b => BARS.has(b.name))
-        const pad = Math.max(...offered.map(b => b.name.length), ...ready.map(b => b.id.length), ...commandNames.map(n => n.length), 'limits'.length) + 2
-        // Every top row starts with a three-column gutter; a group's holds its
-        // ▶ (folded) or ▼ (open), the larger arrows, pressed to open or fold
-        // the rows under it, so what a group holds can be seen first.
-        const row = (key: string, ticked: boolean, name: string, about: string, depth: number, press?: () => unknown, fold?: { open: boolean; group: string }) => {
-          const text = `${ticked ? '[x]' : '[ ]'} ${name.padEnd(pad - depth * 2)}${about}`
+        const pad = Math.max(...offered.map(b => b.name.length), ...ready.map(b => b.id.length), ...commandNames.map(n => n.length)) + 2
+        // Every row starts with a two-column gutter, which holds a group's
+        // ▶ (folded) or ▼ (open). A group's row is only its arrow and name,
+        // and the whole of it is the button that opens or folds it. Its
+        // rows line up with the rest.
+        const row = (key: string, ticked: boolean, name: string, about: string, press?: () => unknown) => {
+          // Capitalised, as on the Order tab and the board's headings.
+          const text = `${ticked ? '[x]' : '[ ]'} ${(name[0]!.toUpperCase() + name.slice(1)).padEnd(pad)}${about}`
           return (
-            <Box key={`row-${key}`} paddingLeft={depth * 5}>
-              {depth === 0 ? (
-                <Box width={3} flexShrink={0}>
-                  {fold ? (
-                    <Button key={`fold-${fold.group}`} plain onPress={() => update($, listOpen, all => ({ ...all, [fold.group]: !fold.open }))}>
-                      <Text>{fold.open ? '▼' : '▶'}</Text>
-                    </Button>
-                  ) : null}
-                </Box>
-              ) : null}
+            <Box key={`row-${key}`} paddingLeft={2}>
               {press ? (
                 <Button key={key} plain onPress={press}>
                   {/* One Text in one colour, so the pointer lights the row as one
@@ -1402,24 +1395,30 @@ export const register: Register = (on, options) => {
             </Box>
           )
         }
-        const rows: any[] = []
-        for (const b of offered) {
-          if (BARS.has(b.name)) {
-            if (b !== bars[0]) continue
-            const any = bars.some(x => chosen.includes(x.name))
-            const open = !!unfolded.limits
-            rows.push(row('pick-limits', any, 'limits', 'context and usage bars', 0, () => toggleBars($, bars.map(x => x.name)), { open, group: 'limits' }))
-            if (open) for (const x of bars) rows.push(row(`pick-${x.name}`, chosen.includes(x.name), x.name, x.about ?? '', 1, () => toggleBlock($, x.name)))
-            continue
-          }
-          const kids = b.name === 'project' && ready.length + commandNames.length > 0
-          const open = kids && !!unfolded.project
-          rows.push(row(`pick-${b.name}`, chosen.includes(b.name), b.name, b.about ?? '', 0, () => toggleBlock($, b.name), kids ? { open, group: 'project' } : undefined))
-          if (open) {
-            for (const r of ready) rows.push(row(`pick-ready-${r.id}`, r.enabled, r.id, r.about, 1, () => toggleReady($, r.id)))
-            for (const n of commandNames) rows.push(row(`mine-${n}`, true, n, 'your own · /config', 1))
-          }
+        // A blank line above each group, parting it from what's above.
+        const group = (name: string, kids: any[]) => {
+          const open = !!unfolded[name]
+          return [
+            <Box key={`gap-${name}`} height={1} />,
+            <Button key={`fold-${name}`} plain onPress={() => update($, listOpen, all => ({ ...all, [name]: !open }))}>
+              {/* Capitalised, as the board's headings are (Project, Limits). */}
+              <Text wrap="truncate">{`${open ? '▼' : '▶'} ${name[0]!.toUpperCase()}${name.slice(1)}`}</Text>
+            </Button>,
+            ...(open ? kids : []),
+          ]
         }
+        // The single blocks first, then the groups.
+        const rows: any[] = offered.filter(b => !BARS.has(b.name) && b.name !== 'project').map(b => row(`pick-${b.name}`, chosen.includes(b.name), b.name, b.about ?? '', () => toggleBlock($, b.name)))
+        const groups: any[] = []
+        if (offered.some(b => b.name === 'project') && ready.length + commandNames.length > 0)
+          groups.push(
+            ...group('project', [
+              ...ready.map(r => row(`pick-ready-${r.id}`, r.enabled, r.id, r.about, () => toggleReady($, r.id))),
+              ...commandNames.map(n => row(`mine-${n}`, true, n, 'your own · /config')),
+            ]),
+          )
+        if (bars.length) groups.push(...group('limits', bars.map(x => row(`pick-${x.name}`, chosen.includes(x.name), x.name, x.about ?? '', () => toggleBlock($, x.name)))))
+        rows.push(...groups)
         return (
           // A blank line under the last row, on both tabs.
           <Box flexDirection="column" paddingX={1} paddingBottom={1}>
@@ -1432,8 +1431,10 @@ export const register: Register = (on, options) => {
       }
       // ▲ and ▼ on every row, in two fixed columns; where one would do nothing
       // (▲ on the first row, ▼ on the last) it is grey and can't be pressed.
-      // The bars are one row, `limits (usage, compact)`: they draw together.
-      const rows = orderRows(ticked).map(row => ({ ...row, label: row.names.length > 1 ? `limits (${row.names.join(', ')})` : row.key }))
+      // The bars are one row, `Limits`: they draw together. Capitalised, as
+      // the board's headings are.
+      const title = (name: string) => `${name[0]!.toUpperCase()}${name.slice(1)}`
+      const rows = orderRows(ticked).map(row => ({ ...row, label: title(row.names.length > 1 ? 'limits' : row.key) }))
       const pad = Math.max(0, ...rows.map(row => row.label.length)) + 3
       const last = rows.length - 1
       const slot = (key: string, label: string, show: boolean, to: number, name: string) =>
@@ -1518,7 +1519,8 @@ export const register: Register = (on, options) => {
     // A grey rule between sections.
     const rule = '─'.repeat(Math.max(1, (e.props.bodyColumns ?? 40) - 2))
     return (
-      <Box flexDirection="column" paddingX={1}>
+      // A blank line under the last section, as on the list of blocks.
+      <Box flexDirection="column" paddingX={1} paddingBottom={1}>
         {/* In red when the board stopped answering: what is below is old. Under
             the work block's title when work comes first; else first of all. */}
         {workFirst ? null : Problem(c)}

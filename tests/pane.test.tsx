@@ -1073,21 +1073,21 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   // Only the list: no board under it.
   expect(list[0]).toBe('Blocks')
   expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
-  // The default pane: work, todo and the bars ticked; the rest not. The
-  // bars' own rows are folded under limits until its ▶ is pressed.
-  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(3)
-  expect(list.some(t => t.startsWith('[x] limits'))).toBe(true)
-  expect(list).toContain('[ ] agents       who is live')
+  // The default pane: work and todo ticked; the rest not. The bars sit
+  // folded below, under a ▶ limits row with no tick of its own.
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(2)
+  expect(list.at(-1)).toBe('▶ Limits')
+  expect(list).toContain('[ ] Agents       who is live')
   // What the band or another block shows already is left off the list.
   for (const name of ['model', 'effort', 'clock', 'context']) expect(await pane.find({ key: `pick-${name}` })).toBeUndefined()
   // Ticks in the cap's orange, as blocks on the band is.
   // One colour a row: ticked orange, the rest grey.
-  expect((await pane.find({ type: 'Text', text: /^\[x\] work/ }))?.props.color).toBe('#F27238')
-  expect((await pane.find({ type: 'Text', text: /^\[ \] agents/ }))?.props.dimColor).toBe(true)
+  expect((await pane.find({ type: 'Text', text: /^\[x\] Work/ }))?.props.color).toBe('#F27238')
+  expect((await pane.find({ type: 'Text', text: /^\[ \] Agents/ }))?.props.dimColor).toBe(true)
   await pane.press({ key: 'pick-agents' })
   await pane.press({ key: 'pick-work' })
   list = (await texts(pane)) as string[]
-  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(3)
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(2)
   // There is no Done: each tick is saved as it is made. The logo, modBOARD, shows the board: work gone, agents there.
   expect(await pane.find({ key: 'blocks-done' })).toBeFalsy()
   await band.press({ key: 'board' })
@@ -1170,14 +1170,14 @@ test('blocks of your own are on the list under project, which shows them under a
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const listed = (await texts(pane)) as string[]
-  expect(listed.some(t => t.startsWith('[ ] project'))).toBe(true)
+  expect(listed).toContain('▶ Project')
   // Folded, its rows are hidden.
-  expect(listed.some(t => t.startsWith('[x] ci'))).toBe(false)
-  await pane.press({ key: 'pick-project' })
+  expect(listed.some(t => t.startsWith('[x] Ci'))).toBe(false)
   await pane.press({ key: 'fold-project' })
   // Opened, your own block shows under it, set in /config, so not pressable here.
-  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] ci') && t.endsWith('your own · /config'))).toBe(true)
+  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] Ci') && t.endsWith('your own · /config'))).toBe(true)
   expect(await pane.find({ key: 'mine-ci' })).toBeUndefined()
+  // Project is on the default pane already, so the board shows it.
   await band.press({ key: 'board' })
   expect(await label(pane, 'group-checks')).toBe('▾ Project')
   expect(await texts(pane)).toEqual(expect.arrayContaining(['ci', 'green']))
@@ -1655,7 +1655,8 @@ const openOrder = async ($: any, on: On) => {
   await pane.press({ key: 'tab-order' })
   return pane
 }
-const order = async (pane: any) => ((await texts(pane)) as string[]).filter(t => /^ ?\d+  /.test(t)).map(t => t.trim().split(/\s+/)[1])
+// The names in order, as typed in settings; the rows show them capitalised.
+const order = async (pane: any) => ((await texts(pane)) as string[]).filter(t => /^ ?\d+  /.test(t)).map(t => t.trim().split(/\s+/)[1]!.toLowerCase())
 
 test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbered, in the board order', ORDER, async ($, on) => {
   host(on, [])
@@ -1664,7 +1665,7 @@ test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbere
   expect(((await texts(pane)) as string[]).slice(0, 3)).toEqual(['Blocks', 'Order', `${' '.repeat(10)}━━━━━`])
   // The two bars are one row, as the pane draws them under one Limits heading.
   expect(await order(pane)).toEqual(['work', 'limits', 'pixel-clock'])
-  expect(((await texts(pane)) as string[]).some(t => t.startsWith(' 2  limits (usage, compact)'))).toBe(true)
+  expect(((await texts(pane)) as string[]).some(t => t.startsWith(' 2  Limits ') && !t.includes('('))).toBe(true)
   // No ▲ on the first, no ▼ on the last; nothing else to press but the arrows.
   for (const [key, there] of [['up-work', false], ['down-work', true], ['up-pixel-clock', true], ['down-pixel-clock', false], ['top-compact', false], ['bottom-usage', false]] as const)
     expect(!!(await pane.find({ key }))).toBe(there)
@@ -1683,10 +1684,10 @@ test('▲ and ▼ move a block a place; the board follows and the order is kept;
   const pressed = pane.press({ key: 'up-pixel-clock' })
   await settle()
   expect(await order(pane)).toEqual(['work', 'pixel-clock', 'limits'])
-  expect((await row(' 2  pixel-clock'))?.props.color).toBe(CAP_COLOR)
+  expect((await row(' 2  Pixel-clock'))?.props.color).toBe(CAP_COLOR)
   pass()
   await pressed
-  expect((await row(' 2  pixel-clock'))?.props.color).toBeUndefined()
+  expect((await row(' 2  Pixel-clock'))?.props.color).toBeUndefined()
   expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'pixel-clock', 'usage', 'compact'])
   const p1 = pane.press({ key: 'up-pixel-clock' }); await settle(); pass(); await p1
   expect(await order(pane)).toEqual(['pixel-clock', 'work', 'limits'])
@@ -1968,17 +1969,16 @@ test('ready-made blocks are listed on the Blocks tab; a tick turns one on, puts 
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  // Project ticked and opened: the ready-made blocks, all off.
-  await pane.press({ key: 'pick-project' })
+  // Project opened: the ready-made blocks, all off.
   await pane.press({ key: 'fold-project' })
   const shown = (await texts(pane)) as string[]
-  expect(shown.some(t => t.startsWith('[ ] ci') && t.includes('latest GitHub Actions run'))).toBe(true)
+  expect(shown.some(t => t.startsWith('[ ] Ci') && t.includes('latest GitHub Actions run'))).toBe(true)
   await pane.press({ key: 'pick-ready-ci' })
   await settle()
   expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'on' && argv[4] === 'ci')).toBe(true)
   expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'run' && argv[4] === 'ci')).toBe(true)
   expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'run' && argv[4] === 'branch')).toBe(false)
-  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] ci'))).toBe(true)
+  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] Ci'))).toBe(true)
   expect((kept.get('paneBlocks') as any).blocks).toContain('project')
   // The board shows it under Checks, green for a success.
   await band.press({ key: 'board' })
@@ -2032,59 +2032,53 @@ test('the Blocks tab groups as the pane does: limits over the bars, project over
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   let list = (await texts(pane)) as string[]
   const at = (start: string) => list.findIndex(t => t.startsWith(start))
-  // Every group starts folded, with a ▶, whether ticked or not.
-  expect(await label(pane, 'fold-limits')).toBe('▶')
-  expect(await label(pane, 'fold-project')).toBe('▶')
-  expect(at('[x] usage')).toBe(-1)
-  expect(at('[x] branch')).toBe(-1)
-  // The arrow opens the rows, right after their group's row, and says ▼.
+  // The single blocks first, then the groups below, folded, each a ▶ row
+  // with no tick of its own.
+  expect(list.slice(-2)).toEqual(['▶ Project', '▶ Limits'])
+  expect(list.some(t => t.includes('[') && t.includes('project'))).toBe(false)
+  expect(at('[x] Usage')).toBe(-1)
+  expect(at('[x] Branch')).toBe(-1)
+  // The whole row opens the rows, right after it, and says ▼.
   await pane.press({ key: 'fold-limits' })
   list = (await texts(pane)) as string[]
-  expect([at('[x] usage'), at('[x] compact')].sort((a, b) => a - b)).toEqual([at('[x] limits') + 1, at('[x] limits') + 2])
-  expect(await label(pane, 'fold-limits')).toBe('▼')
-  // It opens project's rows without ticking project.
+  expect([at('[x] Usage'), at('[x] Compact')].sort((a, b) => a - b)).toEqual([at('▼ Limits') + 1, at('▼ Limits') + 2])
   await pane.press({ key: 'fold-project' })
   list = (await texts(pane)) as string[]
-  expect(at('[x] branch')).toBe(at('[ ] project') + 1)
-  expect(at('[ ] ci')).toBe(at('[ ] project') + 2)
-  // Ticking or unticking a group leaves its rows as they are.
-  await pane.press({ key: 'pick-project' })
-  list = (await texts(pane)) as string[]
-  expect(at('[x] branch')).toBe(at('[x] project') + 1)
-  await pane.press({ key: 'pick-limits' })
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'todo', 'project'])
-  list = (await texts(pane)) as string[]
-  expect(list.some(t => t.startsWith('[ ] usage'))).toBe(true)
-  await pane.press({ key: 'pick-limits' })
-  const back = (kept.get('paneBlocks') as any).blocks as string[]
-  expect(back.slice(0, 3)).toEqual(['work', 'todo', 'project'])
-  expect([...back.slice(3)].sort()).toEqual(['compact', 'usage'])
-  // The arrow folds them again.
+  expect(at('[x] Branch')).toBe(at('▼ Project') + 1)
+  expect(at('[ ] Ci')).toBe(at('▼ Project') + 2)
+  // branch was on at start, so Project is on the pane.
+  expect((kept.get('paneBlocks') as any).blocks).toContain('project')
+  // Unticking the last bar takes the bars off the pane; ticking one brings it back.
+  await pane.press({ key: 'pick-usage' })
+  await pane.press({ key: 'pick-compact' })
+  expect((kept.get('paneBlocks') as any).blocks.some((n: string) => ['usage', 'compact'].includes(n))).toBe(false)
+  await pane.press({ key: 'pick-usage' })
+  expect((kept.get('paneBlocks') as any).blocks).toContain('usage')
+  // The rows stay open through the ticks; pressed again, the row folds them.
   await pane.press({ key: 'fold-project' })
   list = (await texts(pane)) as string[]
-  expect(at('[x] branch')).toBe(-1)
-  expect(await label(pane, 'fold-project')).toBe('▶')
+  expect(at('[x] Branch')).toBe(-1)
+  expect(at('▶ Project')).toBeGreaterThan(-1)
 })
 
-test('with the Project group off the pane, its blocks never run; shown again, they run at once', { options: { pane: 'work' } } as any, async ($, on) => {
+test('a ready block on puts Project on the pane and runs; the last one off takes the group away, and nothing runs', { options: { pane: 'work' } } as any, async ($, on) => {
   const calls = host(on, [], { ready: { list: [readyDef('branch', true)] } })
   const kept = store(on)
-  let tick = async () => {}
-  on('clock.every', (_$, e: any) => (e.ms === 5_000 ? new Promise(resolve => (tick = async () => resolve({ value: undefined }))) : new Promise(() => {})) as any)
   on('ui.open', () => ({ value: { isPlaced: true } }))
   await $.session.start(START)
   await settle()
-  await tick()
-  await settle()
   const runs = () => calls.filter(argv => argv[2] === 'blocks' && argv[3] === 'run').length
-  expect(runs()).toBe(0)
+  // On at start, so the group joins the pane and the block runs.
+  expect((kept.get('paneBlocks') as any).blocks).toContain('project')
+  expect(runs()).toBe(1)
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  await pane.press({ key: 'pick-project' })
+  await pane.press({ key: 'fold-project' })
+  await pane.press({ key: 'pick-ready-branch' })
   await settle()
+  expect((kept.get('paneBlocks') as any).blocks).not.toContain('project')
   expect(runs()).toBe(1)
-  expect((kept.get('paneBlocks') as any).blocks).toContain('project')
 })
 
 test("a pane saved with checks, the group's old name, still shows it as project", async ($, on) => {

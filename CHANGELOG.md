@@ -15,11 +15,16 @@ ask for a review.
   changes, pull requests), not only checks. `checks` in the `pane` setting or
   a saved list still works. The label column is wider, so `changes` no longer
   touches its value, and `prs` says `none open`.
-- **The blocks list groups as the pane does:** the bars under one `limits`
-  row, and the ready-made blocks and your own command blocks under
-  `project`. A group's row shows or hides it; the rows under it
-  pick what's in it. They start folded: the group's `▶` opens them and `▼`
-  folds them; ticking the group never does. With `project` off the pane, Claude Code runs none of its blocks.
+- **The blocks list groups as the pane does:** the bars under `▶ Limits`,
+  and the ready-made blocks and your own command blocks under `▶ Project`,
+  below the single blocks, folded, with a blank line above each. Pressing a
+  group's row opens or folds it. A group has no tick of its own: it's on the
+  pane while any row in it is ticked, so the list and the board can't
+  disagree. Rows on both tabs start with a capital (`Work`, `Pixel-clock`),
+  and the bars are one `Limits` row on Order; settings keep the lowercase
+  names.
+- **A blank line under the board's last section**, so it no longer touches
+  the pane's edge.
 - **Ready-made blocks you turn on with one tick:** `branch`, `changes`, `ci`,
   `prs` and `tests`, on the blocks list in Claude Code or with
   `board blocks on <id>`, shown under Project and by `board blocks` for any

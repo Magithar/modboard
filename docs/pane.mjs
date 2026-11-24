@@ -49,14 +49,21 @@ const line = (left = [], right = []) => {
 const blank = () => line([[' ']])
 const rule = () => line([[' '], ['─'.repeat(COLS - 2), 'rule']])
 
+// Shown capitalised, as the list draws them; settings keep the lowercase names.
 const TICKED = [
-  ['work', "who's doing what"],
-  ['todo', 'your task.md'],
-  ['usage', '5-hour limit'],
-  ['compact', 'context bar + compact button'],
-  ['pixel-clock', 'big clock, weather, alarm'],
-  ['agents', 'who is live'],
+  ['Work', "who's doing what", true],
+  ['Todo', 'your task.md', true],
+  ['Pixel-clock', 'big clock, weather, alarm', true],
+  ['Agents', 'who is live', false],
 ]
+const PROJECT = [
+  ['Branch', 'current git branch', true],
+  ['Changes', 'working tree changes', true],
+  ['Ci', 'latest GitHub Actions run on this branch', true],
+  ['Prs', 'your open pull requests and reviews', false],
+  ['Tests', 'last test result agents recorded', false],
+]
+const tick = ([name, about, on]) => line([['   '], [`${on ? '[x]' : '[ ]'} ${name.padEnd(13)}${about}`, on ? 'cap' : 'dim']])
 const tabs = (on, note) => [
   line([[' '], ['Blocks', on === 'blocks' ? 'bold' : 'dim'], ['    '], ['Order', on === 'order' ? 'bold' : 'dim']], note ? [[note, 'warn'], [' ']] : []),
   line([[on === 'blocks' ? ' ━━━━━━' : `${' '.repeat(11)}━━━━━`, 'cap']]),
@@ -73,16 +80,19 @@ const PAGES = {
   'blocks-list': [
     ...tabs('blocks', 'saved · added pixel-clock'),
     blank(),
-    ...TICKED.map(([name, about]) => {
-      const on = name !== 'agents'
-      return line([['   '], [`${on ? '[x]' : '[ ]'} ${name.padEnd(13)}${about}`, on ? 'cap' : 'dim']])
-    }),
+    ...TICKED.map(tick),
+    // The groups below, each a row that opens or folds it.
+    blank(),
+    line([[' '], ['▼ Project']]),
+    ...PROJECT.map(tick),
+    blank(),
+    line([[' '], ['▶ Limits']]),
     blank(),
   ],
   'blocks-order': [
     ...tabs('order', 'saved · order changed'),
     blank(),
-    ...['pixel-clock', 'work', 'todo', 'usage', 'compact'].map((name, at, all) =>
+    ...['Pixel-clock', 'Work', 'Todo', 'Project', 'Limits'].map((name, at, all) =>
       line([
         ['   '],
         [`${String(at + 1).padStart(2)}  ${name.padEnd(14)}`, at === 0 ? 'capbold' : ''],
@@ -117,7 +127,7 @@ const PAGES = {
     blank(),
   ],
   'pane-checks': [
-    line([['▾ Checks', 'bold']]),
+    line([['▾ Project', 'bold']]),
     blank(),
     line([['  '], ['tests   ', 'dim'], ['✗ 1 failed, 41 passed · login', 'err']]),
     blank(),

@@ -552,7 +552,8 @@ switch between** settings. Leave them out of the band if you'd rather not
 see them; Claude Code shows both in its own header too.
 
 For the pane there's a quicker way: click **blocks** on the band. The pane
-turns to a list with two tabs. On **Blocks**, a click ticks a block on or off.
+turns to a list with two tabs. On **Blocks**, a click ticks a block on or off;
+the groups below, `▶ Project` and `▶ Limits`, open or fold with a click.
 On **Order**, the ticked blocks are numbered in the board's order, and **▲**
 and **▼** move one a place. Each click is saved as it's made, and the right
 of the tabs says what changed (`saved · added agents · order changed`). Click
@@ -560,8 +561,8 @@ of the tabs says what changed (`saved · added agents · order changed`). Click
 
 <table>
   <tr>
-    <td><img src="blocks-list.png" alt="The Blocks tab: work, todo, usage, compact and pixel-clock ticked in orange, agents unticked in grey, and saved · added pixel-clock in yellow at the right of the tabs"/></td>
-    <td><img src="blocks-order.png" alt="The Order tab: the ticked blocks numbered 1 to 5, pixel-clock just moved to the top and lit in orange, each row with ▲ and ▼, the first row's ▲ and the last row's ▼ in grey, and saved · order changed in yellow"/></td>
+    <td><img src="blocks-list.png" alt="The Blocks tab: Work, Todo and Pixel-clock ticked in orange, Agents unticked in grey; below them the Project group open, Branch, Changes and Ci ticked, Prs and Tests not, and the Limits group folded; saved · added pixel-clock in yellow at the right of the tabs"/></td>
+    <td><img src="blocks-order.png" alt="The Order tab: the ticked blocks numbered 1 to 5, Pixel-clock, Work, Todo, Project and Limits, Pixel-clock just moved to the top and lit in orange, each row with ▲ and ▼, the first row's ▲ and the last row's ▼ in grey, and saved · order changed in yellow"/></td>
   </tr>
   <tr>
     <td align="center">Blocks</td>
@@ -601,8 +602,8 @@ command runs, and the block shows the first line it prints:
 }
 ```
 
-In the pane, tick `project` on the list of blocks: your blocks show under one
-**Project** heading, a success in green and a failure in red:
+With them set, the pane shows them under one **Project** heading, with
+nothing to tick, a success in green and a failure in red:
 
 ```
  ▾ Project
@@ -621,7 +622,7 @@ The band now reads `ci success` and `branch main` beside the work. A name is
 lowercase letters, digits and dashes, up to 16 characters, and can't be a
 built-in block's name.
 
-A command that fails keeps its last good result. Under Checks, a result
+A command that fails keeps its last good result. Under Project, a result
 older than 5 minutes says its age (`12 min ago`); once the command has failed
 for 5 minutes, it says `not updating since 14:02` in yellow. The `stale`
 setting changes the 5 minutes.
