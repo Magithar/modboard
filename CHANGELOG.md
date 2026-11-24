@@ -3,7 +3,7 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
-## Unreleased
+## 0.10.0 — 2026-11-24
 
 Running many agents at once, with ideas from Vercel's Board: agents take the
 next ready task in one step, tasks can wait on others, and finished work can
