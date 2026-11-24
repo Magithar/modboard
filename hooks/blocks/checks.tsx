@@ -1,6 +1,7 @@
 import type { Block, Ctx } from './types'
 import { LABEL, commandRow, outcome, standing } from './command'
 import { GROUPS, groupOpen } from './tasks'
+import { YELLOW } from './board'
 
 // Your command blocks (tests, CI, anything with an output) under one heading,
 // like Limits and Clock: each keeps its last good result when its command
@@ -16,7 +17,7 @@ const WARN = new Set(['missing', 'auth', 'offline', 'unsafe', 'timeout'])
 function readyRow(c: Ctx, id: string) {
   const { Box, Text } = c.ui
   const v = c.readyValues[id]
-  const color = !v ? undefined : v.state === 'ok' ? outcome(v.text) : WARN.has(v.state) ? 'warning' : v.state === 'error' ? 'error' : undefined
+  const color = !v ? undefined : v.state === 'ok' ? outcome(v.text) : WARN.has(v.state) ? YELLOW : v.state === 'error' ? 'error' : undefined
   return (
     <Box key={`ready-${id}`}>
       <Box width={LABEL} flexShrink={0}>
@@ -50,7 +51,7 @@ export const checks: Block = {
       }),
     ].flatMap(({ text, warn }) => [
       <Text dimColor> · </Text>,
-      <Text color={warn ? 'warning' : undefined} dimColor={!warn}>
+      <Text color={warn ? YELLOW : undefined} dimColor={!warn}>
         {text}
       </Text>,
     ])

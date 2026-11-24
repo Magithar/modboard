@@ -3,27 +3,32 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
-## Unreleased
+## 0.11.0 — 2026-11-25
 
 ### Changed
 
 - **A task's kind reads at a glance in the pane**, in a column after the ID
   (`T-001  feature  Add password reset`): `kind=feature` shows as `feature`
-  in green, `kind=bug` as `bug` in red and `kind=review` as `review` in
-  orange. Any other kind shows its value in grey. The column only appears in
-  a group where some task has a kind, and the handoff under a task lines up
-  with its title. Other labels follow the title as `key=value`. `board list`
+  in soft blue, `kind=bug` as `bug` in soft red and `kind=review` as
+  `review` in soft violet, each quieter than the yellow that needs you.
+  Any other kind shows its value in grey. The
+  column only appears on a board where some task has a kind, is the same
+  width in every group, and the handoff under a task lines up with its
+  title. Other labels follow the title as `key=value`. `board list`
   and the tools keep the full label.
-- **Only the group headings are bold.** A task title is plain, yours too:
-  your own tasks say `you` at the right, as before.
+- **Bold means it opens.** The group headings are bold, and so is the
+  title of a task with a handoff to show or hide, with the headings' arrow
+  before it. Every other title is plain white, yours too: your own tasks
+  say `you` at the right, as before.
 
 ### Added
 
 - **A task's title shows or hides its handoff.** Under Unfinished, press
   `Add password reset` and the handoff points, `where`, `path`, `files` and
   `check` fold away, leaving the one row; press it again to bring them back.
-  Each task starts open and stays as you left it. A title that opens is
-  in modBOARD's orange, and underlined under the pointer; there's no arrow.
+  Each task starts open and stays as you left it. The title is bold, as
+  the group headings are, with their arrow before it: `▾ Add password reset`
+  open, `▸ Add password reset` folded.
 
 ### Fixed
 

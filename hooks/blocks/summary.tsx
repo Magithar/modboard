@@ -1,5 +1,6 @@
 import type { Block } from './types'
 import { handoffWaiting } from './attention'
+import { YELLOW } from './board'
 
 // How many tasks the alert names in its widest form before the rest become "+N".
 const NAMED = 3
@@ -20,7 +21,7 @@ export const summary: Block = {
     // at the Unfinished group.
     const box = (id: string) => (
       <Button key={`task-${id}`} plain onPress={() => act.showGroup('partway')}>
-        <Text backgroundColor="warning" color="inverseText" bold>
+        <Text backgroundColor={YELLOW} color="inverseText" bold>
           {` ${id} `}
         </Text>
       </Button>
@@ -33,7 +34,7 @@ export const summary: Block = {
         tree: (
           <Box flexShrink={0}>
             {shown.flatMap((t, i) => (i ? [<Text> </Text>, box(t.id)] : [box(t.id)]))}
-            {more ? <Text color="warning">{` +${more}`}</Text> : null}
+            {more ? <Text color={YELLOW}>{` +${more}`}</Text> : null}
           </Box>
         ),
         width: shown.reduce((n, t) => n + t.id.length + 2, 0) + Math.max(0, shown.length - 1) + (more ? ` +${more}`.length : 0),

@@ -1,5 +1,6 @@
 import type { Block, Ctx } from './types'
 import { words } from './types'
+import { YELLOW } from './board'
 
 // A block of your own, with no code: the `blocks` setting names it and the
 // shell command whose first line of output it shows, as JSON,
@@ -82,7 +83,7 @@ export function commandRow(c: Ctx, name: string) {
       </Box>
       {s.note ? (
         <Box flexShrink={0}>
-          <Text color={s.stale ? 'warning' : undefined} dimColor={!s.stale}>
+          <Text color={s.stale ? YELLOW : undefined} dimColor={!s.stale}>
             {s.text ? ` · ${s.note}` : s.note}
           </Text>
         </Box>

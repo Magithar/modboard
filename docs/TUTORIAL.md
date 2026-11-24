@@ -327,7 +327,7 @@ waiting or in progress, it disappears.
 
  ▾ Unfinished · 1
 
-   T-005  Ghost task                            claude 3
+   T-005  ▾ Ghost task                          claude 3
           · layout done
           · saving isn't wired yet
 
@@ -358,9 +358,9 @@ waiting or in progress, it disappears.
 
 <table>
   <tr>
-    <td><img src="pane-board.png" alt="The /board pane as it opens: In progress with an idle codex 1 row in yellow, Unfinished with each handoff as points, Not started and Done folded, To do, and the Limits bars"/></td>
-    <td><img src="pane-done.png" alt="Done opened, listing who finished each task, and To do opened at P0, showing the task file's most urgent items"/></td>
-    <td><img src="pane-all.png" alt="Not started opened, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
+    <td><img src="pane-board.png" alt="The /board pane as it opens: In progress with each task's kind (feature in soft blue, review in soft violet) and an idle codex 1 row in yellow; Unfinished with ▾ Ghost task: settings screen in bold, open to its handoff points and where, path, files and check, and ▸ Fix login redirect, a bug, folded; Not started and Done folded, To do, and the Limits bars"/></td>
+    <td><img src="pane-done.png" alt="Done opened, listing each task's kind and who finished it, and To do opened at P0, showing the task file's most urgent items"/></td>
+    <td><img src="pane-all.png" alt="Not started opened, each task with its kind, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
   </tr>
   <tr>
     <td align="center">As it opens</td>
@@ -369,8 +369,12 @@ waiting or in progress, it disappears.
   </tr>
 </table>
 
-- **The headings say what's happening; each row says who.** Only the
-  headings are bold; your own tasks say `you` at the right.
+- **The headings say what's happening; each row says who.** Bold means it
+  opens: the headings, and the title of a task with a handoff
+  (`▾ Ghost task`), which shows or hides it. Other titles are plain; your
+  own tasks say `you` at the right.
+- **A task's kind** sits after its ID: `feature` in soft blue, `bug` in
+  soft red, `review` in soft violet, any other kind in grey.
 - **Yellow rows need you**: an agent gone idle (`codex 1 · idle`: no note or
   heartbeat for most of its lease), or work stopped partway that nobody has
   picked up.

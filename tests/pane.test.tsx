@@ -216,7 +216,7 @@ test('a handoff written with semicolons shows one point a line', async ($, on) =
   await ui.unmount()
 })
 
-test('a kind shows by its value in a column after the ID: feature green, bug red, review orange, any other kind grey; other labels keep key=value after the title', async ($, on) => {
+test('a kind shows by its value in a column after the ID: feature blue, bug red, review violet, any other kind grey; other labels keep key=value after the title', async ($, on) => {
   host(on, [
     { ...task('T-001', 'todo'), labels: ['kind=feature'] },
     { ...task('T-002', 'todo'), labels: ['kind=bug', 'area=auth'] },
@@ -230,9 +230,9 @@ test('a kind shows by its value in a column after the ID: feature green, bug red
   expect(shown.some(t => t.includes('kind='))).toBe(false)
   // The label's own Text, not the title line that holds it.
   const colour = async (text: string) => ((await ui.findAll({ type: 'Text' })) as any[]).find(t => t.text === text)?.props
-  expect((await colour('feature'))?.color).toBe('success')
-  expect((await colour('bug'))?.color).toBe('error')
-  expect((await colour('review'))?.color).toBe('#F27238')
+  expect((await colour('feature'))?.color).toBe('#6698BF')
+  expect((await colour('bug'))?.color).toBe('#BE6565')
+  expect((await colour('review'))?.color).toBe('#9688BD')
   expect((await colour('docs'))?.dimColor).toBe(true)
   expect((await colour('  area=auth'))?.dimColor).toBe(true)
   // The kind sits after the ID, the title after the kind.
@@ -364,12 +364,18 @@ test("pressing a task's title hides its handoff, and pressing it again shows it"
   host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done; tests left', where: WHERE }] }])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
-  // The title that opens is orange, as the band's buttons are; one with nothing to open stays plain.
-  expect(((await ui.findAll({ type: 'Text' })) as any[]).filter(t => t.text === 'title of T-005').map(t => t.props.color)).toContain('#F27238')
+  // The title that opens is bold, as the group headings that open are.
+  expect(((await ui.findAll({ type: 'Text' })) as any[]).filter(t => t.text === 'title of T-005').map(t => t.props.bold)).toContain(true)
+  // The headings' arrow before it, bold white as they are, says it opens and whether it is open.
+  const arrow = async () => ((await ui.findAll({ type: 'Text' })) as any[]).find(t => t.text === '▾ ' || t.text === '▸ ')?.props
   // Open to start with: the handoff is why the task is there.
   expect((await texts(ui)).join('\n')).toContain('tests left')
   expect((await texts(ui)).join('\n')).toContain('/Users/me/code/app-login')
+  expect((await arrow())?.bold).toBe(true)
+  expect((await arrow())?.dimColor).toBeFalsy()
+  expect((await texts(ui)).some((t: string) => t === '▾ ')).toBe(true)
   await ui.press({ key: 'task-T-005' })
+  expect((await texts(ui)).some((t: string) => t === '▸ ')).toBe(true)
   expect((await texts(ui)).join('\n')).not.toContain('tests left')
   expect((await texts(ui)).join('\n')).not.toContain('/Users/me/code/app-login')
   // The title stays, so it can be pressed again.

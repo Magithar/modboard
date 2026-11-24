@@ -40,4 +40,6 @@ Left before it ships:
   can't answer Claude Code's question dialog).
 - Work through the issues found trying it.
 - Decide how a fixed colour should behave across light and dark themes.
+- Cover the kind colours added since (`feature` blue, `bug` red, `review`
+  violet, each soft), as one row each or one row for all three.
 - Check exact colours on terminals with 256 colours only (macOS Terminal).

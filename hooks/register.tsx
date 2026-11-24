@@ -5,7 +5,7 @@ import { scrolled } from './scroll'
 import type { Agent, ReadyBlock, ReadyValue, Reminder, Task, TaskFile, Weather } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import type { CommandState } from './blocks/types'
-import { CAP } from './blocks/board'
+import { CAP, YELLOW } from './blocks/board'
 import { hhmm } from './blocks/clock'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
 import { groupOpen, taskOpen, type GroupName } from './blocks/tasks'
@@ -1356,7 +1356,7 @@ export const register: Register = (on, options) => {
             {tab('order', 'Order')}
             {changed ? (
               <Box flexGrow={1} justifyContent="flex-end">
-                <Text color="warning" wrap="truncate">
+                <Text color={YELLOW} wrap="truncate">
                   {`saved · ${changed}`}
                 </Text>
               </Box>
@@ -1399,7 +1399,8 @@ export const register: Register = (on, options) => {
             </Box>
           )
         }
-        // A blank line above each group, parting it from what's above.
+        // A blank line above each group, parting it from what's above, and,
+        // open, one under its name.
         const group = (name: string, kids: any[]) => {
           const open = !!unfolded[name]
           return [
@@ -1408,7 +1409,8 @@ export const register: Register = (on, options) => {
               {/* Capitalised, as the board's headings are (Project, Limits). */}
               <Text wrap="truncate">{`${open ? '▼' : '▶'} ${name[0]!.toUpperCase()}${name.slice(1)}`}</Text>
             </Button>,
-            ...(open ? kids : []),
+            // Open, a blank line under its name too, as the board's groups have.
+            ...(open ? [<Box key={`under-${name}`} height={1} />, ...kids] : []),
           ]
         }
         // The single blocks first, then the groups.

@@ -79,7 +79,8 @@
         summary · board · work          every 30 s: sh -c the command,    in index.ts, in your copy
         todo · usage · compact          show its first line (60 chars)    of the mod: a fork or a PR
         model · effort · clock
-        context · agents
+        pixel-clock · weather
+        context · agents · project
             │                               │                                 │
             └───────────────────────────────┼─────────────────────────────────┘
                                             ▼

@@ -1,4 +1,4 @@
-import { CAP } from './board'
+import { CAP, YELLOW } from './board'
 import { groupOpen } from './tasks'
 import { hhmm } from './clock'
 import { words, type Block } from './types'
@@ -55,7 +55,7 @@ export const pixelClock: Block = {
   about: 'big clock, weather, alarm',
   // The band is one line: the time plainly, then the alarm.
   band: ({ ui: { Text }, now, alarms, reminders, ringing }) => {
-    if (ringing) return [words(Text, `⏰ ${ringing}`, { color: 'warning', bold: true })]
+    if (ringing) return [words(Text, `⏰ ${ringing}`, { color: YELLOW, bold: true })]
     const next = nextAlarm([...alarms, ...reminders.map(r => r.at)], now)
     return [...(next ? [words(Text, `${hhmm(now)}  ⏰ ${next}`, { dimColor: true })] : []), words(Text, hhmm(now), { dimColor: true })]
   },
@@ -81,7 +81,7 @@ export const pixelClock: Block = {
       ) : null,
       alarm ? (
         <Box>
-          <Text bold={!!ringing} color={ringing ? 'warning' : undefined} dimColor={!ringing} wrap="truncate">
+          <Text bold={!!ringing} color={ringing ? YELLOW : undefined} dimColor={!ringing} wrap="truncate">
             {alarm}
           </Text>
           {ringing ? (
@@ -99,7 +99,7 @@ export const pixelClock: Block = {
     const digits = (
       <Box flexDirection="column" flexShrink={0}>
         {rows.map(row => (
-          <Text color={ringing ? 'warning' : CAP} wrap="truncate">
+          <Text color={ringing ? YELLOW : CAP} wrap="truncate">
             {row}
           </Text>
         ))}

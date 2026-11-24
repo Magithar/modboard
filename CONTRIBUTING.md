@@ -43,7 +43,7 @@ Then:
   `node docs/render.mjs` to rebuild the images. Never edit the `.png` by hand.
 - **If you change what the band or the pane draws**, update the pictures
   that show it: `node docs/band.mjs` for the band, `node docs/pane.mjs` for
-  the list of blocks, the pixel clock and Checks. Both need Google Chrome.
+  the board as it opens, the list of blocks, the pixel clock and Checks. Both need Google Chrome.
 
 ## Where things go
 
@@ -81,7 +81,11 @@ through each kind.
   doesn't: under "In progress", a row names only who ("claude 2").
 - **Colour only when something needs the person**: theme `warning` from
   70%, `error` from 90%, and alerts. Green is kept for the `modBOARD` logo
-  and for work that is moving (`1 active`), never for "fine".
+  and for work that is moving (`1 active`), never for "fine". A task's kind
+  is the one exception, in soft colours that stay quieter than the yellow.
+- **Bold means it opens**: the group headings, and a task title with a
+  handoff, which carries the headings' arrow (`▾`/`▸`). Other titles are
+  plain white.
 - **Fold, don't cut.** A long list is a heading with its count
   (`▸ Not started · 12`); opened, it shows every row and the pane scrolls.
   Work that needs the person starts open.

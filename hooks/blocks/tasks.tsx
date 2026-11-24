@@ -1,8 +1,8 @@
 import type { Note, Task } from '../../types'
 import type { Block, Ctx } from './types'
 import { Problem } from './problem'
-import { CAP } from './board'
 import { branchOf, commitOf, goingQuiet, handedOffBy, handoffWaiting, lastCheck, tilde } from './attention'
+import { YELLOW } from './board'
 
 // Who a row is about. The group's heading says what they did ("In progress",
 // "Unfinished"), so the row only names them. Warnings are what needs you:
@@ -24,16 +24,19 @@ function status(t: Task, { now, who }: Ctx): { text: string; warn: boolean } {
   return { text: '', warn: false }
 }
 
-// A label as the pane shows it. A kind shows by its value alone, coloured
-// when it is one the board knows: a feature green, a bug red, a review in the
-// logo's orange; any other kind grey. Other labels keep key=value, in grey.
+// A label as the pane shows it. A kind shows by its value alone, in a soft
+// colour when it is one the board knows: a feature blue, a bug red, a review
+// violet, each at about 80% over the pane's dark, so they read quieter than
+// the yellow that needs you. Any other kind grey. Other labels keep
+// key=value, in grey.
 // The CLI and the tools keep the full label (kind=bug), since agents filter by it.
-const KINDS: Record<string, string> = { feature: 'success', bug: 'error', review: CAP }
 // A task's kind, the first kind= label, as the pane shows it; or none.
 export const kindOf = (t: Task) => {
   const k = (t.labels ?? []).find(l => l.startsWith('kind=') && l.length > 5)
   return k ? label(k) : undefined
 }
+
+const KINDS: Record<string, string> = { feature: '#6698BF', bug: '#BE6565', review: '#9688BD' }
 
 export function label(l: string): { text: string; color?: string } {
   const [key, value] = l.split('=')
@@ -56,8 +59,13 @@ function Row(c: Ctx, t: Task, kindW = 0) {
   // A task with a handoff opens and closes by its title; open until closed.
   const open = !handoff || taskOpen(c.groupsOpen, t.id)
   const titleText = (
-    <Text wrap="truncate" hover={handoff ? { underline: true } : undefined}>
-      {handoff ? <Text color={CAP}>{t.title}</Text> : t.title}
+    // Bold white is for what you can click: a title with a handoff, as the
+    // group headings are. A title you can't click is plain white. A title
+    // that opens has the headings' arrow before it, bold white as they have,
+    // to say it opens and whether it is open.
+    <Text wrap="truncate">
+      {handoff ? <Text bold>{`${open ? '▾' : '▸'} `}</Text> : null}
+      {handoff ? <Text bold>{t.title}</Text> : t.title}
       {/* Other labels after the title, grey (see label below). */}
       {(t.labels ?? []).filter(l => !(kindW && kind && l.startsWith('kind='))).map(l => {
         const { text, color } = label(l)
@@ -75,18 +83,18 @@ function Row(c: Ctx, t: Task, kindW = 0) {
       <Box width={7} flexShrink={0}>
         <Text dimColor>{t.id}</Text>
       </Box>
-      {/* The kind, in its own column after the ID, so the colours line up. */}
+      {/* The kind, in its own column after the ID, so the kinds line up. */}
       {kindW ? (
         <Box width={kindW} flexShrink={0}>
           {kind ? <Text color={kind.color} dimColor={!kind.color}>{kind.text}</Text> : null}
         </Box>
       ) : null}
       <Box key={`title-${t.id}`} flexGrow={1} flexShrink={1}>
-        {/* Titles plain: bold is for the group headings alone. Yours says
-            "you" at the right. */}
+        {/* Bold is for what opens and closes: the group headings, and a
+            title with a handoff. Other titles plain; yours says "you" at the right. */}
         {/* With a handoff, the title is the button that shows or hides it:
-            in modBOARD's orange, so it reads as a button at a glance, and
-            underlined under the pointer, as the path is. */}
+            bold, as the group headings that open and close are. No underline
+            under the pointer: the bold already says it can be clicked. */}
         {handoff ? (
           <Button key={`task-${t.id}`} plain onPress={() => c.act.toggleTask(t.id)}>
             {titleText}
@@ -97,7 +105,7 @@ function Row(c: Ctx, t: Task, kindW = 0) {
       </Box>
       {text && (
         <Box marginLeft={2} flexShrink={0}>
-          <Text color={warn ? 'warning' : undefined} dimColor={!warn}>
+          <Text color={warn ? YELLOW : undefined} dimColor={!warn}>
             {text}
           </Text>
         </Box>
@@ -234,23 +242,19 @@ export const GROUPS = {
 } as const
 export type GroupName = keyof typeof GROUPS
 
-// Whether a group is open: as the person last left it, else its default.
 // Whether a task's handoff shows: as the person last left it, else open.
 export const taskOpen = (chosen: Record<string, boolean>, id: string) => chosen[`task:${id}`] ?? true
+// Whether a group is open: as the person last left it, else its default.
 export const groupOpen = (chosen: Record<string, boolean>, name: GroupName) => chosen[name] ?? GROUPS[name].open
 
 // A heading that is a button ("▾ In progress · 2"), then, open, all its rows.
-function Group(c: Ctx, name: GroupName, list: Task[], last = false) {
+function Group(c: Ctx, name: GroupName, list: Task[], last = false, kindW = 0) {
   const { Box, Button, Text } = c.ui
   if (!list.length) return null
   const open = groupOpen(c.groupsOpen, name)
   // Done only grows: the newest few, then how many more. The rest is drawn
   // nowhere, so a board with thousands done opens as fast as a new one.
   const shown = name === 'done' ? list.slice(0, DONE_SHOWN) : list
-  // A kind column after the ID only in a group where some task has a kind: as
-  // wide as its longest kind, then a gap. A board without kinds looks as before.
-  const kinds = shown.map(t => kindOf(t)?.text.length ?? 0)
-  const kindW = Math.max(0, ...kinds) ? Math.max(...kinds) + 2 : 0
   const more = list.length - shown.length
   return (
     <Box flexDirection="column">
@@ -327,6 +331,11 @@ export const tasks: Block = {
         ['done', done],
       ] as [GroupName, Task[]][]
     ).filter(([, list]) => list.length)
+    // A kind column after the ID, as wide as the longest kind on the board,
+    // then a gap, so titles line up from group to group. A board without
+    // kinds has no column and looks as before.
+    const kinds = groups.flatMap(([name, list]) => (name === 'done' ? list.slice(0, DONE_SHOWN) : list).map(t => kindOf(t)?.text.length ?? 0))
+    const kindW = Math.max(0, ...kinds) ? Math.max(...kinds) + 2 : 0
     return (
       <Box flexDirection="column">
         {title}
@@ -334,7 +343,7 @@ export const tasks: Block = {
         {groups.map(([name, list], i) => {
           // Each group sits a blank line apart, which an open group above already leaves.
           const apart = i > 0 && !groupOpen(c.groupsOpen, groups[i - 1]![0])
-          const group = Group(c, name, list, i === groups.length - 1)
+          const group = Group(c, name, list, i === groups.length - 1, kindW)
           return apart ? <Box marginTop={1}>{group}</Box> : group
         })}
       </Box>

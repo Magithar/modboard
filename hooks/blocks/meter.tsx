@@ -1,4 +1,5 @@
 import type { Ctx } from './types'
+import { YELLOW } from './board'
 
 // How the board draws "how full": a bar, for both the 5-hour limit and the
 // context window, so the same idea always looks the same. The used part is in
@@ -6,7 +7,7 @@ import type { Ctx } from './types'
 
 // Colour only when it asks something of you: yellow from 70%, red from 90%.
 // With room left it stays plain. Theme colours, so they follow the terminal.
-export const tone = (percent: number) => (percent >= 90 ? 'error' : percent >= 70 ? 'warning' : undefined)
+export const tone = (percent: number) => (percent >= 90 ? 'error' : percent >= 70 ? YELLOW : undefined)
 
 export const CELLS = 10
 const filled = (percent: number, cells: number) => Math.min(cells, Math.round((percent / 100) * cells))

@@ -1,7 +1,7 @@
 // Draws pictures of the /board pane for the README with headless Chrome, in
-// the look of the pane screenshots (pane-board.png): the same background,
-// font and colours, and the text each block draws, as the mod lays it out.
-//   node docs/pane.mjs [blocks-list] [blocks-order] [pane-clock] [clock-ringing] [pane-checks]
+// the look of the pane in a terminal: the same background, font and colours,
+// and the text each block draws, as the mod lays it out.
+//   node docs/pane.mjs [pane-board] [pane-done] [pane-all] [blocks-list] [blocks-order] [pane-clock] [clock-ringing] [pane-checks]
 //
 // The pixel clock's digits are drawn as cells, not font glyphs, so the half
 // blocks meet as they do in a terminal.
@@ -76,7 +76,153 @@ const clockColumn = (time, rows, { ringing } = {}) => {
   )
 }
 
+// A task row: ID, kind in its column, title, and who at the right end.
+// A title with a handoff is bold with the headings' arrow (open or folded).
+const KIND = { feature: 'feature', bug: 'bug', review: 'review' }
+const task = (id, kind, title, who, { warn, handoff } = {}) =>
+  line(
+    [['  '], [id, 'dim'], ['  '], [(kind ?? '').padEnd(9), kind ? KIND[kind] : ''], ...(handoff ? [[`${handoff === 'open' ? '▾' : '▸'} ${title}`, 'bold']] : [[title]])],
+    [[who, warn ? 'warn' : 'dim']],
+  )
+// Under a handoff, lined up with the title: its points, then its facts.
+const UNDER = ' '.repeat(2 + 7 + 9)
+const point = text => line([[UNDER], [`· ${text}`, 'dim']])
+const fact = (label, value) => line([[UNDER], [label.padEnd(7), 'dim'], [value]])
+// A Limits row: label, a 10-cell bar, the figure, then what goes with it.
+const bar = (label, pct, after, cls = 'dim') => {
+  const n = Math.round(pct / 10)
+  return line([['  '], [label.padEnd(13), 'dim'], ['▓'.repeat(n)], ['░'.repeat(10 - n), 'dim'], [`${pct}%`.padStart(5)], ['   '], [after, cls]])
+}
+
+// The three pane pictures share one board: its top, In progress, and the
+// groups, folded or open.
+const heading = (title, count, open) => line([[`${open ? '▾' : '▸'} ${title}`, 'bold'], [` · ${count}`, 'dim']])
+const TOP = [
+  line([['modBOARD', 'okbold'], [' · claude 1', 'dim']], [['10 waiting', 'dim'], [' · ', 'dim'], ['3 active', 'ok']]),
+  blank(),
+  heading('In progress', 3, true),
+  blank(),
+  task('T-002', 'feature', 'Set up the database', 'claude 4'),
+  task('T-006', 'feature', 'Add dark mode', 'codex 1 · idle', { warn: true }),
+  task('T-007', 'review', 'Review T-003: Cache API results', 'claude 2'),
+  blank(),
+]
+const NOT_STARTED = [
+  ['T-009', 'feature', 'Add export to CSV'],
+  ['T-010', 'feature', 'Mobile layout'],
+  ['T-011', 'feature', 'Localise strings'],
+  ['T-012', 'feature', 'Add search'],
+  ['T-013', null, 'Benchmark the parser'],
+  ['T-014', 'bug', 'Fix the error page'],
+  ['T-015', 'feature', 'Onboarding tour'],
+  ['T-016', 'feature', 'Keyboard shortcuts'],
+]
+const DONE = [
+  ['T-004', 'feature', 'Add a test script', 'claude 4'],
+  ['T-001', 'feature', 'Add a login page', 'codex 1'],
+  ['T-003', 'bug', 'Fix the signup form', 'claude 2'],
+  ['T-017', null, 'Write the README', 'you'],
+  ['T-018', 'feature', 'Add a favicon', 'codex 1'],
+  ['T-019', 'review', 'Review T-001: Add a login page', 'claude 2'],
+]
+const TODO = [
+  ['P0', 'Fix the signup crash'],
+  ['P0', 'Rate-limit the login API'],
+  ['P0', 'Rotate the leaked staging key'],
+  ['P1', 'Empty states for the inbox'],
+  ['P1', 'Loading skeletons'],
+  ['P2', 'Animate the sidebar'],
+  ['P2', 'Offline mode'],
+  ['—', 'Dark mode'],
+  ['—', 'Keyboard shortcuts'],
+]
+const todoHeading = (open, filter) => line([[`${open ? '▾' : '▸'} To do`, 'bold'], [' · 9 open', 'dim'], ['   '], [filter, 'bold']])
+const LIMITS = [
+  line([['▾ Limits', 'bold']]),
+  blank(),
+  bar('context', 3, 'compact', 'bold'),
+  blank(),
+  bar('5-hour limit', 21, 'resets 08:00'),
+  blank(),
+]
+
 const PAGES = {
+  'pane-board': [
+    ...TOP,
+    line([['▾ Unfinished', 'bold'], [' · 2', 'dim']]),
+    blank(),
+    task('T-005', 'feature', 'Ghost task: settings screen', 'claude 1', { warn: true, handoff: 'open' }),
+    blank(),
+    point('layout done in src/settings.tsx'),
+    point("saving isn't wired yet"),
+    blank(),
+    fact('where', 'settings @ 4f2a9c1'),
+    blank(),
+    fact('path', '~/code/app-settings'),
+    blank(),
+    fact('files', 'src/settings.tsx, src/settings.css'),
+    blank(),
+    fact('check', 'npm test passed at 4f2a9c1'),
+    blank(),
+    task('T-008', 'bug', 'Fix login redirect', 'codex 1', { warn: true, handoff: 'folded' }),
+    blank(),
+    heading('Not started', 8),
+    blank(),
+    heading('Done', 6),
+    blank(),
+    rule(),
+    blank(),
+    todoHeading(false, 'P0'),
+    blank(),
+    rule(),
+    blank(),
+    ...LIMITS,
+  ],
+  'pane-done': [
+    ...TOP,
+    heading('Unfinished', 2),
+    blank(),
+    heading('Not started', 8),
+    blank(),
+    heading('Done', 6, true),
+    blank(),
+    ...DONE.map(([id, kind, title, who]) => task(id, kind, title, who)),
+    blank(),
+    rule(),
+    blank(),
+    todoHeading(true, 'P0'),
+    blank(),
+    line([['  '], ['from TASKS.md', 'dim']]),
+    blank(),
+    ...TODO.filter(([p]) => p === 'P0').map(([, item]) => line([['  · '], [item]])),
+    blank(),
+    rule(),
+    blank(),
+    ...LIMITS,
+  ],
+  'pane-all': [
+    ...TOP,
+    heading('Unfinished', 2),
+    blank(),
+    heading('Not started', 8, true),
+    blank(),
+    ...NOT_STARTED.map(([id, kind, title]) => task(id, kind, title, '')),
+    blank(),
+    heading('Done', 6),
+    blank(),
+    rule(),
+    blank(),
+    todoHeading(true, 'all'),
+    blank(),
+    line([['  '], ['from TASKS.md', 'dim']]),
+    blank(),
+    ...TODO.map(([p, item]) => line([[p.padEnd(4), 'dim'], [item]])),
+    blank(),
+    rule(),
+    blank(),
+    line([['▸ Limits', 'bold'], [' · context 3% · 5-hour 21%', 'dim']]),
+    blank(),
+  ],
   'blocks-list': [
     ...tabs('blocks', 'saved · added pixel-clock'),
     blank(),
@@ -119,7 +265,7 @@ const PAGES = {
     blank(),
     line([['▾ In progress', 'bold'], [' · 1', 'dim']]),
     blank(),
-    line([['  '], ['T-004', 'dim'], ['  Ship release']], [['claude 2', 'dim']]),
+    task('T-004', 'feature', 'Ship release', 'claude 2'),
     blank(),
     line([['▸ Not started', 'bold'], [' · 2', 'dim']]),
     blank(),
@@ -166,6 +312,7 @@ font:13.5px/${LINE}px Menlo,"SF Mono",monospace;color:#e6e6e6;white-space:pre}
 .dim{color:#9a9a9a} .bold{font-weight:700;color:#f2f2f2} .ok{color:#5fd068} .okbold{color:#5fd068;font-weight:700}
 .cap{color:#F27238} .capbold{color:#F27238;font-weight:700} .warn{color:#f2c200} .warnbold{color:#f2c200;font-weight:700}
 .rule{color:#6a6a6a} .err{color:#ff6b6b}
+.feature{color:#6698BF} .bug{color:#BE6565} .review{color:#9688BD}
 .px{display:inline-block;width:1ch;height:${LINE}px;vertical-align:top}
 .px.t{background:linear-gradient(currentColor 50%,transparent 50%)}
 .px.b{background:linear-gradient(transparent 50%,currentColor 50%)}

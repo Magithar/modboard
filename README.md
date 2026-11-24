@@ -61,8 +61,8 @@ progress, your task.md, CI status, the git branch, or any command's output.
 ![Three live Claude Code sessions share one board: claude 2 and claude 3 race for T-001, claude 2 hands T-003 off partway, claude 3 picks it up, and claude 1's /board pane follows along](docs/board-live.gif)
 
 Three real Claude Code sessions, recorded live at real speed. Only the wait
-before the two workers start is cut. The board shows its default blocks; you
-can [change them](#settings).
+before the two workers start is cut. The pane also has the `agents` block on,
+the `Live` line of who is in a session; you can [choose what it shows](#settings).
 
 1. The board names each session as it joins. `claude 1` has `/board` open;
    `claude 2` and `claude 3` are each told to work the board.
@@ -169,7 +169,8 @@ board tail                                # follow the board as it changes; --js
 ```
 
 In the pane, a kind shows by its value alone, in a column after the ID:
-`feature` in green, `bug` in red, `review` in orange, any other kind in grey.
+`feature` in soft blue, `bug` in soft red, `review` in soft violet, any other
+kind in grey.
 The column is only there in a group where some task has a kind. Other labels
 follow the title, in grey.
 `board list` and the tools keep the full `kind=bug`, since agents filter by it.
@@ -288,14 +289,14 @@ right end.
 ### The `/board` pane
 
 <p align="center">
-  <img src="docs/pane-board.png" width="640" alt="The /board pane as it opens: In progress with an idle codex 1 row in yellow, Unfinished with each handoff as points, Not started and Done folded, To do, and the Limits bars"/>
+  <img src="docs/pane-board.png" width="640" alt="The /board pane as it opens: In progress with each task's kind (feature in soft blue, review in soft violet) and an idle codex 1 row in yellow; Unfinished with ▾ Ghost task: settings screen in bold, open to its handoff points and where, path, files and check, and ▸ Fix login redirect, a bug, folded; Not started and Done folded, To do, and the Limits bars"/>
   <br/><em>As it opens</em>
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/pane-done.png" alt="Done opened, listing who finished each task, and To do opened at P0, showing the task file's most urgent items"/></td>
-    <td width="50%"><img src="docs/pane-all.png" alt="Not started opened, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
+    <td width="50%"><img src="docs/pane-done.png" alt="Done opened, listing each task's kind and who finished it, and To do opened at P0, showing the task file's most urgent items"/></td>
+    <td width="50%"><img src="docs/pane-all.png" alt="Not started opened, each task with its kind, To do turned to all with each item's priority, and Limits folded to its figures"/></td>
   </tr>
   <tr>
     <td align="center">Done and To do opened</td>
@@ -314,8 +315,12 @@ right end.
 
 - **Every heading is a button.** Click to open or close it. In progress and
   Unfinished start open, because they need you.
+- **Bold means it opens**: the headings, and the title of a task with a
+  handoff (`▾ Add password reset`), which shows or hides it. Other titles
+  are plain.
 - **Colour only when something needs you**: yellow for unfinished or idle work
-  and for a limit past 70%; red for a limit past 90%.
+  and for a limit past 70%; red for a limit past 90%. The one exception is a
+  task's kind, in soft blue, red or violet, quieter than the yellow.
 - If the board stops answering, a red `board not updating: …` line says so at
   the top until it answers again.
 
@@ -743,6 +748,7 @@ What a block gets (the full shape is in [`types.tsx`](hooks/blocks/types.tsx)):
 Two rules keep the display calm:
 
 - **Colour only when something needs you** (theme `warning` and `error`).
+  The soft kind colours in `tasks.tsx` are the one exception.
 - **No word or mark that the heading or the order already says.**
 
 For anything that fills up, reuse the bar in `meter.tsx`, as the context and

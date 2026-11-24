@@ -10,6 +10,9 @@ import type { Block } from './types'
 const BLOCKS_LABEL = 'blocks'
 // The logo's cap orange, beside modBOARD's green: the logo's two colours.
 export const CAP = '#F27238'
+// The board's yellow, for what wants a look: waiting work, bars from 70%,
+// the band's task box. The theme's own bright warning colour, so it stands out.
+export const YELLOW = 'warning'
 const GAP = 3
 
 export const board: Block = {
