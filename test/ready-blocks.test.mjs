@@ -15,7 +15,10 @@ const BOARD = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin
 const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'blocks-')))
 const which = tool => path.dirname(execFileSync('/usr/bin/which', [tool], { encoding: 'utf8' }).trim())
 const GIT_DIR = which('git')
-const NODE_DIR = path.dirname(process.execPath)
+// The system tools the blocks may use, and nothing else: on a CI runner
+// /usr/bin also holds a real gh, which would answer in place of "missing".
+const SYS = tmp()
+for (const [name, target] of [['git', path.join(GIT_DIR, 'git')], ['node', process.execPath], ['sleep', path.join(which('sleep'), 'sleep')]]) fs.symlinkSync(target, path.join(SYS, name))
 
 // A git repo on `branch`, with a GitHub origin.
 function repo(branch = 'main') {
@@ -42,7 +45,7 @@ function fake(dir, name, marker, then = 'exit 0') {
 
 function board(cwd, args, env = {}) {
   const settings = env.BOARD_SETTINGS_FILE ?? path.join(tmp(), 'settings.json')
-  const base = { ...process.env, BOARD_SETTINGS_FILE: settings, BOARD_DIR: path.join(cwd, '.modboard'), PATH: [GIT_DIR, NODE_DIR, '/usr/bin', '/bin'].join(':') }
+  const base = { ...process.env, BOARD_SETTINGS_FILE: settings, BOARD_DIR: path.join(cwd, '.modboard'), PATH: SYS }
   delete base.BOARD_AGENT
   try {
     return { code: 0, out: execFileSync(process.execPath, [BOARD, ...args], { cwd, env: { ...base, ...env }, encoding: 'utf8', stdio: 'pipe' }) }
@@ -85,7 +88,7 @@ test("a project's own git and gh never run, even first on PATH", () => {
   const marker = path.join(tmp(), 'ran')
   fake(path.join(root, 'bin'), 'git', marker, 'echo evil')
   fake(path.join(root, 'node_modules', '.bin'), 'gh', marker, 'echo evil')
-  const PATH = [path.join(root, 'bin'), path.join(root, 'node_modules', '.bin'), '.', GIT_DIR, NODE_DIR, '/usr/bin', '/bin'].join(':')
+  const PATH = [path.join(root, 'bin'), path.join(root, 'node_modules', '.bin'), '.', SYS].join(':')
   assert.equal(json(root, ['blocks', 'run', 'branch'], { PATH }).text, 'main')
   assert.equal(json(root, ['blocks', 'run', 'changes'], { PATH }).state, 'ok')
   // The only gh is the project's: the block says gh is missing, and doesn't run it.
@@ -126,7 +129,7 @@ test('two projects at once each get their own lines', async () => {
   const b = repo('beta')
   const run = cwd =>
     new Promise((resolve, reject) =>
-      execFile(process.execPath, [BOARD, 'blocks', 'run', 'branch', '--json'], { cwd, env: { ...process.env, PATH: [GIT_DIR, '/usr/bin', '/bin'].join(':') } }, (err, out) => (err ? reject(err) : resolve(JSON.parse(out).text))),
+      execFile(process.execPath, [BOARD, 'blocks', 'run', 'branch', '--json'], { cwd, env: { ...process.env, PATH: SYS } }, (err, out) => (err ? reject(err) : resolve(JSON.parse(out).text))),
     )
   const [ra, rb] = await Promise.all([run(a), run(b)])
   assert.equal(ra, 'alpha')
@@ -139,7 +142,7 @@ test('a block that is off never runs: nothing executes', () => {
   const tools = path.join(tmp(), 'tools')
   fake(tools, 'git', marker, `exec ${JSON.stringify(path.join(GIT_DIR, 'git'))} "$@"`)
   fake(tools, 'gh', marker)
-  const PATH = [tools, NODE_DIR, '/usr/bin', '/bin'].join(':')
+  const PATH = [tools, SYS].join(':')
   assert.deepEqual(json(root, ['blocks'], { PATH }), { lines: [] })
   json(root, ['blocks', '--all'], { PATH })
   assert.equal(fs.existsSync(marker), false)
@@ -150,7 +153,7 @@ test('a hanging tool times out, and the other blocks still show', () => {
   const settings = path.join(tmp(), 'settings.json')
   const tools = path.join(tmp(), 'tools')
   fake(tools, 'gh', path.join(tmp(), 'log'), 'sleep 30')
-  const env = { BOARD_SETTINGS_FILE: settings, BOARD_BLOCK_TIMEOUT_MS: '800', PATH: [tools, GIT_DIR, NODE_DIR, '/usr/bin', '/bin'].join(':') }
+  const env = { BOARD_SETTINGS_FILE: settings, BOARD_BLOCK_TIMEOUT_MS: '800', PATH: [tools, SYS].join(':') }
   json(root, ['blocks', 'on', 'ci'], env)
   json(root, ['blocks', 'on', 'branch'], env)
   const started = Date.now()
@@ -166,7 +169,7 @@ test('gh missing, not signed in, and offline each say so', () => {
   const log = path.join(tmp(), 'log')
   const withGh = then => {
     fake(tools, 'gh', log, then)
-    return { PATH: [tools, GIT_DIR, NODE_DIR, '/usr/bin', '/bin'].join(':') }
+    return { PATH: [tools, SYS].join(':') }
   }
   assert.deepEqual(json(root, ['blocks', 'run', 'prs']), { id: 'prs', state: 'missing', text: 'needs gh (GitHub CLI)' })
   const auth = json(root, ['blocks', 'run', 'ci'], withGh('echo "To get started with GitHub CLI, please run:  gh auth login" >&2; exit 4'))
@@ -190,7 +193,7 @@ test('a repo not on GitHub says so instead of asking gh', () => {
   const tools = path.join(tmp(), 'tools')
   const marker = path.join(tmp(), 'ran')
   fake(tools, 'gh', marker)
-  const r = json(root, ['blocks', 'run', 'prs'], { PATH: [tools, GIT_DIR, NODE_DIR, '/usr/bin', '/bin'].join(':') })
+  const r = json(root, ['blocks', 'run', 'prs'], { PATH: [tools, SYS].join(':') })
   assert.deepEqual(r, { id: 'prs', state: 'empty', text: 'origin is not on GitHub' })
   assert.equal(fs.existsSync(marker), false)
   assert.equal(githubRepo('git@github.com:acme/widgets.git'), 'acme/widgets')
