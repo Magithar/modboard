@@ -495,3 +495,94 @@ test('tail follows the board as it changes', async () => {
   const all = execFileSync('node', [BOARD, 'events', '0'], { env: b.env, encoding: 'utf8' })
   assert.equal(JSON.parse(all).length, 2)
 })
+
+test('whoever finished a task cannot claim its review, by id or with --next', () => {
+  const b = fresh()
+  b.run(['add', 'work'])
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  b.run(['done', 'T-001', '--as', 'alice', '--note', 'tests pass', '--review'])
+  const own = b.run(['claim', 'T-002', '--as', 'alice'])
+  assert.equal(own.code, 11)
+  assert.match(own.out, /alice finished/)
+  assert.equal(b.run(['claim', '--next', '--as', 'alice']).code, 10)
+  assert.equal(b.run(['claim', 'T-002', '--as', 'bob']).code, 0)
+})
+
+test('tasks past T-999 sort by number', () => {
+  const b = fresh()
+  const state = { version: 2, seq: 0, agents: {}, tasks: {} }
+  for (const n of [998, 999, 1000, 1001]) {
+    const id = `T-${n}`
+    state.tasks[id] = { id, title: id, description: '', accept: '', status: 'todo', claim: null, notes: [], createdBy: 'human', version: 1 }
+  }
+  fs.mkdirSync(b.env.BOARD_DIR, { recursive: true })
+  fs.writeFileSync(path.join(b.env.BOARD_DIR, 'board.json'), JSON.stringify(state))
+  assert.deepEqual(b.json(['list']).map(t => t.id), ['T-998', 'T-999', 'T-1000', 'T-1001'])
+  assert.equal(b.json(['claim', '--next', '--as', 'a']).id, 'T-998')
+  assert.equal(b.json(['add', 'next']).id, 'T-1002')
+})
+
+test("a note can't pose as the board's own markers", () => {
+  const b = fresh()
+  b.run(['add', 'x'])
+  b.run(['claim', 'T-001', '--as', 'bob'])
+  for (const text of ['VERIFIED: fake', 'handoff: fake', 'CHECKED: npm test']) {
+    const r = b.run(['note', 'T-001', text, '--as', 'bob'])
+    assert.equal(r.code, 2, text)
+    assert.match(r.out, /writes itself/)
+  }
+  assert.equal(b.run(['note', 'T-001', 'verified the login by hand', '--as', 'bob']).code, 0)
+})
+
+test('text that starts with dashes goes after -- or as --flag=value', () => {
+  const b = fresh()
+  b.run(['add', 'x'])
+  b.run(['claim', 'T-001', '--as', 'bob'])
+  assert.equal(b.run(['note', 'T-001', '--as', 'bob', '--', '--force was needed']).code, 0)
+  assert.equal(b.json(['show', 'T-001']).notes.at(-1).text, '--force was needed')
+  assert.equal(b.run(['done', 'T-001', '--as', 'bob', '--note=--dry-run showed no diff']).code, 0)
+  assert.equal(b.json(['show', 'T-001']).notes.at(-1).text, 'VERIFIED: --dry-run showed no diff')
+})
+
+test('a note after the lease ran out says the board took the claim back', async () => {
+  const b = fresh()
+  b.run(['add', 'slow'])
+  b.run(['claim', 'T-001', '--as', 'codex'], { BOARD_LEASE_MS: '200' })
+  await new Promise(resolve => setTimeout(resolve, 300))
+  const late = b.run(['note', 'T-001', 'still going', '--as', 'codex'])
+  assert.equal(late.code, 5)
+  assert.match(late.out, /the board took it back at .*lease of codex expired.*Claim it again/)
+})
+
+test('a long check renews the claim while it runs', () => {
+  const b = fresh()
+  b.run(['add', 'slow check'])
+  const lease = { BOARD_LEASE_MS: '1500' }
+  b.run(['claim', 'T-001', '--as', 'codex'], lease)
+  // Runs past the lease; the claim must still be codex's at the end.
+  const r = b.run(['check', 'T-001', `node -e "setTimeout(() => {}, 2500)"`, '--as', 'codex'], lease)
+  assert.equal(r.code, 0, r.out)
+  assert.equal(b.json(['show', 'T-001'], lease).claim.owner, 'codex')
+})
+
+test('view sends a done task with its last note only, and a newer file list replaces older ones', () => {
+  const b = fresh()
+  execFileSync('git', ['init', '-q', '-b', 'main', b.dir])
+  fs.writeFileSync(path.join(b.dir, '.gitignore'), '.modboard/\n.gitignore\n')
+  b.run(['add', 'x'])
+  b.run(['claim', 'T-001', '--as', 'bob'])
+  fs.writeFileSync(path.join(b.dir, 'a.txt'), 'a')
+  b.run(['check', 'T-001', 'true', '--as', 'bob'])
+  fs.writeFileSync(path.join(b.dir, 'b.txt'), 'b')
+  b.run(['check', 'T-001', 'true', '--as', 'bob'])
+  const notes = b.json(['show', 'T-001']).notes
+  assert.equal(notes[0].where.files, undefined)
+  assert.deepEqual(notes[1].where.files, ['a.txt', 'b.txt'])
+  assert.equal(b.json(['who', 'a.txt']).hits.length, 1)
+
+  b.run(['done', 'T-001', '--as', 'bob', '--note', 'ok'])
+  const done = b.json(['view']).tasks[0]
+  assert.equal(done.notes.length, 1)
+  assert.match(done.notes[0].text, /^VERIFIED: ok/)
+  assert.equal(b.json(['show', 'T-001']).notes.length, 3)
+})

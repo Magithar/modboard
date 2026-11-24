@@ -382,7 +382,7 @@ test('board_done passes the verification note through', async ($, on) => {
   const calls = host(on, [task('T-001', 'claimed', 'claude 1')])
   await $.session.start(START)
   await $.tool.call({ tool: 'mcp__modboard__board_done', id: 'T-001', note: 'ran it, saw hello' } as any)
-  expect(calls.find(argv => argv.includes('done'))?.slice(-6)).toEqual(['done', 'T-001', '--note', 'ran it, saw hello', '--as', 'claude 1'])
+  expect(calls.find(argv => argv.includes('done'))?.slice(-5)).toEqual(['done', 'T-001', '--note=ran it, saw hello', '--as', 'claude 1'])
 })
 
 test('ending the session releases what it holds and gives up its name', async ($, on) => {
@@ -1380,7 +1380,7 @@ test('board_add with ring flags the task on the board', async ($, on) => {
   const calls = host(on, [])
   await $.session.start(START)
   await $.tool.call({ tool: 'mcp__modboard__board_add', title: 'Ship release', ring: true } as any)
-  expect(calls.find(argv => argv.includes('add'))?.slice(2)).toEqual(['add', 'Ship release', '--ring', '--as', 'claude 1'])
+  expect(calls.find(argv => argv.includes('add'))?.slice(2)).toEqual(['add', '--ring', '--as', 'claude 1', '--', 'Ship release'])
 })
 
 test('board_claim with no id takes the next ready task; board_add and board_done pass waits, labels and review', async ($, on) => {
@@ -1392,9 +1392,9 @@ test('board_claim with no id takes the next ready task; board_add and board_done
   await $.tool.call({ tool: 'mcp__modboard__board_claim', id: 'T-004' } as any)
   expect(argv('claim')).toEqual(['claim', 'T-004', '--as', 'claude 1'])
   await $.tool.call({ tool: 'mcp__modboard__board_add', title: 'Ship', after: ['T-001', 'T-002'], labels: ['kind=release'] } as any)
-  expect(argv('add')).toEqual(['add', 'Ship', '--after', 'T-001,T-002', '--label', 'kind=release', '--as', 'claude 1'])
+  expect(argv('add')).toEqual(['add', '--after', 'T-001,T-002', '--label', 'kind=release', '--as', 'claude 1', '--', 'Ship'])
   await $.tool.call({ tool: 'mcp__modboard__board_done', id: 'T-004', note: 'ran it', review: true } as any)
-  expect(argv('done')).toEqual(['done', 'T-004', '--note', 'ran it', '--review', '--as', 'claude 1'])
+  expect(argv('done')).toEqual(['done', 'T-004', '--note=ran it', '--review', '--as', 'claude 1'])
 })
 
 test('board_alarm rings now with its note, but not twice in a minute, and needs a note', { options: { band: 'pixel-clock' } } as any, async ($, on) => {

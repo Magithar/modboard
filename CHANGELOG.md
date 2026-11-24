@@ -32,6 +32,39 @@ ask for a review.
 - **An agent skill** (`skills/modboard`), for agents that load skills:
   `npx skills add Magithar/modboard`.
 
+### Fixed
+
+- **A project's storage block runs only once you trust it.** `.modboard/config.json`
+  could name a block file, and every `board` command (and Claude Code, at
+  session start) ran it, so a cloned repo could run its code. Now
+  `board trust` records a fingerprint of the config and the block in your
+  own config, and a change asks again (exit 12). The built-in block needs none.
+- **The file store survives a writer that stalls.** An agent frozen
+  mid-commit for over 10 seconds (a sleeping laptop) could overwrite another
+  agent's write and reuse its event number. The lock now carries a token, and
+  a writer that lost it writes nothing.
+- **A half-written ledger line no longer breaks the board.** Readers skip it,
+  `board doctor` reports it, and the next commit cuts it off, along with
+  events a crash left that the state never got. `doctor` also reports event
+  numbers used twice or out of order.
+- **`board.json` is flushed to disk before it replaces the old one**, so a
+  power cut can't leave it empty, and it's written on one line, about half
+  the size.
+- **Whoever finished a task can't claim its review by id** either, not only
+  through `claim --next` (exit 11).
+- **T-1000 sorts after T-999**, in lists and for `claim --next`.
+- **Boards stay light as they grow.** A new note with the files the work
+  changed takes the list off earlier notes from the same checkout and branch,
+  and `board view` (polled by the pane) sends a done task with its last note
+  only.
+- **A long `board check` renews the claim while it runs**, so a test suite
+  longer than the lease can't lose it. A note after a lease ran out says the
+  board took the claim back, and when.
+- **A note can't start with `VERIFIED:`, `HANDOFF:` or `CHECKED:`**, which the
+  board writes itself and displays read.
+- **Text that starts with dashes** can go after `--` or as `--flag=value`, and
+  the Claude Code tools pass text that way.
+
 ### Docs
 
 - **`docs/AGENT-SETUP.md`**, a setup page written for agents: point any

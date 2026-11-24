@@ -8,12 +8,12 @@
 // Which storage block holds it is named in .modboard/config.json (see
 // lib/load-store.mjs); the default is the built-in "file" block.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { BoardError, createEngine } from '../lib/engine.mjs'
-import { loadStore } from '../lib/load-store.mjs'
+import { loadStore, trustBoard, trustFile } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
 
 function boardDir() {
@@ -97,9 +97,16 @@ function parseArgs(argv) {
   const flags = {}
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
+    // After a bare --, everything is a word: board note T-1 -- "--force was needed".
+    if (a === '--') {
+      pos.push(...argv.slice(i + 1))
+      break
+    }
     if (a.startsWith('--')) {
-      const val = argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') ? argv[++i] : true
-      const name = a.slice(2)
+      // --note=--anything keeps a value that starts with dashes.
+      const eq = a.indexOf('=')
+      const name = eq > 0 ? a.slice(2, eq) : a.slice(2)
+      const val = eq > 0 ? a.slice(eq + 1) : argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') ? argv[++i] : true
       // A flag given twice (--label a --label b) keeps both.
       flags[name] = name in flags ? [flags[name], val].flat() : val
     } else pos.push(a)
@@ -153,6 +160,7 @@ function describe(t) {
 }
 
 const DIR = boardDir()
+const LEASE_MS = Number(process.env.BOARD_LEASE_MS ?? 15 * 60 * 1000)
 
 // Local clock time, for people: "19:45".
 const hhmm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -190,6 +198,10 @@ const SAY = {
     r.file
       ? [r.file, ...r.items.map(i => `${'  '.repeat(i.depth)}${i.done === null ? '-' : i.done ? '[x]' : '[ ]'} ${i.priority === null ? '' : `P${i.priority} `}${i.text}`)].join('\n')
       : '(no task.md here)',
+  trust: r =>
+    r.needed
+      ? `trusted storage block ${r.block} (${r.code}) for ${DIR}\nrecorded in ${trustFile()}; a change to it or to config.json asks again`
+      : `this board uses the built-in ${r.block} block, which needs no trust`,
   doctor: r =>
     [`storage block: ${r.block}`, ...(r.tasks !== undefined ? [`${r.tasks} ${r.tasks === 1 ? 'task' : 'tasks'}, ${r.events ?? '?'} events`] : []), r.ok ? 'ok: the ledger and the state agree' : 'problems:', ...r.problems.map(p => `- ${p}`)].join('\n'),
 }
@@ -285,8 +297,15 @@ const commands = {
       throw new BoardError(5, `${t.id} is not claimed by ${actor}${t.claim ? ` (owner: ${t.claim.owner})` : ''}`)
     const ran = !flags.passed
     if (ran) {
-      // Its output goes to stderr, so stdout stays the board's answer (and --json stays JSON).
-      const run = spawnSync(cmd, { shell: true, stdio: ['ignore', 2, 2] })
+      // Its output goes to stderr, so stdout stays the board's answer (and
+      // --json stays JSON). A long run (a full test suite) renews the claim as
+      // it goes, so the lease can't run out under it.
+      const renew = setInterval(() => board.heartbeat(actor).catch(() => {}), Math.max(1000, LEASE_MS / 3))
+      const run = await new Promise(resolve => {
+        const child = spawn(cmd, { shell: true, stdio: ['ignore', 2, 2] })
+        child.on('error', error => resolve({ status: null, error }))
+        child.on('close', (status, signal) => resolve({ status, signal }))
+      }).finally(() => clearInterval(renew))
       if (run.status !== 0)
         throw new BoardError(8, `check failed: ${cmd} ${run.status === null ? `was stopped (${run.signal ?? run.error?.message})` : `exited ${run.status}`}; nothing recorded`)
     }
@@ -308,7 +327,12 @@ const commands = {
   whoami: async (board, _, flags) => ({ name: await actorOf(board, flags) }),
   agents: board => board.agents(),
   // Everything a display needs, in one call: every task and the live agents.
-  view: async board => ({ tasks: await board.list({ all: true }), agents: await board.agents() }),
+  // A done task comes with its last note only (who finished it, and how): a
+  // display polls this every few seconds, and done tasks pile up.
+  view: async board => ({
+    tasks: (await board.list({ all: true })).map(t => (t.status === 'done' ? { ...t, notes: t.notes.slice(-1) } : t)),
+    agents: await board.agents(),
+  }),
   events: (board, [since]) => board.events(Number(since ?? 0)),
   // Follow the board as it changes, one line an event (--json: one JSON
   // object a line), until stopped. From now on, or from --since <seq> (0 for
@@ -328,6 +352,9 @@ const commands = {
   },
   doctor: async (board, _, __, store) => ({ block: store, ...(await board.doctor()) }),
   where: () => DIR,
+  // Run the storage block this board's config.json names. It is code from the
+  // project, so it waits for this; a change to it asks again.
+  trust: () => trustBoard(DIR),
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
 }
@@ -361,7 +388,7 @@ function checkFlags(cmd, flags) {
 }
 
 // Commands that read no board, so no storage block is loaded for them.
-const BOARDLESS = new Set(['where', 'taskfile'])
+const BOARDLESS = new Set(['where', 'taskfile', 'trust'])
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2)
@@ -377,7 +404,7 @@ async function main() {
     const board =
       store &&
       createEngine(store, {
-        leaseMs: Number(process.env.BOARD_LEASE_MS ?? 15 * 60 * 1000),
+        leaseMs: LEASE_MS,
         presenceMs: Number(process.env.BOARD_PRESENCE_MS ?? 3 * 60 * 1000),
       })
     const out = await run(board, pos, flags, name)

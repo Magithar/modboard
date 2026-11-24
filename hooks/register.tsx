@@ -97,7 +97,10 @@ async function cli($: EngineInterface, args: string[]) {
 }
 
 async function board($: EngineInterface, args: string[]) {
-  return cli($, [...args, '--as', await read($, me)])
+  // --as goes last, but before a bare --, after which everything is text.
+  const as = ['--as', await read($, me)]
+  const end = args.indexOf('--')
+  return cli($, end < 0 ? [...args, ...as] : [...args.slice(0, end), ...as, ...args.slice(end)])
 }
 
 // The board names the session by what it runs and when it joined ("claude 1",
@@ -108,6 +111,8 @@ async function joined($: EngineInterface) {
   try {
     if (out.ok) return (JSON.parse(out.text) as { name: string }).name
   } catch {}
+  // A project's storage block that isn't trusted yet: say so once, at start.
+  if (out.code === 12) $.ui.toast(out.text)
   return `claude:${session.slice(0, 8)}`
 }
 
@@ -267,12 +272,14 @@ const TOOLS = [
     required: ['title'],
     args: (i: any) => [
       'add',
-      i.title,
-      ...(i.description ? ['--desc', i.description] : []),
-      ...(i.accept ? ['--accept', i.accept] : []),
+      // Text goes as --flag=value, or after --, so text that starts with dashes stays text.
+      ...(i.description ? [`--desc=${i.description}`] : []),
+      ...(i.accept ? [`--accept=${i.accept}`] : []),
       ...(i.ring ? ['--ring'] : []),
       ...(i.after?.length ? ['--after', i.after.join(',')] : []),
       ...(i.labels?.length ? ['--label', i.labels.join(',')] : []),
+      '--',
+      i.title,
     ],
   },
   {
@@ -293,7 +300,7 @@ const TOOLS = [
     description: 'Record progress on a task you hold (what is done, what is next, decisions).',
     schema: { id: { type: 'string' }, text: { type: 'string' } },
     required: ['id', 'text'],
-    args: (i: any) => ['note', i.id, i.text],
+    args: (i: any) => ['note', i.id, '--', i.text],
   },
   {
     name: 'board_release',
@@ -302,7 +309,7 @@ const TOOLS = [
       'The board records the worktree, branch and commit with it; record your last passing check with board_check first.',
     schema: { id: { type: 'string' }, handoff: { type: 'string' } },
     required: ['id', 'handoff'],
-    args: (i: any) => ['release', i.id, '--handoff', i.handoff],
+    args: (i: any) => ['release', i.id, `--handoff=${i.handoff ?? ''}`],
   },
   {
     name: 'board_check',
@@ -312,7 +319,7 @@ const TOOLS = [
       'Record only checks that passed.',
     schema: { id: { type: 'string' }, command: { type: 'string' } },
     required: ['id', 'command'],
-    args: (i: any) => ['check', i.id, i.command, '--passed'],
+    args: (i: any) => ['check', i.id, '--passed', '--', i.command],
   },
   {
     name: 'board_who',
@@ -321,7 +328,7 @@ const TOOLS = [
       'The latest first. Use it before editing a file another agent may be working on.',
     schema: { file: { type: 'string' } },
     required: ['file'],
-    args: (i: any) => ['who', i.file],
+    args: (i: any) => ['who', '--', i.file],
   },
   {
     name: 'board_done',
@@ -331,7 +338,7 @@ const TOOLS = [
       'review: true also adds a task to review it, which another agent or a person picks up; never you.',
     schema: { id: { type: 'string' }, note: { type: 'string' }, review: { type: 'boolean' } },
     required: ['id', 'note'],
-    args: (i: any) => ['done', i.id, '--note', i.note ?? '', ...(i.review ? ['--review'] : [])],
+    args: (i: any) => ['done', i.id, `--note=${i.note ?? ''}`, ...(i.review ? ['--review'] : [])],
   },
 ]
 

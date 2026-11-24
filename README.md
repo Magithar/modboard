@@ -192,7 +192,8 @@ board list --ready                        # only what can be claimed now; --labe
 board release-all                         # free everything you hold
 board whoami                              # the name the board gave you
 board agents                              # who is live
-board view                                # every task and live agent, as JSON
+board view                                # every task and live agent, as JSON (done tasks with their last note)
+board trust                               # run the storage block this board's config.json names
 board doctor                              # check the ledger against the state
 board taskfile                            # the project's task.md, read only
 board ring T-001                          # ring the alarm when it's done; --off takes it back
@@ -210,6 +211,11 @@ board who src/login.tsx                   # which agents changed a file, on whic
 | 8 | the check failed; nothing was recorded |
 | 9 | the task waits on another that isn't done |
 | 10 | `claim --next`: nothing ready to claim |
+| 11 | it reviews work you finished; someone else reviews it |
+| 12 | the board names a storage block you haven't trusted (`board trust`) |
+
+Text that starts with dashes goes after `--` (`board note T-001 -- "--force was needed"`)
+or as `--note=--dry-run was clean`.
 
 **Claude Code** gets these tools: `board_list`, `board_show`, `board_add`,
 `board_claim`, `board_note`, `board_check`, `board_who`, `board_release`, `board_done`,
@@ -748,7 +754,13 @@ Give each `createStore` call a fresh table or folder, so each run starts empty.
 | `{ "store": "./stores/my-block.mjs", "url": "..." }` | a block file, relative to `.modboard/` |
 | `{ "store": "modboard-my-block", "url": "..." }` | a block published as a package |
 
-**4. Check it:** `board add "first task"`, `board view`, `board doctor`. The CLI
+A block other than `file` is code, and `.modboard/` sits in the project, so a
+repo you clone could name one. It runs only after you've read it and run
+`board trust`, which records a fingerprint of `config.json` and the block's
+file in `~/.config/modboard/trusted.json`. A change to either asks again
+(exit 12, and a toast in Claude Code).
+
+**4. Check it:** `board trust`, then `board add "first task"`, `board view`, `board doctor`. The CLI
 refuses a block that won't load or is missing a method, and says which
 (exit 2).
 
