@@ -924,7 +924,7 @@ modboard/
 ├── hooks/
 │   ├── register.tsx         # the Claude Code mod: tools, heartbeat, band, pane
 │   ├── blocks/              # one file per display block, listed in index.ts
-│   └── sounds/alarm.wav     # the alarm's chime
+│   └── sounds/alarm.wav     # the alarm's chime, made by docs/alarm.mjs
 ├── .claude-plugin/
 │   └── plugin.json          # the mod's manifest and settings
 ├── test/                    # CLI and store contract tests (npm test)
@@ -937,6 +937,7 @@ modboard/
     ├── system.txt  .png     # how it fits together
     ├── blocks.txt  .png     # how blocks work
     ├── render.mjs           # rebuilds each diagram from its .txt
+    ├── alarm.mjs            # makes the alarm's chime from sine tones (no samples)
     ├── band.mjs    .png     # the band image
     ├── pane.mjs             # draws blocks-*.png, pane-clock.png, clock-ringing.png, pane-checks.png
     ├── blocks-*.png         # the list of blocks: the Blocks and Order tabs
