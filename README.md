@@ -168,6 +168,10 @@ board done T-001 --note "..." --review    # also adds a review task, never hande
 board tail                                # follow the board as it changes; --json for scripts
 ```
 
+In the pane, a kind shows by its value alone, coloured: `feature` in green,
+`bug` in red, `review` in orange; any other kind, and any other label, in grey.
+`board list` and the tools keep the full `kind=bug`, since agents filter by it.
+
 `board tail` prints one line an event (`14:05  claude 1  claimed T-004`) until
 you stop it. Pipe it into your own script to post to a chat or start an agent
 when something happens; the board itself never does.

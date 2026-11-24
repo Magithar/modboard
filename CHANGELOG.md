@@ -5,6 +5,13 @@ modboard was called agent-board until 0.5.0.
 
 ## Unreleased
 
+### Changed
+
+- **A task's kind reads at a glance in the pane:** `kind=feature` shows as
+  `feature` in green, `kind=bug` as `bug` in red and `kind=review` as
+  `review` in orange. Any other kind shows its value in grey, and other
+  labels keep `key=value`. `board list` and the tools keep the full label.
+
 ### Fixed
 
 - **A killed Codex or shell agent no longer holds its work for 15 minutes.**

@@ -216,6 +216,28 @@ test('a handoff written with semicolons shows one point a line', async ($, on) =
   await ui.unmount()
 })
 
+test('a kind shows by its value: feature green, bug red, review orange, any other kind grey; other labels keep key=value', async ($, on) => {
+  host(on, [
+    { ...task('T-001', 'todo'), labels: ['kind=feature'] },
+    { ...task('T-002', 'todo'), labels: ['kind=bug', 'area=auth'] },
+    { ...task('T-003', 'todo'), labels: ['kind=review'] },
+    { ...task('T-004', 'todo'), labels: ['kind=docs'] },
+  ])
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  await ui.press({ key: 'group-not-started' })
+  const shown = (await texts(ui)) as string[]
+  expect(shown.some(t => t.includes('kind='))).toBe(false)
+  // The label's own Text, not the title line that holds it.
+  const colour = async (text: string) => ((await ui.findAll({ type: 'Text' })) as any[]).find(t => t.text === text)?.props
+  expect((await colour('  feature'))?.color).toBe('success')
+  expect((await colour('  bug'))?.color).toBe('error')
+  expect((await colour('  review'))?.color).toBe('#F27238')
+  expect((await colour('  docs'))?.dimColor).toBe(true)
+  expect((await colour('  area=auth'))?.dimColor).toBe(true)
+  await ui.unmount()
+})
+
 test('a task not ready yet says what it waits on, and labels show beside the title', async ($, on) => {
   host(on, [{ ...task('T-002', 'todo'), after: ['T-001'], waitingOn: ['T-001'], labels: ['kind=bug'] }, task('T-001', 'claimed', 'codex')])
   await $.session.start(START)
@@ -223,7 +245,7 @@ test('a task not ready yet says what it waits on, and labels show beside the tit
   await ui.press({ key: 'group-not-started' })
   const shown = await texts(ui)
   expect(shown).toContain('waits on T-001')
-  expect(shown).toContain('  kind=bug')
+  expect(shown).toContain('  bug')
   // Waiting is not a warning: nothing has gone wrong.
   expect((await ui.find({ type: 'Text', text: 'waits on T-001' }))?.props.color).toBeUndefined()
   await ui.unmount()

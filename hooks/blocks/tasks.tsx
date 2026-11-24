@@ -1,6 +1,7 @@
 import type { Note, Task } from '../../types'
 import type { Block, Ctx } from './types'
 import { Problem } from './problem'
+import { CAP } from './board'
 import { branchOf, commitOf, goingQuiet, handedOffBy, handoffWaiting, lastCheck, tilde } from './attention'
 
 // Who a row is about. The group's heading says what they did ("In progress",
@@ -23,6 +24,17 @@ function status(t: Task, { now, who }: Ctx): { text: string; warn: boolean } {
   return { text: '', warn: false }
 }
 
+// A label as the pane shows it. A kind shows by its value alone, coloured
+// when it is one the board knows: a feature green, a bug red, a review in the
+// logo's orange; any other kind grey. Other labels keep key=value, in grey.
+// The CLI and the tools keep the full label (kind=bug), since agents filter by it.
+const KINDS: Record<string, string> = { feature: 'success', bug: 'error', review: CAP }
+export function label(l: string): { text: string; color?: string } {
+  const [key, value] = l.split('=')
+  if (key !== 'kind' || !value) return { text: l }
+  return { text: value, color: KINDS[value] }
+}
+
 function Row(c: Ctx, t: Task) {
   const { Box, Text } = c.ui
   const isMine = t.claim?.owner === c.who
@@ -41,8 +53,15 @@ function Row(c: Ctx, t: Task) {
       <Box flexGrow={1} flexShrink={1}>
         <Text bold={isMine} wrap="truncate">
           {t.title}
-          {/* Labels after the title, grey: what kind of work it is. */}
-          {t.labels?.length ? <Text dimColor>{`  ${t.labels.join(' ')}`}</Text> : null}
+          {/* Labels after the title: what kind of work it is (see label below). */}
+          {(t.labels ?? []).map(l => {
+            const { text, color } = label(l)
+            return (
+              <Text color={color} dimColor={!color}>
+                {`  ${text}`}
+              </Text>
+            )
+          })}
         </Text>
       </Box>
       {text && (
