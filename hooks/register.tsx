@@ -818,8 +818,9 @@ async function alarmCommand($: EngineInterface, args: string) {
 // TEMPORARY: how long a press takes to show the pane, as a toast, each from
 // the press: `mod` when the mod asked for the pane, `open` when Claude Code
 // answered (with whether it placed it), `draw` when the pane's first drawing
-// started. The toast waits for that drawing, or 10 s.
-let probe: { name: string; at: number; asked?: number; opened?: number; placed?: string; done?: boolean } | null = null
+// started. The drawing only notes its time (a toast from inside a drawing
+// doesn't show); a timer outside it waits for that, up to 10 s, then toasts.
+let probe: { name: string; at: number; asked?: number; opened?: number; drawn?: number } | null = null
 function probeStart(name: string) {
   probe = { name, at: performance.now() }
 }
@@ -830,15 +831,13 @@ function probeEnd($: EngineInterface, opened: { isPlaced: boolean; reason?: stri
   const p = probe
   if (!p) return
   p.opened = performance.now()
-  p.placed = opened.isPlaced ? 'placed' : `not placed: ${opened.reason ?? '?'}`
-  void $.clock.sleep(10_000).then(() => probeShow($, p, undefined)).catch(() => {})
-}
-function probeShow($: EngineInterface, p: NonNullable<typeof probe>, drawn: number | undefined) {
-  if (p.done || p.opened === undefined) return
-  p.done = true
-  if (probe === p) probe = null
-  const ms = (t: number | undefined) => (t === undefined ? 'none in 10 s' : `${Math.round(t - p.at)} ms`)
-  $.ui.toast(`${p.name} timing: mod ${ms(p.asked)} · open ${ms(p.opened)} (${p.placed}) · draw ${ms(drawn)}`, { timeoutMs: 15000 })
+  const placed = opened.isPlaced ? 'placed' : `not placed: ${opened.reason ?? '?'}`
+  void (async () => {
+    for (let i = 0; i < 200 && p.drawn === undefined; i++) await $.clock.sleep(50)
+    if (probe === p) probe = null
+    const ms = (t: number | undefined) => (t === undefined ? 'none in 10 s' : `${Math.round(t - p.at)} ms`)
+    $.ui.toast(`${p.name} timing: mod ${ms(p.asked)} · open ${ms(p.opened)} (${placed}) · draw ${ms(p.drawn)}`, { timeoutMs: 15000 })
+  })().catch(() => {})
 }
 
 async function openBoard($: EngineInterface) {
@@ -1238,7 +1237,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    if (probe && probe.opened !== undefined) probeShow($, probe, performance.now())
+    if (probe && probe.drawn === undefined) probe.drawn = performance.now()
     const { Box, Text, Button } = $.ui.resolve(e)
     const [chosen, view] = await Promise.all([read($, paneBlocks), read($, paneView)])
     // The list of blocks, alone: each row ticks its block on or off; Done
