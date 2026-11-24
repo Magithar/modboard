@@ -1,6 +1,6 @@
 import type { Block, Ctx } from './types'
-import { commandRow, outcome, standing } from './command'
-import { groupOpen } from './tasks'
+import { LABEL, commandRow, outcome, standing } from './command'
+import { GROUPS, groupOpen } from './tasks'
 
 // Your command blocks (tests, CI, anything with an output) under one heading,
 // like Limits and Clock: each keeps its last good result when its command
@@ -19,7 +19,7 @@ function readyRow(c: Ctx, id: string) {
   const color = !v ? undefined : v.state === 'ok' ? outcome(v.text) : WARN.has(v.state) ? 'warning' : v.state === 'error' ? 'error' : undefined
   return (
     <Box key={`ready-${id}`}>
-      <Box width={8} flexShrink={0}>
+      <Box width={LABEL} flexShrink={0}>
         <Text dimColor>{id}</Text>
       </Box>
       <Box flexShrink={1}>
@@ -33,8 +33,8 @@ function readyRow(c: Ctx, id: string) {
 }
 
 export const checks: Block = {
-  name: 'checks',
-  about: 'test and CI results',
+  name: 'project',
+  about: 'where the project stands',
   pane: c => {
     const { Box, Button, Text } = c.ui
     const open = groupOpen(c.groupsOpen, 'checks')
@@ -58,7 +58,7 @@ export const checks: Block = {
       <Box flexDirection="column">
         <Box>
           <Button key="group-checks" plain onPress={() => c.act.toggleGroup('checks')}>
-            <Text bold>{`${open ? '▾' : '▸'} Checks`}</Text>
+            <Text bold>{`${open ? '▾' : '▸'} ${GROUPS.checks.title}`}</Text>
           </Button>
           {!open ? brief : null}
         </Box>
@@ -70,7 +70,7 @@ export const checks: Block = {
                 <Box marginTop={i ? 1 : 0}>
                   {commandRow(c, name) ?? (
                     <Box>
-                      <Box width={8} flexShrink={0}>
+                      <Box width={LABEL} flexShrink={0}>
                         <Text dimColor>{name}</Text>
                       </Box>
                       <Text dimColor>waiting for its first run</Text>

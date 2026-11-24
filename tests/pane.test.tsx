@@ -1021,7 +1021,7 @@ test('bars with another block between them still share one Limits heading, where
   expect(shown.filter(t => /Limits$/.test(t))).toEqual(['▾ Limits'])
   // Limits (both bars) first, then Checks.
   expect(shown.indexOf('5-hour limit')).toBeLessThan(shown.indexOf('context'))
-  expect(shown.indexOf('context')).toBeLessThan(shown.indexOf('▾ Checks'))
+  expect(shown.indexOf('context')).toBeLessThan(shown.indexOf('▾ Project'))
 })
 
 test('the pane opens with modBOARD, this session\'s name, and the counts of what waits and what is active', BOARD_ONLY, async ($, on) => {
@@ -1073,8 +1073,10 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   // Only the list: no board under it.
   expect(list[0]).toBe('Blocks')
   expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
-  // The default pane: work, todo, compact, usage ticked; the rest not.
-  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
+  // The default pane: work, todo, and the bars (the limits row, compact and
+  // usage under it) ticked; the rest not.
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(5)
+  expect(list.some(t => t.startsWith('[x] limits'))).toBe(true)
   expect(list).toContain('[ ] agents       who is live')
   // What the band or another block shows already is left off the list.
   for (const name of ['model', 'effort', 'clock', 'context']) expect(await pane.find({ key: `pick-${name}` })).toBeUndefined()
@@ -1085,7 +1087,7 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   await pane.press({ key: 'pick-agents' })
   await pane.press({ key: 'pick-work' })
   list = (await texts(pane)) as string[]
-  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(4)
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(5)
   // There is no Done: each tick is saved as it is made. The logo, modBOARD, shows the board: work gone, agents there.
   expect(await pane.find({ key: 'blocks-done' })).toBeFalsy()
   await band.press({ key: 'board' })
@@ -1159,7 +1161,7 @@ test('blocks pressed again while the list shows closes the pane; from the board 
   expect(closed).toEqual(['modboard'])
 })
 
-test('blocks of your own are on the list as one, checks, which shows them under a Checks heading', { options: { blocks: '{"ci": "echo green"}' } } as any, async ($, on) => {
+test('blocks of your own are on the list under project, which shows them under a Project heading', { options: { blocks: '{"ci": "echo green"}' } } as any, async ($, on) => {
   host(on, [])
   store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -1168,11 +1170,13 @@ test('blocks of your own are on the list as one, checks, which shows them under 
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const listed = (await texts(pane)) as string[]
-  expect(listed.some(t => t.startsWith('[ ] checks'))).toBe(true)
-  expect(listed.some(t => / ci /.test(t))).toBe(false)
-  await pane.press({ key: 'pick-checks' })
+  expect(listed.some(t => t.startsWith('[ ] project'))).toBe(true)
+  // Your own block sits under it, set in /config, so not pressable here.
+  expect(listed.some(t => t.startsWith('[x] ci') && t.endsWith('your own · /config'))).toBe(true)
+  expect(await pane.find({ key: 'mine-ci' })).toBeUndefined()
+  await pane.press({ key: 'pick-project' })
   await band.press({ key: 'board' })
-  expect(await label(pane, 'group-checks')).toBe('▾ Checks')
+  expect(await label(pane, 'group-checks')).toBe('▾ Project')
   expect(await texts(pane)).toEqual(expect.arrayContaining(['ci', 'green']))
 })
 
@@ -1696,7 +1700,7 @@ test('bars apart in the order are one limits row, where the first sits, as the p
   host(on, [])
   store(on)
   const pane = await openOrder($, on)
-  expect(await order(pane)).toEqual(['work', 'limits', 'todo', 'checks', 'agents'])
+  expect(await order(pane)).toEqual(['work', 'limits', 'todo', 'project', 'agents'])
 })
 
 test('every row shows ▲ and ▼; the first row\'s ▲ and the last row\'s ▼ are grey and do nothing', ORDER, async ($, on) => {
@@ -1968,7 +1972,7 @@ test('ready-made blocks are listed on the Blocks tab; a tick turns one on, puts 
   expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'run' && argv[4] === 'ci')).toBe(true)
   expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'run' && argv[4] === 'branch')).toBe(false)
   expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] ci'))).toBe(true)
-  expect((kept.get('paneBlocks') as any).blocks).toContain('checks')
+  expect((kept.get('paneBlocks') as any).blocks).toContain('project')
   // The board shows it under Checks, green for a success.
   await band.press({ key: 'board' })
   const line = await pane.find({ type: 'Text', text: 'success · CI · 2 min ago' })
@@ -2009,4 +2013,58 @@ test('check lines are grey unless their colour says something: nothing under Che
   const ci = await pane.find({ type: 'Text', text: 'success · CI · 1 min ago' })
   expect(ci?.props.color).toBe('success')
   expect(ci?.props.dimColor).toBe(false)
+})
+
+test('the Blocks tab groups as the pane does: limits over the bars, project over the ready-made blocks', { options: { band: 'summary,board' } } as any, async ($, on) => {
+  host(on, [], { ready: { list: [readyDef('branch', true, 'current git branch'), readyDef('ci', false, 'latest GitHub Actions run')] } })
+  const kept = store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  let list = (await texts(pane)) as string[]
+  // The children come right after their group's row.
+  const at = (start: string) => list.findIndex(t => t.startsWith(start))
+  expect([at('[x] usage'), at('[x] compact')].sort((a, b) => a - b)).toEqual([at('[x] limits') + 1, at('[x] limits') + 2])
+  expect(at('[x] branch')).toBe(at('[ ] project') + 1)
+  expect(at('[ ] ci')).toBe(at('[ ] project') + 2)
+  // limits hides both bars, and shows them again.
+  await pane.press({ key: 'pick-limits' })
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'todo'])
+  await pane.press({ key: 'pick-limits' })
+  const back = (kept.get('paneBlocks') as any).blocks as string[]
+  expect(back.slice(0, 2)).toEqual(['work', 'todo'])
+  expect([...back.slice(2)].sort()).toEqual(['compact', 'usage'])
+  list = (await texts(pane)) as string[]
+  expect(list.some(t => t.startsWith('[x] usage'))).toBe(true)
+})
+
+test('with the Project group off the pane, its blocks never run; shown again, they run at once', { options: { pane: 'work' } } as any, async ($, on) => {
+  const calls = host(on, [], { ready: { list: [readyDef('branch', true)] } })
+  const kept = store(on)
+  let tick = async () => {}
+  on('clock.every', (_$, e: any) => (e.ms === 5_000 ? new Promise(resolve => (tick = async () => resolve({ value: undefined }))) : new Promise(() => {})) as any)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  await settle()
+  await tick()
+  await settle()
+  const runs = () => calls.filter(argv => argv[2] === 'blocks' && argv[3] === 'run').length
+  expect(runs()).toBe(0)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await pane.press({ key: 'pick-project' })
+  await settle()
+  expect(runs()).toBe(1)
+  expect((kept.get('paneBlocks') as any).blocks).toContain('project')
+})
+
+test("a pane saved with checks, the group's old name, still shows it as project", async ($, on) => {
+  host(on, [])
+  store(on, { paneBlocks: { from: 'work,todo,compact,usage', blocks: ['work', 'checks'] } })
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await label(pane, 'group-checks')).toBe('▾ Project')
 })

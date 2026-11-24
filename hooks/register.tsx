@@ -176,7 +176,7 @@ async function loadPane($: EngineInterface) {
   const kept: any = await $.store.get('paneBlocks').catch(() => undefined)
   const names =
     kept && kept.from === paneSetting && Array.isArray(kept.blocks)
-      ? (kept.blocks as unknown[]).filter((n): n is string => typeof n === 'string' && paneChoosable.includes(n))
+      ? [...new Set((kept.blocks as unknown[]).filter((n): n is string => typeof n === 'string').map(n => RENAMED[n] ?? n))].filter(n => paneChoosable.includes(n))
       : paneFromSetting
   await update($, paneBlocks, () => names)
   reads(names)
@@ -208,6 +208,9 @@ async function loadReady($: EngineInterface) {
 }
 
 async function runReady($: EngineInterface, force = false) {
+  // Hidden means no work: with the Project group off the pane, nothing runs.
+  // The blocks stay on in your settings, for board blocks and other agents.
+  if (!(await read($, paneBlocks)).includes('project')) return
   const now = await $.clock.now()
   const due = (await read($, readyList)).filter(
     b => b.enabled && !readyRunning.has(b.id) && (force || now - (readyLastRun.get(b.id) ?? 0) >= b.every),
@@ -241,9 +244,19 @@ async function toggleReady($: EngineInterface, id: string) {
   await loadReady($)
   if (on) {
     const shown = await read($, paneBlocks)
-    if (!shown.includes('checks')) await toggleBlock($, 'checks')
+    if (!shown.includes('project')) await toggleBlock($, 'project')
     await runReady($, true)
   }
+}
+
+// The limits row on the Blocks tab: with any bar shown, hides them all; with
+// none, shows them all, side by side at the end.
+async function toggleBars($: EngineInterface, bars: string[]) {
+  const now = await read($, paneBlocks)
+  const names = now.some(n => bars.includes(n)) ? now.filter(n => !bars.includes(n)) : [...now, ...bars]
+  await update($, paneBlocks, () => names)
+  reads(names)
+  await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
 }
 
 async function toggleBlock($: EngineInterface, name: string) {
@@ -254,6 +267,7 @@ async function toggleBlock($: EngineInterface, name: string) {
   reads(names)
   await $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
   if (name === 'todo' && names.includes('todo')) await refresh($)
+  if (name === 'project' && names.includes('project')) void runReady($, true).catch(() => {})
   if (name === 'pixel-clock' && names.includes('pixel-clock')) void askOnTick($)
 }
 
@@ -457,7 +471,7 @@ const SYMBOL = { todo: '○', claimed: '◐', done: '●' } as const
 
 // Names blocks had before they were renamed, so a setting written then still
 // shows them. They stay taken: a command block can't use them either.
-const RENAMED: Record<string, string> = { tasks: 'work', taskfile: 'todo' }
+const RENAMED: Record<string, string> = { tasks: 'work', taskfile: 'todo', checks: 'project' }
 
 const pick = (all: Block[], setting: unknown, fallback: string) =>
   String(setting ?? fallback)
@@ -1340,35 +1354,55 @@ export const register: Register = (on, options) => {
         </Box>
       )
       if (view === 'blocks') {
+        // Grouped as the pane draws them: the bars under one `limits` row, and
+        // the ready-made blocks and your own command blocks under `project`.
+        // A group's row shows or hides the group; the rows under it pick
+        // what's in it.
         const ready = await read($, readyList)
-        const pad = Math.max(...offered.map(b => b.name.length), ...ready.map(b => b.id.length)) + 2
+        const bars = offered.filter(b => BARS.has(b.name))
+        const pad = Math.max(...offered.map(b => b.name.length), ...ready.map(b => b.id.length), ...commandNames.map(n => n.length), 'limits'.length) + 2
+        const row = (key: string, ticked: boolean, name: string, about: string, depth: number, press?: () => unknown) => {
+          const text = `${ticked ? '[x]' : '[ ]'} ${name.padEnd(pad - depth * 2)}${about}`
+          return (
+            <Box key={`row-${key}`} paddingLeft={depth * 4}>
+              {press ? (
+                <Button key={key} plain onPress={press}>
+                  {/* One Text in one colour, so the pointer lights the row as one
+                      bar: ticked rows orange, the rest grey. */}
+                  <Text color={ticked ? CAP : undefined} dimColor={!ticked} wrap="truncate">
+                    {text}
+                  </Text>
+                </Button>
+              ) : (
+                // Not pressable (your own block, set in /config): grey, as text is.
+                <Text dimColor wrap="truncate">
+                  {text}
+                </Text>
+              )}
+            </Box>
+          )
+        }
+        const rows: any[] = []
+        for (const b of offered) {
+          if (BARS.has(b.name)) {
+            if (b !== bars[0]) continue
+            const any = bars.some(x => chosen.includes(x.name))
+            rows.push(row('pick-limits', any, 'limits', 'context and usage bars', 0, () => toggleBars($, bars.map(x => x.name))))
+            for (const x of bars) rows.push(row(`pick-${x.name}`, chosen.includes(x.name), x.name, x.about ?? '', 1, () => toggleBlock($, x.name)))
+            continue
+          }
+          rows.push(row(`pick-${b.name}`, chosen.includes(b.name), b.name, b.about ?? '', 0, () => toggleBlock($, b.name)))
+          if (b.name === 'project') {
+            for (const r of ready) rows.push(row(`pick-ready-${r.id}`, r.enabled, r.id, r.about, 1, () => toggleReady($, r.id)))
+            for (const n of commandNames) rows.push(row(`mine-${n}`, true, n, 'your own · /config', 1))
+          }
+        }
         return (
           // A blank line under the last row, on both tabs.
           <Box flexDirection="column" paddingX={1} paddingBottom={1}>
             {tabs}
             <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-              {offered.map(b => (
-                <Box>
-                  <Button key={`pick-${b.name}`} plain onPress={() => toggleBlock($, b.name)}>
-                    {/* One Text in one colour, so the pointer lights the row as one
-                        bar: ticked rows orange, the rest grey. */}
-                    <Text color={chosen.includes(b.name) ? CAP : undefined} dimColor={!chosen.includes(b.name)} wrap="truncate">
-                      {`${chosen.includes(b.name) ? '[x]' : '[ ]'} ${b.name.padEnd(pad)}${b.about ?? ''}`}
-                    </Text>
-                  </Button>
-                </Box>
-              ))}
-              {/* Ready-made blocks, after the rest: ticked, one runs and shows
-                  under Checks, for every agent; unticked, it never runs. */}
-              {ready.map(b => (
-                <Box>
-                  <Button key={`pick-ready-${b.id}`} plain onPress={() => toggleReady($, b.id)}>
-                    <Text color={b.enabled ? CAP : undefined} dimColor={!b.enabled} wrap="truncate">
-                      {`${b.enabled ? '[x]' : '[ ]'} ${b.id.padEnd(pad)}${b.about}`}
-                    </Text>
-                  </Button>
-                </Box>
-              ))}
+              {rows}
             </Box>
           </Box>
         )

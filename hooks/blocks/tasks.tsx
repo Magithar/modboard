@@ -178,8 +178,9 @@ export const GROUPS = {
   limits: { title: 'Limits', open: true },
   // The pixel clock, with its weather and alarm (see pixel.tsx).
   clock: { title: 'Clock', open: true },
-  // Your command blocks, with their age (see checks.tsx).
-  checks: { title: 'Checks', open: true },
+  // Where the project stands: ready-made blocks and your command blocks
+  // (see checks.tsx). Its key is still `checks`, as kept in older sessions.
+  checks: { title: 'Project', open: true },
 } as const
 export type GroupName = keyof typeof GROUPS
 

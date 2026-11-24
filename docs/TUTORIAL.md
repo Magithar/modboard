@@ -601,11 +601,11 @@ command runs, and the block shows the first line it prints:
 }
 ```
 
-In the pane, tick `checks` on the list of blocks: your blocks show under one
-**Checks** heading, a success in green and a failure in red:
+In the pane, tick `project` on the list of blocks: your blocks show under one
+**Project** heading, a success in green and a failure in red:
 
 ```
- ▾ Checks
+ ▾ Project
 
    ci       success
    branch   main

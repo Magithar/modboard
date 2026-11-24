@@ -71,7 +71,7 @@ export function commandRow(c: Ctx, name: string) {
   if (!s) return null
   return (
     <Box>
-      <Box width={8} flexShrink={0}>
+      <Box width={LABEL} flexShrink={0}>
         <Text dimColor>{name}</Text>
       </Box>
       <Box flexShrink={1}>
@@ -92,6 +92,9 @@ export function commandRow(c: Ctx, name: string) {
 }
 
 const NAME = /^[a-z][a-z0-9-]{0,15}$/
+
+// The label column under Project: room for "changes" and a space after it.
+export const LABEL = 10
 
 // The `blocks` setting, read: name → command. What it cannot use is left out
 // and said in `problems`, so a typo is reported and not silently dropped.

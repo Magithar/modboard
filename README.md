@@ -378,7 +378,7 @@ pane: work,todo,compact,usage           (the default)
 | `board` | ✓ | | the `blocks` and `modBOARD` buttons |
 | `work` | | ✓ | who's doing what: In progress, Unfinished, Not started and Done |
 | `todo` | | ✓ | your task.md under To do |
-| `checks` | | ✓ | your command blocks under a Checks heading, each with its age, or `not updating` when its command keeps failing |
+| `project` | | ✓ | where the project stands, under a Project heading: the ready-made blocks you turned on and your command blocks, each with its age, or `not updating` when its command keeps failing (`checks` still works as its old name) |
 | `compact` | ✓ | ✓ | the context window as a bar, and a button that compacts the conversation |
 | `usage` | ✓ | ✓ | the 5-hour limit as a bar (in the band, only once it passes 50%) |
 | `model` | ✓ | ✓ | the model; click to switch |
@@ -558,7 +558,7 @@ a block you choose.
 
 Five blocks you turn on with one tick, nothing to write: on the band's
 **blocks** list in Claude Code, or `board blocks on <id>` from any agent or a
-terminal. They show under **Checks** in the pane, and `board blocks` prints
+terminal. They show under **Project** in the pane, and `board blocks` prints
 them for Codex, OpenCode or a shell:
 
 ```
@@ -576,6 +576,10 @@ tests    npm test passed · 4 min ago · T-004
 | `ci` | the latest GitHub Actions run on this branch | git, gh |
 | `prs` | your open pull requests and the ones waiting for your review | git, gh |
 | `tests` | the last check an agent recorded with `board check`; it never runs your tests | nothing |
+
+On the blocks list they sit under the `project` row, as the bars sit under
+`limits`: the group's row shows or hides the group, the rows under it pick
+what's in it. With `project` off the pane, Claude Code runs none of them.
 
 Which are on is yours, kept in `~/.config/modboard/settings.json`: a project
 can't turn one on. Each runs in the folder it's shown for, so two sessions in
@@ -624,8 +628,10 @@ The quickest way. Two steps, both in the plugin's settings (`/config`):
 }
 ```
 
-**2. Show it.** In the pane, tick `checks` on the list of blocks: every
-command block shows under one **Checks** heading. In the band, add the name to
+**2. Show it.** In the pane, tick `project` on the list of blocks: every
+command block shows under one **Project** heading, next to the ready-made
+blocks you turned on. On the list, your blocks sit under `project`, marked
+`your own · /config`. In the band, add the name to
 `band`, like a built-in block:
 
 ```
@@ -636,7 +642,7 @@ That's it. Every 30 seconds the command runs, and the block shows the first
 line it prints, cut to 60 characters. In the band it reads `ci success`, or
 just `success` when the line is short.
 
-Under Checks, each block says how it went and how fresh it is:
+Under Project, each block says how it went and how fresh it is:
 
 <img src="docs/pane-checks.png" width="604" alt="The Checks heading with three blocks: tests, 1 failed, 41 passed · login, in red; ci, success in green, then 12 min ago in grey; deploy, live · v0.9.0 in green, then not updating since 14:02 in yellow"/>
 
@@ -646,7 +652,7 @@ Under Checks, each block says how it went and how fresh it is:
 - A result older than 5 minutes says its age, in grey.
 - A command that fails keeps its last good result; once it has failed for 5
   minutes, it says `not updating since 14:02` in yellow, and the folded
-  heading names it in yellow too: `▸ Checks · tests · ci not updating`.
+  heading names it in yellow too: `▸ Project · tests · ci not updating`.
 - The `stale` setting changes the 5 minutes.
 
 Good to know:
@@ -655,7 +661,7 @@ Good to know:
   can't reuse a built-in block's name. A bad entry is skipped, with a toast
   saying why.
 - A command that fails (non-zero exit) keeps its last good result; one that
-  has never succeeded shows nothing in the band, and says it fails under Checks.
+  has never succeeded shows nothing in the band, and says it fails under Project.
 - The setting lives in your user config, not in the project, so opening
   someone else's repo can never make your session run its commands.
 

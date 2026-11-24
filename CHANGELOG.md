@@ -11,9 +11,17 @@ ask for a review.
 
 ### Added
 
+- **Checks is now Project**, since it holds where the project stands (branch,
+  changes, pull requests), not only checks. `checks` in the `pane` setting or
+  a saved list still works. The label column is wider, so `changes` no longer
+  touches its value, and `prs` says `none open`.
+- **The blocks list groups as the pane does:** the bars under one `limits`
+  row, and the ready-made blocks and your own command blocks under
+  `project`. A group's row shows or hides it; the rows under it pick what's in
+  it. With `project` off the pane, Claude Code runs none of its blocks.
 - **Ready-made blocks you turn on with one tick:** `branch`, `changes`, `ci`,
   `prs` and `tests`, on the blocks list in Claude Code or with
-  `board blocks on <id>`, shown under Checks and by `board blocks` for any
+  `board blocks on <id>`, shown under Project and by `board blocks` for any
   agent. Reviewed commands, no shell: a project's own `git` or `gh` never
   runs, git's program-running settings are switched off, and a repo whose
   config sets a filter or diff driver isn't read. Each block has its own
