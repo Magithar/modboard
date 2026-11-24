@@ -43,7 +43,7 @@ export function label(l: string): { text: string; color?: string } {
 
 // `kindW`: the width of the kind column after the ID, 0 when the group has no kinds.
 function Row(c: Ctx, t: Task, kindW = 0) {
-  const { Box, Text } = c.ui
+  const { Box, Button, Text } = c.ui
   const kind = kindW ? kindOf(t) : undefined
   // Handoff points and facts line up under the title.
   const under = 7 + kindW
@@ -53,6 +53,22 @@ function Row(c: Ctx, t: Task, kindW = 0) {
   const note = handoffWaiting(t) ? t.notes.at(-1)! : undefined
   const handoff = note ? note.text.replace(/^HANDOFF:\s*/, '') : ''
   const points = handoff.split(';').map(p => p.trim()).filter(Boolean)
+  // A task with a handoff opens and closes by its title; open until closed.
+  const open = !handoff || taskOpen(c.groupsOpen, t.id)
+  const titleText = (
+    <Text wrap="truncate" hover={handoff ? { underline: true } : undefined}>
+      {t.title}
+      {/* Other labels after the title, grey (see label below). */}
+      {(t.labels ?? []).filter(l => !(kindW && kind && l.startsWith('kind='))).map(l => {
+        const { text, color } = label(l)
+        return (
+          <Text color={color} dimColor={!color}>
+            {`  ${text}`}
+          </Text>
+        )
+      })}
+    </Text>
+  )
   // The group's heading already says the task's state; the row needs no mark.
   const row = (
     <Box>
@@ -65,21 +81,18 @@ function Row(c: Ctx, t: Task, kindW = 0) {
           {kind ? <Text color={kind.color} dimColor={!kind.color}>{kind.text}</Text> : null}
         </Box>
       ) : null}
-      <Box flexGrow={1} flexShrink={1}>
+      <Box key={`title-${t.id}`} flexGrow={1} flexShrink={1}>
         {/* Titles plain: bold is for the group headings alone. Yours says
             "you" at the right. */}
-        <Text wrap="truncate">
-          {t.title}
-          {/* Other labels after the title, grey (see label below). */}
-          {(t.labels ?? []).filter(l => !(kindW && kind && l.startsWith('kind='))).map(l => {
-            const { text, color } = label(l)
-            return (
-              <Text color={color} dimColor={!color}>
-                {`  ${text}`}
-              </Text>
-            )
-          })}
-        </Text>
+        {/* With a handoff, the title is the button that shows or hides it:
+            plain, underlined under the pointer, as the path is. */}
+        {handoff ? (
+          <Button key={`task-${t.id}`} plain onPress={() => c.act.toggleTask(t.id)}>
+            {titleText}
+          </Button>
+        ) : (
+          titleText
+        )}
       </Box>
       {text && (
         <Box marginLeft={2} flexShrink={0}>
@@ -90,7 +103,7 @@ function Row(c: Ctx, t: Task, kindW = 0) {
       )}
     </Box>
   )
-  if (!handoff) return row
+  if (!handoff || !open) return row
   return (
     <Box flexDirection="column">
       {row}
@@ -221,6 +234,8 @@ export const GROUPS = {
 export type GroupName = keyof typeof GROUPS
 
 // Whether a group is open: as the person last left it, else its default.
+// Whether a task's handoff shows: as the person last left it, else open.
+export const taskOpen = (chosen: Record<string, boolean>, id: string) => chosen[`task:${id}`] ?? true
 export const groupOpen = (chosen: Record<string, boolean>, name: GroupName) => chosen[name] ?? GROUPS[name].open
 
 // A heading that is a button ("▾ In progress · 2"), then, open, all its rows.

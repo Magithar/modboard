@@ -306,7 +306,7 @@ right end.
 | Section | What it shows |
 |---|---|
 | **In progress** | who is on what. `codex 1 · idle` in yellow: no note or heartbeat for most of its claim's time |
-| **Unfinished** | work stopped partway: the handoff as points, then `where` (branch and commit), `path` (the worktree; press it to put a `cd` to it on the clipboard), `files` (what the work changed) and `check` (the last check that passed) |
+| **Unfinished** | work stopped partway: the handoff as points, then `where` (branch and commit), `path` (the worktree; press it to put a `cd` to it on the clipboard), `files` (what the work changed) and `check` (the last check that passed). Press the task's title to fold these away and again to bring them back |
 | **Not started** | everything waiting |
 | **Done** | what's finished, and who finished it |
 | **To do** | what's left in [your task.md](#your-taskmd) |

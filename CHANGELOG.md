@@ -17,6 +17,14 @@ modboard was called agent-board until 0.5.0.
 - **Only the group headings are bold.** A task title is plain, yours too:
   your own tasks say `you` at the right, as before.
 
+### Added
+
+- **A task's title shows or hides its handoff.** Under Unfinished, press
+  `Add password reset` and the handoff points, `where`, `path`, `files` and
+  `check` fold away, leaving the one row; press it again to bring them back.
+  Each task starts open and stays as you left it. The title is underlined
+  under the pointer; there's no arrow.
+
 ### Fixed
 
 - **A killed Codex or shell agent no longer holds its work for 15 minutes.**

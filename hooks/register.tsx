@@ -8,7 +8,7 @@ import type { CommandState } from './blocks/types'
 import { CAP } from './blocks/board'
 import { hhmm } from './blocks/clock'
 import { commandBlock, firstLine, parseCommandBlocks } from './blocks/command'
-import { groupOpen, type GroupName } from './blocks/tasks'
+import { groupOpen, taskOpen, type GroupName } from './blocks/tasks'
 import { Problem } from './blocks/problem'
 import { tone } from './blocks/meter'
 import { nextTier, openItems } from './blocks/taskfile'
@@ -995,6 +995,10 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     stopAlarm: () => stopAlarm($),
     toggleGroup: async (name: string) => {
       await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
+    },
+    // A task's title under a handoff: shows or hides the handoff and its facts.
+    toggleTask: async (id: string) => {
+      await update($, groupsOpen, chosen => ({ ...chosen, [`task:${id}`]: !taskOpen(chosen, id) }))
     },
     // A press opens or folds at once on what the 3-second poll last read; a
     // fresh read of the file follows, so what was just added shows a moment later.

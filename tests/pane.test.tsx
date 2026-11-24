@@ -360,6 +360,23 @@ test('pressing the path puts a cd to the worktree on the clipboard, and says so 
   await ui.unmount()
 })
 
+test("pressing a task's title hides its handoff, and pressing it again shows it", async ($, on) => {
+  host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done; tests left', where: WHERE }] }])
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  // Open to start with: the handoff is why the task is there.
+  expect((await texts(ui)).join('\n')).toContain('tests left')
+  expect((await texts(ui)).join('\n')).toContain('/Users/me/code/app-login')
+  await ui.press({ key: 'task-T-005' })
+  expect((await texts(ui)).join('\n')).not.toContain('tests left')
+  expect((await texts(ui)).join('\n')).not.toContain('/Users/me/code/app-login')
+  // The title stays, so it can be pressed again.
+  expect((await texts(ui)).join('\n')).toContain('T-005')
+  await ui.press({ key: 'task-T-005' })
+  expect((await texts(ui)).join('\n')).toContain('tests left')
+  await ui.unmount()
+})
+
 test('where the surface cannot copy, a toast gives the path', async ($, on) => {
   host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done', where: WHERE }] }])
   on('ui.copy', () => ({ value: { isCopied: false, reason: 'remote' } }))
