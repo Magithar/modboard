@@ -3,6 +3,14 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## Unreleased
+
+### Fixed
+
+- **The storage contract no longer fails on a slow machine.** Its test for
+  a refused stale write gave the new owner a 50 ms lease, which could run
+  out before the test read it back. The new owner now holds a minute.
+
 ## 0.11.1 — 2026-11-25
 
 ### Fixed
