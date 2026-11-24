@@ -120,7 +120,7 @@ async function joined($: EngineInterface) {
     if (out.ok) return (JSON.parse(out.text) as { name: string }).name
   } catch {}
   // A project's storage block that isn't trusted yet: say so once, at start.
-  if (out.code === 12) $.ui.toast(out.text)
+  if (out.code === 12) $.ui.toast(`board: ${reason(out.text)}`)
   return `claude:${session.slice(0, 8)}`
 }
 
@@ -216,6 +216,11 @@ async function moveBlock($: EngineInterface, name: string, to: number, shown: st
 // What went wrong, in one line: the board's own message, or the error line of
 // a crash ("EACCES: permission denied, open '…/board.json'"), not its stack.
 function reason(text: string) {
+  // A command run with --json answers an error as JSON: {"error": "...", "code": 12}.
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed && typeof parsed.error === 'string') return parsed.error
+  } catch {}
   const lines = text.split('\n').map(l => l.trim())
   const line = lines.find(l => /^board:/.test(l)) ?? lines.find(l => /^\w*Error\b/.test(l)) ?? lines.find(Boolean) ?? ''
   return line.replace(/^board:\s*/, '').replace(/^\w*Error:\s*/, '')

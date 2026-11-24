@@ -37,6 +37,9 @@ ask for a review.
 
 ### Fixed
 
+- **An untrusted storage block is explained in words** in Claude Code's toast
+  and the pane, not as raw JSON, and the message starts with what to do, so a
+  narrow pane no longer cuts off "board trust" behind a long path.
 - **Claude Code keeps its claims through a long tool call.** A Bash call
   longer than the lease (a 20-minute test run) used to let the claim expire,
   since the heartbeat came only after each call. Now each presence ping

@@ -27,11 +27,12 @@ function host(
     modelEffort,
     taskfile = { file: null, items: [] },
     broken = { now: false },
+    untrusted = false,
     home,
     live = [{ name: 'codex', lastSeen: '' }],
     time,
     shell,
-  }: { time?: { now: number }; shell?: { failing: Set<string> }; live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
+  }: { untrusted?: boolean; time?: { now: number }; shell?: { failing: Set<string> }; live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -63,6 +64,12 @@ function host(
   on('process.run', (_$, e: any) => {
     const argv: string[] = [...e.argv]
     calls.push(argv)
+    // A board whose storage block isn't trusted: every board command exits
+    // 12, and one with --json says why as JSON on stdout, as the CLI does.
+    if (untrusted && argv[1]?.endsWith('board.mjs')) {
+      const error = 'storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet. Read /repo/.modboard/cloned.mjs, then run board trust at a terminal'
+      return { value: argv.includes('--json') ? { exitCode: 12, stdout: JSON.stringify({ error, code: 12 }), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } : { exitCode: 12, stdout: '', stderr: `board: ${error}`, isStdoutTruncated: false, isStderrTruncated: false } }
+    }
     // A board that cannot be read, while `broken.now` says so.
     if (argv[2] === 'view' && broken.now)
       return { value: { exitCode: 1, stdout: '', stderr: 'board: cannot read .modboard/board.json', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -1799,4 +1806,16 @@ test('the done group shows the newest twenty, then how many more', async ($, on)
   expect(shown).toContain('title of T-025')
   expect(shown).not.toContain('title of T-005')
   expect(shown).toContain('… 5 more: board list --all')
+})
+
+test('an untrusted storage block is named in words, not JSON, in the toast and the pane', async ($, on) => {
+  host(on, [], { untrusted: true })
+  const rung = bell(on)
+  await $.session.start(START)
+  const toast = rung.toasts.find(t => t.includes('runs code on this machine'))
+  expect(toast).toBe('board: storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet. Read /repo/.modboard/cloned.mjs, then run board trust at a terminal')
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const shown = (await texts(ui)) as string[]
+  expect(shown.some(t => t.startsWith('board not updating: storage block "./cloned.mjs" runs code'))).toBe(true)
+  expect(shown.some(t => t.includes('{"error"'))).toBe(false)
 })
