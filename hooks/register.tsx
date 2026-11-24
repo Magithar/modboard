@@ -1,5 +1,6 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
+import { scrolled } from './scroll'
 
 import type { Agent, ReadyBlock, ReadyValue, Reminder, Task, TaskFile, Weather } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
@@ -1315,6 +1316,9 @@ export const register: Register = (on, options) => {
       </Box>
     )
   })
+
+  // The wheel on the pane moves three rows a tick, as a terminal does.
+  on('ui.scroll', { component: 'Pane', requestId: PANE }, ($, e, next) => next({ ...e, offset: scrolled(e) }))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
