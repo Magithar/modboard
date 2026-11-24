@@ -995,6 +995,19 @@ test('the bars sit under a Limits heading that folds to their figures, coloured 
   expect(await texts(ui)).toContain('▾ Limits')
 })
 
+test('bars with another block between them still share one Limits heading, where the first bar sits', { options: { pane: 'usage,checks,compact' } } as any, async ($, on) => {
+  host(on, [task('T-001', 'todo')])
+  on('session.measure', (_$, e: any) => ({ changed: e.changed }))
+  await $.session.start(START)
+  await $.session.measure({ ...measure(18), context: { window: 200000, percent: 3 } } as any)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const shown = (await texts(ui)) as string[]
+  expect(shown.filter(t => /Limits$/.test(t))).toEqual(['▾ Limits'])
+  // Limits (both bars) first, then Checks.
+  expect(shown.indexOf('5-hour limit')).toBeLessThan(shown.indexOf('context'))
+  expect(shown.indexOf('context')).toBeLessThan(shown.indexOf('▾ Checks'))
+})
+
 test('the pane opens with modBOARD, this session\'s name, and the counts of what waits and what is active', BOARD_ONLY, async ($, on) => {
   host(on, [task('T-001', 'todo'), task('T-002', 'todo'), task('T-003', 'claimed', 'codex')])
   await $.session.start(START)

@@ -1314,10 +1314,12 @@ export const register: Register = (on, options) => {
     const parts = pane.map(b => ({ block: b, part: b.pane!(drawn) })).filter(p => p.part !== null)
     // Sections, in order: each block on its own, except that bars side by
     // side (context, the 5-hour limit) make one, under a Limits heading.
+    // Every bar joins the one Limits section, where the first bar sits, even
+    // with other blocks between them in the order: never two Limits headings.
     const sections: (typeof parts)[] = []
     for (const p of parts) {
-      const last = sections.at(-1)
-      if (last && BARS.has(p.block.name) && BARS.has(last[0]!.block.name)) last.push(p)
+      const bars = BARS.has(p.block.name) ? sections.find(s => BARS.has(s[0]!.block.name)) : undefined
+      if (bars) bars.push(p)
       else sections.push([p])
     }
     const limits = (bars: typeof parts) => {
