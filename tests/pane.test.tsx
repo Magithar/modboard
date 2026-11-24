@@ -1171,10 +1171,12 @@ test('blocks of your own are on the list under project, which shows them under a
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const listed = (await texts(pane)) as string[]
   expect(listed.some(t => t.startsWith('[ ] project'))).toBe(true)
-  // Your own block sits under it, set in /config, so not pressable here.
-  expect(listed.some(t => t.startsWith('[x] ci') && t.endsWith('your own · /config'))).toBe(true)
-  expect(await pane.find({ key: 'mine-ci' })).toBeUndefined()
+  // Unticked, its rows are folded away.
+  expect(listed.some(t => t.startsWith('[x] ci'))).toBe(false)
   await pane.press({ key: 'pick-project' })
+  // Ticked, your own block shows under it, set in /config, so not pressable here.
+  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] ci') && t.endsWith('your own · /config'))).toBe(true)
+  expect(await pane.find({ key: 'mine-ci' })).toBeUndefined()
   await band.press({ key: 'board' })
   expect(await label(pane, 'group-checks')).toBe('▾ Project')
   expect(await texts(pane)).toEqual(expect.arrayContaining(['ci', 'green']))
@@ -1964,6 +1966,8 @@ test('ready-made blocks are listed on the Blocks tab; a tick turns one on, puts 
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  // Project ticked, its rows open: the ready-made blocks, all off.
+  await pane.press({ key: 'pick-project' })
   const shown = (await texts(pane)) as string[]
   expect(shown.some(t => t.startsWith('[ ] ci') && t.includes('latest GitHub Actions run'))).toBe(true)
   await pane.press({ key: 'pick-ready-ci' })
@@ -2027,15 +2031,20 @@ test('the Blocks tab groups as the pane does: limits over the bars, project over
   // The children come right after their group's row.
   const at = (start: string) => list.findIndex(t => t.startsWith(start))
   expect([at('[x] usage'), at('[x] compact')].sort((a, b) => a - b)).toEqual([at('[x] limits') + 1, at('[x] limits') + 2])
-  expect(at('[x] branch')).toBe(at('[ ] project') + 1)
-  expect(at('[ ] ci')).toBe(at('[ ] project') + 2)
-  // limits hides both bars, and shows them again.
+  // project is unticked: its rows are folded away until it's ticked.
+  expect(at('[x] branch')).toBe(-1)
+  await pane.press({ key: 'pick-project' })
+  list = (await texts(pane)) as string[]
+  expect(at('[x] branch')).toBe(at('[x] project') + 1)
+  expect(at('[ ] ci')).toBe(at('[x] project') + 2)
+  // limits hides both bars, and folds their rows away; ticked again, both come back.
   await pane.press({ key: 'pick-limits' })
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'todo'])
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'todo', 'project'])
+  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[ ] usage') || t.startsWith('[x] usage'))).toBe(false)
   await pane.press({ key: 'pick-limits' })
   const back = (kept.get('paneBlocks') as any).blocks as string[]
-  expect(back.slice(0, 2)).toEqual(['work', 'todo'])
-  expect([...back.slice(2)].sort()).toEqual(['compact', 'usage'])
+  expect(back.slice(0, 3)).toEqual(['work', 'todo', 'project'])
+  expect([...back.slice(3)].sort()).toEqual(['compact', 'usage'])
   list = (await texts(pane)) as string[]
   expect(list.some(t => t.startsWith('[x] usage'))).toBe(true)
 })

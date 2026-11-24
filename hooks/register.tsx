@@ -1357,7 +1357,8 @@ export const register: Register = (on, options) => {
         // Grouped as the pane draws them: the bars under one `limits` row, and
         // the ready-made blocks and your own command blocks under `project`.
         // A group's row shows or hides the group; the rows under it pick
-        // what's in it.
+        // what's in it, and show only while the group is ticked, so the list
+        // opens and closes with it like the board's groups.
         const ready = await read($, readyList)
         const bars = offered.filter(b => BARS.has(b.name))
         const pad = Math.max(...offered.map(b => b.name.length), ...ready.map(b => b.id.length), ...commandNames.map(n => n.length), 'limits'.length) + 2
@@ -1388,11 +1389,11 @@ export const register: Register = (on, options) => {
             if (b !== bars[0]) continue
             const any = bars.some(x => chosen.includes(x.name))
             rows.push(row('pick-limits', any, 'limits', 'context and usage bars', 0, () => toggleBars($, bars.map(x => x.name))))
-            for (const x of bars) rows.push(row(`pick-${x.name}`, chosen.includes(x.name), x.name, x.about ?? '', 1, () => toggleBlock($, x.name)))
+            if (any) for (const x of bars) rows.push(row(`pick-${x.name}`, chosen.includes(x.name), x.name, x.about ?? '', 1, () => toggleBlock($, x.name)))
             continue
           }
           rows.push(row(`pick-${b.name}`, chosen.includes(b.name), b.name, b.about ?? '', 0, () => toggleBlock($, b.name)))
-          if (b.name === 'project') {
+          if (b.name === 'project' && chosen.includes('project')) {
             for (const r of ready) rows.push(row(`pick-ready-${r.id}`, r.enabled, r.id, r.about, 1, () => toggleReady($, r.id)))
             for (const n of commandNames) rows.push(row(`mine-${n}`, true, n, 'your own · /config', 1))
           }

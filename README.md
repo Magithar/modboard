@@ -578,8 +578,8 @@ tests    npm test passed · 4 min ago · T-004
 | `tests` | the last check an agent recorded with `board check`; it never runs your tests | nothing |
 
 On the blocks list they sit under the `project` row, as the bars sit under
-`limits`: the group's row shows or hides the group, the rows under it pick
-what's in it. With `project` off the pane, Claude Code runs none of them.
+`limits`: the group's row shows or hides the group, and the rows under it,
+shown while it's ticked, pick what's in it. With `project` off the pane, Claude Code runs none of them.
 
 Which are on is yours, kept in `~/.config/modboard/settings.json`: a project
 can't turn one on. Each runs in the folder it's shown for, so two sessions in
