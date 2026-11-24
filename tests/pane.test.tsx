@@ -1748,3 +1748,55 @@ test('the clock has a Clock heading that folds to one line: the time, the weathe
   await pane.press({ key: 'group-clock' })
   expect((await texts(pane))[1]).toBe('█▀█ █▀█   █ █ ▀█ ')
 })
+
+test('a tool call still running renews the claims with each presence ping, so it cannot outlast the lease', async ($, on) => {
+  const calls = host(on, [{ ...task('T-001', 'claimed', 'claude 1'), claim: { owner: 'claude 1', since: '', expiresAt: inMinutes(14) } }])
+  let ping = async () => {}
+  on('clock.every', (_$, e: any) => (e.ms === 60_000 ? new Promise(resolve => (ping = async () => resolve({ value: undefined }))) : new Promise(() => {})) as any)
+  // A Bash call that runs for a long time: it ends only when the test says.
+  let finish = () => {}
+  on('tool.call', { tool: 'Bash' } as any, () => new Promise(resolve => (finish = () => resolve({ result: 'done' } as any))) as any)
+  await $.session.start(START)
+  const beats = () => calls.filter(argv => argv[2] === 'heartbeat').length
+  const call = $.tool.call({ tool: 'Bash', command: 'npm test' } as any)
+  await new Promise(resolve => setTimeout(resolve, 20))
+  const before = beats()
+  await ping()
+  await new Promise(resolve => setTimeout(resolve, 20))
+  expect(beats()).toBe(before + 1)
+  finish()
+  await call
+})
+
+test('a one-off alarm whose minute was slept through rings when the session sees it; one an hour late is told as missed', { options: { band: 'pixel-clock' } } as any, async ($, on) => {
+  host(on, [])
+  // NOW reads 09:41. One due 10 minutes ago (the minute was slept through),
+  // one due two hours ago (missed), one still to come.
+  const kept = store(on, {
+    reminders: [
+      { at: '09:31', note: 'slept through', due: NOW - 10 * 60_000 },
+      { at: '07:41', note: 'long gone', due: NOW - 120 * 60_000 },
+      { at: '18:00', note: 'standup', due: NOW + 60 * 60_000 },
+    ],
+  })
+  const rung = bell(on)
+  await $.session.start(START)
+  await settle()
+  expect(rung.notes).toEqual(['slept through'])
+  expect(rung.toasts.some((t: string) => t.includes('missed: 07:41 · long gone'))).toBe(true)
+  expect((kept.get('reminders') as any).map((r: any) => r.note)).toEqual(['standup'])
+})
+
+test('the done group shows the newest twenty, then how many more', async ($, on) => {
+  const done = Array.from({ length: 25 }, (_, i) => ({ ...task(`T-${String(i + 1).padStart(3, '0')}`, 'done'), notes: [{ at: new Date(NOW - (25 - i) * 60_000).toISOString(), by: 'codex', text: 'VERIFIED: ok' }] }))
+  host(on, done)
+  store(on, {})
+  await $.session.start(START)
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await pane.press({ key: 'group-done' })
+  const shown = await texts(pane)
+  expect(shown).toContain(' · 25')
+  expect(shown).toContain('title of T-025')
+  expect(shown).not.toContain('title of T-005')
+  expect(shown).toContain('… 5 more: board list --all')
+})

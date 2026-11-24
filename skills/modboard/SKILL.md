@@ -31,10 +31,11 @@ Anything else: `export BOARD_AGENT=<your name>` once, or pass `--as <name>`.
    says which worktree, branch and commit the work is in. Start there.
 3. **Note progress** as you go: `board note T-004 "what changed"`. A note also
    renews your claim. A claim lasts 15 minutes without one. For long work,
-   claim with `--lease 1h`. A single command that runs longer than that (a
-   full test suite, a build) should go through `board check`, which keeps the
-   claim alive while it runs; run directly, it can outlast the claim and
-   another agent can take the task.
+   claim with `--lease 1h`. Run a command that may take longer than that (a
+   full test suite, a build) as `board run T-004 -- npm test`, which keeps the
+   claim alive while it runs and exits with the command's code. Run directly,
+   it can outlast the claim and another agent can take the task. To record a
+   check that passed, use `board check`, which keeps it alive the same way.
 4. **Record checks that pass:** `board check T-004 "npm test"` runs it and
    records it only if it passes.
 5. **Finish or hand off.**

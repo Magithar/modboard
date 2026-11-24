@@ -620,3 +620,16 @@ test('a task done long enough ago is archived: a stub stays, show and who still 
   assert.equal(b.json(['doctor'], soon).ok, true)
 })
 
+
+test('board run keeps the claim through a long command and exits with its code', () => {
+  const b = fresh()
+  b.run(['add', 'long build'])
+  const lease = { BOARD_LEASE_MS: '1500' }
+  b.run(['claim', 'T-001', '--as', 'codex'], lease)
+  const ok = b.run(['run', 'T-001', '--as', 'codex', '--', 'node', '-e', '"setTimeout(() => {}, 2500)"'], lease)
+  assert.equal(ok.code, 0, ok.out)
+  assert.equal(b.json(['show', 'T-001'], lease).claim.owner, 'codex')
+  const failed = b.run(['run', 'T-001', '--as', 'codex', '--', 'exit 3'], lease)
+  assert.equal(failed.code, 3)
+  assert.equal(b.run(['run', 'T-001', '--as', 'mallory', '--', 'true'], lease).code, 5)
+})

@@ -11,6 +11,9 @@ ask for a review.
 
 ### Added
 
+- **`board run T-004 -- <command>`** runs any command on a task you hold and
+  keeps the claim alive however long it takes, then exits with the command's
+  code. For Codex and other CLI agents running a long build or test suite.
 - **`board claim --next`** picks the first ready task and claims it in the
   same locked step, so agents racing for work each get a different one.
   `--label` limits it to tasks with those labels; `--wait 10m` waits for one
@@ -34,6 +37,14 @@ ask for a review.
 
 ### Fixed
 
+- **Claude Code keeps its claims through a long tool call.** A Bash call
+  longer than the lease (a 20-minute test run) used to let the claim expire,
+  since the heartbeat came only after each call. Now each presence ping
+  renews the claims while a call is still running.
+- **A one-off alarm slept through rings when the session sees it**, not a
+  day late at the same time; one more than an hour late is shown as missed.
+- **The Done group shows the newest 20**, then how many more, so a board with
+  thousands done opens as fast as a new one.
 - **A command block that hangs no longer holds anything up.** It used to
   block the session's start and every other command block behind it, and a
   new copy started every 30 seconds. Now each block runs alongside the others,

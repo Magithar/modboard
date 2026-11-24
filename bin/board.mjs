@@ -231,6 +231,25 @@ const said = e => `${hhmm(e.at)}  ${e.actor}  ${DID[e.type] ?? e.type}${e.task ?
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+// Refuse, with the board's own words, unless actor holds the task.
+async function holding(board, id, actor) {
+  const t = await board.show(id)
+  if (t.status !== 'claimed' || t.claim.owner !== actor)
+    throw new BoardError(5, `${t.id} is not claimed by ${actor}${t.claim ? ` (owner: ${t.claim.owner})` : ''}`)
+  return t
+}
+
+// Run a shell command, renewing actor's claims as it goes, so a long run (a
+// full test suite, a build) can't outlast the lease.
+async function keepingClaim(board, actor, cmd, stdio) {
+  const renew = setInterval(() => board.heartbeat(actor).catch(() => {}), Math.max(1000, LEASE_MS / 3))
+  return new Promise(resolve => {
+    const child = spawn(cmd, { shell: true, stdio })
+    child.on('error', error => resolve({ status: null, error }))
+    child.on('close', (status, signal) => resolve({ status, signal }))
+  }).finally(() => clearInterval(renew))
+}
+
 const commands = {
   async list(board, _, flags) {
     const tasks = await board.list({ all: !!flags.all, ready: !!flags.ready, labels: many(flags.label) })
@@ -311,24 +330,30 @@ const commands = {
   async check(board, [id, cmd], flags) {
     if (!id || !cmd) throw new BoardError(2, 'usage: board check <id> "<command>" [--passed]')
     const actor = await actorOf(board, flags)
-    const t = await board.show(id)
-    if (t.status !== 'claimed' || t.claim.owner !== actor)
-      throw new BoardError(5, `${t.id} is not claimed by ${actor}${t.claim ? ` (owner: ${t.claim.owner})` : ''}`)
+    await holding(board, id, actor)
     const ran = !flags.passed
     if (ran) {
       // Its output goes to stderr, so stdout stays the board's answer (and
-      // --json stays JSON). A long run (a full test suite) renews the claim as
-      // it goes, so the lease can't run out under it.
-      const renew = setInterval(() => board.heartbeat(actor).catch(() => {}), Math.max(1000, LEASE_MS / 3))
-      const run = await new Promise(resolve => {
-        const child = spawn(cmd, { shell: true, stdio: ['ignore', 2, 2] })
-        child.on('error', error => resolve({ status: null, error }))
-        child.on('close', (status, signal) => resolve({ status, signal }))
-      }).finally(() => clearInterval(renew))
+      // --json stays JSON).
+      const run = await keepingClaim(board, actor, cmd, ['ignore', 2, 2])
       if (run.status !== 0)
         throw new BoardError(8, `check failed: ${cmd} ${run.status === null ? `was stopped (${run.signal ?? run.error?.message})` : `exited ${run.status}`}; nothing recorded`)
     }
     return board.check(id, actor, { cmd, ran, where: whereNow() })
+  },
+  // board run <id> -- <command>: run any command on a task you hold, keeping
+  // the claim alive however long it takes. Nothing is recorded (that is
+  // board check); its output is its own, and board exits with its exit code.
+  async run(board, [id, ...words], flags) {
+    const cmd = words.join(' ')
+    if (!id || !cmd) throw new BoardError(2, 'usage: board run <id> -- <command>')
+    const actor = await actorOf(board, flags)
+    await holding(board, id, actor)
+    const run = await keepingClaim(board, actor, cmd, 'inherit')
+    const t = await board.show(id)
+    const still = t.claim?.owner === actor ? `${t.id} is still yours until ${hhmm(t.claim.expiresAt)}` : `${t.id} is no longer yours`
+    console.error(`board: ${cmd} ${run.status === null ? `was stopped (${run.signal ?? run.error?.message})` : `exited ${run.status}`}; ${still}`)
+    process.exit(run.status ?? 1)
   },
   done: async (board, [id], flags) => board.done(id, await actorOf(board, flags), text(flags.note), { review: !!flags.review }),
   'release-all': async (board, _, flags) => board.releaseAll(await actorOf(board, flags), { handoff: text(flags.handoff), session: text(flags.session), where: whereNow() }),
@@ -414,6 +439,7 @@ const FLAGS = {
   ring: ['off'],
   release: ['handoff'],
   check: ['passed'],
+  run: [],
   done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],

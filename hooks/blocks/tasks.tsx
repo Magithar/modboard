@@ -162,6 +162,8 @@ function Facts(c: Ctx, t: Task, note: Note) {
   )
 }
 
+const DONE_SHOWN = 20
+
 // The groups, each a heading that opens and closes like the task file's.
 // What needs you starts open; what nobody has started, and what is done, start
 // closed, one line with its count, so the pane fits on screen.
@@ -188,6 +190,10 @@ function Group(c: Ctx, name: GroupName, list: Task[], last = false) {
   const { Box, Button, Text } = c.ui
   if (!list.length) return null
   const open = groupOpen(c.groupsOpen, name)
+  // Done only grows: the newest few, then how many more. The rest is drawn
+  // nowhere, so a board with thousands done opens as fast as a new one.
+  const shown = name === 'done' ? list.slice(0, DONE_SHOWN) : list
+  const more = list.length - shown.length
   return (
     <Box flexDirection="column">
       {/* The name is the button, bold; the count is grey text beside it. */}
@@ -202,7 +208,8 @@ function Group(c: Ctx, name: GroupName, list: Task[], last = false) {
         // reads as its own block; the last leaves that to what follows the pane.
         <Box flexDirection="column" paddingLeft={2} marginTop={1} marginBottom={last ? 0 : 1}>
           {/* Work left partway carries its handoff, so each task there sits apart. */}
-          {list.map((t, i) => (name === 'partway' && i > 0 ? <Box marginTop={1}>{Row(c, t)}</Box> : Row(c, t)))}
+          {shown.map((t, i) => (name === 'partway' && i > 0 ? <Box marginTop={1}>{Row(c, t)}</Box> : Row(c, t)))}
+          {more > 0 ? <Text dimColor>{`… ${more} more: board list --all`}</Text> : null}
         </Box>
       )}
     </Box>

@@ -103,6 +103,14 @@ async function board($: EngineInterface, args: string[]) {
   return cli($, end < 0 ? [...args, ...as] : [...args.slice(0, end), ...as, ...args.slice(end)])
 }
 
+// Tool calls under way in this session, and a heartbeat for its claims.
+let toolsRunning = 0
+async function beat($: EngineInterface) {
+  const who = await read($, me)
+  // A failed heartbeat must never fail the tool call it rode in on.
+  if ((await read($, tasks)).some(t => t.claim?.owner === who)) await board($, ['heartbeat']).catch(() => {})
+}
+
 // The board names the session by what it runs and when it joined ("claude 1",
 // "claude 2"), unless BOARD_AGENT asks for a name: then that one, or the next
 // free one after it.
@@ -650,7 +658,11 @@ async function saveReminders($: EngineInterface, list: Reminder[]) {
 
 async function loadReminders($: EngineInterface) {
   const kept: any = await $.store.get('reminders').catch(() => undefined)
-  const list = Array.isArray(kept) ? kept.filter((r: any) => r && typeof r.at === 'string' && alarmTime(r.at)).map((r: any) => ({ at: alarmTime(r.at)!, note: String(r.note ?? '') })) : []
+  const list = Array.isArray(kept)
+    ? kept
+        .filter((r: any) => r && typeof r.at === 'string' && alarmTime(r.at))
+        .map((r: any) => ({ at: alarmTime(r.at)!, note: String(r.note ?? ''), ...(typeof r.due === 'number' ? { due: r.due } : {}) }))
+    : []
   await update($, reminders, () => list)
 }
 
@@ -692,6 +704,19 @@ function soonest(text: string, now: number) {
   return until(at) <= until(other) ? at : other
 }
 
+// The next time the clock reads `at`, from now, in ms.
+function dueAt(at: string, now: number) {
+  const [h, m] = at.split(':').map(Number) as [number, number]
+  const d = new Date(now)
+  d.setHours(h, m, 0, 0)
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1)
+  return d.getTime()
+}
+
+// A one-off alarm whose time passed this long ago (the machine slept, or no
+// session was open) is missed: said in a toast, not rung late.
+const MISSED_MS = 60 * 60_000
+
 let lastAgentRing = -Infinity
 
 // The board_alarm tool: ring now, at a time, or in some minutes; always with
@@ -716,7 +741,7 @@ async function agentAlarm($: EngineInterface, input: { note?: unknown; at?: unkn
     void ring($, note, note, { loop: false })
     return `rang the alarm: ${note}`
   }
-  await saveReminders($, [...(await read($, reminders)), { at, note }])
+  await saveReminders($, [...(await read($, reminders)), { at, note, due: dueAt(at, now) }])
   return `the alarm rings once at ${at}: ${note}`
 }
 
@@ -729,12 +754,21 @@ async function stopAlarm($: EngineInterface) {
 // Every few seconds: when the minute turns, the clock redraws, and an alarm
 // set for it rings.
 async function tick($: EngineInterface) {
-  const now = hhmm(await $.clock.now())
+  const ms = await $.clock.now()
+  const now = hhmm(ms)
   if ((await read($, minute)) === now) return
   await update($, minute, () => now)
-  const due = (await read($, reminders)).filter(r => r.at === now)
+  // One with a due time rings once it is reached, even if the minute itself
+  // was slept through; one older than an hour was missed. One without (set
+  // before due times) rings at its minute.
+  const isDue = (r: Reminder) => (r.due !== undefined ? r.due <= ms : r.at === now)
+  const isMissed = (r: Reminder) => r.due !== undefined && ms - r.due > MISSED_MS
+  const all = await read($, reminders)
+  const missed = all.filter(isMissed)
+  const due = all.filter(r => isDue(r) && !isMissed(r))
+  if (missed.length || due.length) await saveReminders($, (await read($, reminders)).filter(r => !isDue(r)))
+  for (const r of missed) $.ui.toast(`⏰ missed: ${r.at} · ${r.note} (this machine was asleep or closed)`)
   if (due.length) {
-    await saveReminders($, (await read($, reminders)).filter(r => r.at !== now))
     const note = due.map(r => r.note).join(' · ')
     return void ring($, `${now} · ${note}`, note, { loop: true })
   }
@@ -1025,7 +1059,10 @@ export const register: Register = (on, options) => {
     }
     // Presence: keeps this session's name while it is open, so no other
     // session can take it; leases stay tied to work (see tool.call below).
-    $.clock.every(PRESENCE_MS, () => cli($, ['register', name, '--session', session]).catch(() => {}))
+    $.clock.every(PRESENCE_MS, async () => {
+      await cli($, ['register', name, '--session', session]).catch(() => {})
+      if (toolsRunning > 0) await beat($)
+    })
 
     return next(e)
   })
@@ -1051,15 +1088,22 @@ export const register: Register = (on, options) => {
     return { result: await alarmCommand($, `off ${at}`) }
   }).catch(() => ({ result: 'error: the alarm could not be turned off' }))
 
-  // Leases need a heartbeat; an LLM won't send one, so tool activity does.
+  // Leases need a heartbeat; an LLM won't send one, so tool activity does:
+  // after each tool call, and, while one is still running (a 20-minute test
+  // run in Bash), with each presence ping, so a long call can't outlast the
+  // lease.
   on('tool.call', async ($, e, next) => {
-    const ran = await next(e)
+    toolsRunning++
+    let ran
+    try {
+      ran = await next(e)
+    } finally {
+      toolsRunning--
+    }
     const now = await $.clock.now()
     if (now - lastBeat > HEARTBEAT_MS) {
       lastBeat = now
-      const who = await read($, me)
-      // A failed heartbeat must never fail the tool call it rode in on.
-      if ((await read($, tasks)).some(t => t.claim?.owner === who)) await board($, ['heartbeat']).catch(() => {})
+      await beat($)
     }
     return ran
   })

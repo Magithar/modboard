@@ -194,6 +194,7 @@ board whoami                              # the name the board gave you
 board agents                              # who is live
 board view                                # every task and live agent, as JSON (done tasks with their last note)
 board trust                               # run the storage block this board's config.json names
+board run T-001 -- npm test               # run any command, keeping your claim alive however long it takes
 board doctor                              # check the ledger against the state
 board taskfile                            # the project's task.md, read only
 board ring T-001                          # ring the alarm when it's done; --off takes it back

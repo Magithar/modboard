@@ -48,7 +48,9 @@ export type Usage = {
 export type Weather = { temp: number; high: number; code: number; place: string; at: number }
 
 // A one-off alarm an agent set with board_alarm: it rings once at `at`, then goes.
-export type Reminder = { at: string; note: string }
+// `due`: when it rings, in ms, so one missed while the machine slept is
+// known as missed, not rung a day late. Older ones have only `at`.
+export type Reminder = { at: string; note: string; due?: number }
 
 declare module 'claude-code' {
   interface PluginState {
