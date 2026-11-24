@@ -195,22 +195,39 @@ async function toggleBlock($: EngineInterface, name: string) {
 // blocks the list shows (0 is the top), and the board follows that order. The
 // row lights up for a moment, so you can see where it landed. Kept between
 // sessions, as the ticks are.
-async function moveBlock($: EngineInterface, name: string, to: number, shown: string[]) {
+// The rows of the Order screen: one per block, except that the bars (two or
+// more ticked) are one `limits` row where the first of them sits, as the pane
+// draws them under one Limits heading.
+function orderRows(names: string[]) {
+  const bars = names.filter(n => BARS.has(n))
+  const rows: { key: string; names: string[] }[] = []
+  for (const n of names) {
+    if (bars.length < 2 || !BARS.has(n)) rows.push({ key: n, names: [n] })
+    else if (n === bars[0]) rows.push({ key: 'limits', names: bars })
+  }
+  return rows
+}
+
+async function moveBlock($: EngineInterface, key: string, to: number, shown: string[]) {
   const now = await read($, paneBlocks)
-  const visible = now.filter(n => shown.includes(n)).filter(n => n !== name)
-  const at = Math.max(0, Math.min(to, visible.length))
-  const order = [...visible.slice(0, at), name, ...visible.slice(at)]
+  const rows = orderRows(now.filter(n => shown.includes(n)))
+  const from = rows.findIndex(row => row.key === key)
+  if (from < 0) return
+  const [row] = rows.splice(from, 1)
+  rows.splice(Math.max(0, Math.min(to, rows.length)), 0, row!)
+  // The bars land side by side, so the saved order reads as the pane draws.
+  const order = rows.flatMap(row => row.names)
   // Hidden blocks (named in `pane`, off the list) keep their places.
   let k = 0
   const names = now.map(n => (shown.includes(n) ? order[k++]! : n))
   // The move and the light show at once; saving and the light's fading go on
   // after the press returns, so the next press never waits for them.
   await update($, paneBlocks, () => names)
-  await update($, moved, () => name)
+  await update($, moved, () => key)
   void $.store.set('paneBlocks', { from: paneSetting, blocks: names }).catch(() => $.ui.toast('board: could not save the list of blocks'))
   void (async () => {
     await $.clock.sleep(MOVED_MS)
-    await update($, moved, now => (now === name ? '' : now))
+    await update($, moved, now => (now === key ? '' : now))
   })().catch(() => {})
 }
 
@@ -1269,8 +1286,10 @@ export const register: Register = (on, options) => {
       }
       // ▲ and ▼ on every row, in two fixed columns; where one would do nothing
       // (▲ on the first row, ▼ on the last) it is grey and can't be pressed.
-      const pad = Math.max(0, ...ticked.map(n => n.length)) + 3
-      const last = ticked.length - 1
+      // The bars are one row, `limits (usage, compact)`: they draw together.
+      const rows = orderRows(ticked).map(row => ({ ...row, label: row.names.length > 1 ? `limits (${row.names.join(', ')})` : row.key }))
+      const pad = Math.max(0, ...rows.map(row => row.label.length)) + 3
+      const last = rows.length - 1
       const slot = (key: string, label: string, show: boolean, to: number, name: string) =>
         show ? (
           <Button key={key} plain onPress={() => moveBlock($, name, to, names)}>
@@ -1286,11 +1305,11 @@ export const register: Register = (on, options) => {
         <Box flexDirection="column" paddingX={1} paddingBottom={1}>
           {tabs}
           <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-            {ticked.length ? (
-              ticked.map((name, at) => (
+            {rows.length ? (
+              rows.map(({ key: name, label }, at) => (
                 <Box gap={1}>
                   <Text color={movedNow === name ? CAP : undefined} bold={movedNow === name} wrap="truncate">
-                    {`${String(at + 1).padStart(2)}  ${name.padEnd(pad)}`}
+                    {`${String(at + 1).padStart(2)}  ${label.padEnd(pad)}`}
                   </Text>
                   <Box flexShrink={0} gap={1}>
                     {slot(`up-${name}`, '[ ▲ ]', at > 0, at - 1, name)}

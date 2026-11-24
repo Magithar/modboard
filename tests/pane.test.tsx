@@ -1639,7 +1639,9 @@ test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbere
   store(on)
   const pane = await openOrder($, on)
   expect(((await texts(pane)) as string[]).slice(0, 3)).toEqual(['Blocks', 'Order', `${' '.repeat(10)}━━━━━`])
-  expect(await order(pane)).toEqual(['work', 'usage', 'compact', 'pixel-clock'])
+  // The two bars are one row, as the pane draws them under one Limits heading.
+  expect(await order(pane)).toEqual(['work', 'limits', 'pixel-clock'])
+  expect(((await texts(pane)) as string[]).some(t => t.startsWith(' 2  limits (usage, compact)'))).toBe(true)
   // No ▲ on the first, no ▼ on the last; nothing else to press but the arrows.
   for (const [key, there] of [['up-work', false], ['down-work', true], ['up-pixel-clock', true], ['down-pixel-clock', false], ['top-compact', false], ['bottom-usage', false]] as const)
     expect(!!(await pane.find({ key }))).toBe(there)
@@ -1654,22 +1656,31 @@ test('▲ and ▼ move a block a place; the board follows and the order is kept;
   let pass = () => {}
   on('clock.sleep', () => new Promise(resolve => (pass = () => resolve({ value: undefined }))) as any)
   const pane = await openOrder($, on)
+  const row = async (start: string) => ((await pane.findAll({ type: 'Text' })) as any[]).find(t => t.text.startsWith(start))
   const pressed = pane.press({ key: 'up-pixel-clock' })
   await settle()
-  expect(await order(pane)).toEqual(['work', 'usage', 'pixel-clock', 'compact'])
-  expect((await pane.find({ type: 'Text', text: ' 3  pixel-clock   ' }))?.props.color).toBe(CAP_COLOR)
+  expect(await order(pane)).toEqual(['work', 'pixel-clock', 'limits'])
+  expect((await row(' 2  pixel-clock'))?.props.color).toBe(CAP_COLOR)
   pass()
   await pressed
-  expect((await pane.find({ type: 'Text', text: ' 3  pixel-clock   ' }))?.props.color).toBeUndefined()
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'usage', 'pixel-clock', 'compact'])
-  for (let i = 0; i < 2; i++) {
-    const p = pane.press({ key: 'up-pixel-clock' }); await settle(); pass(); await p
-  }
-  expect(await order(pane)).toEqual(['pixel-clock', 'work', 'usage', 'compact'])
+  expect((await row(' 2  pixel-clock'))?.props.color).toBeUndefined()
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'pixel-clock', 'usage', 'compact'])
+  const p1 = pane.press({ key: 'up-pixel-clock' }); await settle(); pass(); await p1
+  expect(await order(pane)).toEqual(['pixel-clock', 'work', 'limits'])
   const p2 = pane.press({ key: 'down-work' }); await settle(); pass(); await p2
-  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'usage', 'work', 'compact'])
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['pixel-clock', 'usage', 'compact', 'work'])
+  // The bars move as one.
+  const p3 = pane.press({ key: 'up-limits' }); await settle(); pass(); await p3
+  expect((kept.get('paneBlocks') as any).blocks).toEqual(['usage', 'compact', 'pixel-clock', 'work'])
   await (await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)).press({ key: 'board' })
   expect(await pane.find({ key: 'tab-order' })).toBeFalsy()
+})
+
+test('bars apart in the order are one limits row, where the first sits, as the pane draws them', { options: { band: 'summary,board', pane: 'work,usage,todo,checks,compact,agents' } } as any, async ($, on) => {
+  host(on, [])
+  store(on)
+  const pane = await openOrder($, on)
+  expect(await order(pane)).toEqual(['work', 'limits', 'todo', 'checks', 'agents'])
 })
 
 test('every row shows ▲ and ▼; the first row\'s ▲ and the last row\'s ▼ are grey and do nothing', ORDER, async ($, on) => {
@@ -1677,7 +1688,7 @@ test('every row shows ▲ and ▼; the first row\'s ▲ and the last row\'s ▼ 
   store(on)
   const pane = await openOrder($, on)
   const arrows = ((await pane.findAll({ type: 'Text' })) as any[]).filter(t => /^\[ [▲▼] \]$/.test(t.text))
-  expect(arrows).toHaveLength(8)
+  expect(arrows).toHaveLength(6)
   expect(arrows.filter(t => t.props.dimColor).map(t => t.text)).toEqual(['[ ▲ ]', '[ ▼ ]'])
   expect(await pane.find({ key: 'up-work' })).toBeFalsy()
   expect(await pane.find({ key: 'down-pixel-clock' })).toBeFalsy()
@@ -1692,26 +1703,31 @@ test('every ▲ and every ▼ moves its block one place, on the terminal and the
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const start = ['work', 'usage', 'compact', 'pixel-clock']
+  // The Order rows: the bars are one, `limits`.
+  const BARS = ['usage', 'compact']
+  const rows = (names: string[]) => names.filter(n => !BARS.includes(n) || n === names.find(m => BARS.includes(m))).map(n => (BARS.includes(n) ? 'limits' : n))
+  const flat = (keys: string[]) => keys.flatMap(k => (k === 'limits' ? BARS : [k]))
   for (const surface of ['terminal', 'desktop'] as const) {
     const pane = await $.ui.mount({ plugin: 'modboard', surface, ...PANE } as any)
     await pane.press({ key: 'tab-order' })
     const now = () => (kept.get('paneBlocks') as any)?.blocks ?? start
-    for (let at = 0; at < start.length; at++) {
+    for (let at = 0; at < rows(start).length; at++) {
       for (const by of [-1, 1] as const) {
         const before = [...now()]
-        const name = before[at]!
+        const keys = rows(before)
+        const name = keys[at]!
         const key = `${by < 0 ? 'up' : 'down'}-${name}`
         const to = at + by
-        if (to < 0 || to >= before.length) {
+        if (to < 0 || to >= keys.length) {
           // The grey arrow: nothing to press, nothing changes.
           expect(await pane.find({ key })).toBeFalsy()
           continue
         }
         await pane.press({ key })
-        const want = [...before]
-        want[at] = before[to]!
+        const want = [...keys]
+        want[at] = keys[to]!
         want[to] = name
-        expect(now()).toEqual(want)
+        expect(now()).toEqual(flat(want))
         // And back, so each row is tried from its own place.
         await pane.press({ key: `${by < 0 ? 'down' : 'up'}-${name}` })
         expect(now()).toEqual(before)
@@ -1746,10 +1762,12 @@ test('at the right of the tabs, in yellow, what was saved: added, removed, order
   await pane.press({ key: 'tab-blocks' })
   await pane.press({ key: 'pick-agents' })
   await pane.press({ key: 'pick-usage' })
+  // compact off and on, so the bars read usage, compact again (work, pixel-clock, usage, compact).
+  await pane.press({ key: 'pick-compact' })
+  await pane.press({ key: 'pick-compact' })
   await pane.press({ key: 'tab-order' })
-  // usage went back last (work, compact, pixel-clock, usage): two places up puts it where it was.
-  await pane.press({ key: 'up-usage' })
-  await pane.press({ key: 'up-usage' })
+  // The bars are one limits row: a place up puts them where they were.
+  await pane.press({ key: 'up-limits' })
   expect(await note()).toBeUndefined()
   await band.press({ key: 'board' })
   await settle()
