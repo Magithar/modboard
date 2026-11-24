@@ -1822,3 +1822,25 @@ test('an untrusted storage block is named in words, not JSON, in the toast and t
   const line = await ui.find({ type: 'Text', text: `board not updating: storage block "./cloned.mjs" runs code on this machine and isn't trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json` })
   expect(line?.props.wrap).toBeUndefined()
 })
+
+test('the board error sits under the work title when work comes first, and on top when it does not', async ($, on) => {
+  const broken = { now: true }
+  host(on, [task('T-001', 'todo')], { broken })
+  const kept = store(on)
+  await $.session.start(START)
+  const ERROR = 'board not updating: cannot read .modboard/board.json'
+  const first = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  let shown = (await texts(first)) as string[]
+  await first.unmount()
+  // modBOARD · claude 1, then the error, then the tasks.
+  expect(shown.indexOf('modBOARD')).toBeLessThan(shown.indexOf(ERROR))
+  expect(shown.indexOf(ERROR)).toBeLessThan(shown.indexOf('title of T-001') < 0 ? Infinity : shown.indexOf('title of T-001'))
+  expect(shown.filter(t => t === ERROR).length).toBe(1)
+
+  // Work moved below the bars: the error goes first, once.
+  kept.set('paneBlocks', { from: 'work,todo,compact,usage', blocks: ['compact', 'usage', 'work'] })
+  await $.session.start(START)
+  shown = (await texts(await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any))) as string[]
+  expect(shown.indexOf(ERROR)).toBeLessThan(shown.indexOf('modBOARD'))
+  expect(shown.filter(t => t === ERROR).length).toBe(1)
+})

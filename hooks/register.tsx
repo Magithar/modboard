@@ -911,7 +911,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
 // Everything a drawing reads, asked for at once: a pane is drawn again on
 // every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
-  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, commandStateNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow, movedNow] =
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, commandStateNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow, movedNow, problemNow] =
     await Promise.all([
       $.clock.now(),
       read($, me),
@@ -934,6 +934,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
       read($, reminders),
       read($, located),
       read($, moved),
+      read($, boardError),
       // Read so a drawing of the clock redraws when the minute turns.
       read($, minute),
     ])
@@ -963,6 +964,7 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     reminders: remindersNow,
     located: locatedNow,
     moved: movedNow,
+    problem: problemNow,
     act,
   }
 }
@@ -1191,11 +1193,10 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
-    const [c, chosen, view, problem] = await Promise.all([
+    const [c, chosen, view] = await Promise.all([
       context($, e.props.bodyColumns ?? 40, { Box, Text, Button }, actions($, cycles)),
       read($, paneBlocks),
       read($, paneView),
-      read($, boardError),
     ])
     // The list of blocks, alone: each row ticks its block on or off; Done
     // turns the pane to the board, as modBOARD does.
@@ -1293,7 +1294,11 @@ export const register: Register = (on, options) => {
       )
     }
     const pane = chosen.map(name => choosable.find(b => b.name === name)).filter(b => b !== undefined)
-    const parts = pane.map(b => ({ block: b, part: b.pane!(c) })).filter(p => p.part !== null)
+    // The board's error goes under the work block's title when work is first,
+    // else on top of the pane, never both.
+    const workFirst = pane[0]?.name === 'work'
+    const drawn = workFirst ? c : { ...c, problem: '' }
+    const parts = pane.map(b => ({ block: b, part: b.pane!(drawn) })).filter(p => p.part !== null)
     // Sections, in order: each block on its own, except that bars side by
     // side (context, the 5-hour limit) make one, under a Limits heading.
     const sections: (typeof parts)[] = []
@@ -1334,11 +1339,12 @@ export const register: Register = (on, options) => {
     const rule = '─'.repeat(Math.max(1, (e.props.bodyColumns ?? 40) - 2))
     return (
       <Box flexDirection="column" paddingX={1}>
-        {/* First, in red, when the board stopped answering: what is below is old. */}
-        {problem ? (
+        {/* In red when the board stopped answering: what is below is old. Under
+            the work block's title when work comes first; else first of all. */}
+        {c.problem && !workFirst ? (
           <Box marginBottom={1}>
             {/* Wrapped, not cut: the end may say what to do. */}
-            <Text color="error">{`board not updating: ${problem}`}</Text>
+            <Text color="error">{`board not updating: ${c.problem}`}</Text>
           </Box>
         ) : null}
         {sections.map((section, i) =>

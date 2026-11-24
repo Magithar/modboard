@@ -249,10 +249,18 @@ export const tasks: Block = {
         </Box>
       </Box>
     )
+    // When the board stopped answering, right under the title, in red: what
+    // is below is old. Wrapped, not cut: the end may say what to do.
+    const problem = c.problem ? (
+      <Box marginBottom={1}>
+        <Text color="error">{`board not updating: ${c.problem}`}</Text>
+      </Box>
+    ) : null
     if (!c.tasks.length)
       return (
         <Box flexDirection="column">
           {title}
+          {problem}
           <Text dimColor>No tasks yet. Ask Claude to add some, or run `board add`.</Text>
         </Box>
       )
@@ -267,6 +275,7 @@ export const tasks: Block = {
     return (
       <Box flexDirection="column">
         {title}
+        {problem}
         {groups.map(([name, list], i) => {
           // Each group sits a blank line apart, which an open group above already leaves.
           const apart = i > 0 && !groupOpen(c.groupsOpen, groups[i - 1]![0])
