@@ -52,7 +52,7 @@ progress, your task.md, CI status, the git branch, or any command's output.
 | **Crashed work comes back** | A task held by an agent that died returns to the board on its own. |
 | **Handoffs keep context** | An agent that stops partway leaves a note, with the worktree it was in and the last check that passed; the next one reads it and carries on there. |
 | **Done means verified** | Nothing is marked done without saying how it was checked. |
-| **Keep it where you want** | The board lives in a folder by default. A storage block you write can keep it in a database instead. |
+| **Keep it where you want** | The board lives in a folder by default. A storage block you write and install can keep it in a database instead. |
 
 ---
 
@@ -193,7 +193,7 @@ board release-all                         # free everything you hold
 board whoami                              # the name the board gave you
 board agents                              # who is live
 board view                                # every task and live agent, as JSON (done tasks with their last note)
-board trust                               # run the storage block this board's config.json names
+board block add ./my-block.mjs            # install your own storage block (asks you first); list, remove
 board run T-001 -- npm test               # run any command, keeping your claim alive however long it takes
 board doctor                              # check the ledger against the state
 board taskfile                            # the project's task.md, read only
@@ -213,7 +213,7 @@ board who src/login.tsx                   # which agents changed a file, on whic
 | 9 | the task waits on another that isn't done |
 | 10 | `claim --next`: nothing ready to claim |
 | 11 | it reviews work you finished; someone else reviews it |
-| 12 | the board names a storage block you haven't trusted (`board trust`) |
+| 12 | the board names a storage block that isn't installed, or names one by path |
 
 Text that starts with dashes goes after `--` (`board note T-001 -- "--force was needed"`)
 or as `--note=--dry-run was clean`.
@@ -748,32 +748,55 @@ storeContract('my block', () => createStore({ /* test settings */ }, { dir: '/tm
 
 Give each `createStore` call a fresh table or folder, so each run starts empty.
 
-**3. Point a board at it** in `.modboard/config.json`. Everything besides
+**3. Install it, then point a board at it.** A block is code, so modBOARD
+runs only blocks you installed yourself, from your own blocks folder
+(`~/.config/modboard/blocks`, or `BOARD_BLOCKS_DIR`). Install one at a
+terminal:
+
+```bash
+board block add ./my-block.mjs            # a single file; or a folder with package.json or index.mjs
+board block add ./my-block.mjs --name db  # under another name
+board block list                          # what's installed
+board block remove db
+```
+
+`board block add` shows the code it's about to install and asks you to type
+`yes`. It copies the block into your folder, so later changes in the project
+don't reach it. Then name it in `.modboard/config.json`. Everything besides
 `store` is passed to your block:
 
 | `config.json` | Uses |
 |---|---|
 | `{ "store": "file" }` | the built-in default |
-| `{ "store": "./stores/my-block.mjs", "url": "..." }` | a block file, relative to `.modboard/` |
-| `{ "store": "modboard-my-block", "url": "..." }` | a block published as a package |
+| `{ "store": "my-block", "url": "..." }` | the block you installed as `my-block` |
+| `{ "store": "@acme/board-store" }` | a package folder you installed, by its package name |
 
-A block other than `file` is code, and `.modboard/` sits in the project, so a
-repo you clone could name one. It runs only after you've read it and run
-`board trust`, which shows the block's code files and asks you to type
-`yes`, at a terminal (an agent's shell has none, so an agent can't trust a
-block for you). It records a fingerprint of `config.json` and every code file
-in the block's folder (or its package) in `~/.config/modboard/trusted.json`.
-A change to any of them asks again (exit 12, and a toast in Claude Code).
+**Why it works this way.** `.modboard/` sits in the project, so a repo you
+clone can put anything in it. So `config.json` can only *name* a block: the
+code is looked up in your blocks folder, never in the project or its
+`node_modules`. A path (`./stores/x.mjs`, `/abs/x.mjs`, `../x.mjs`) is refused,
+and a symlink in your blocks folder that points out of it won't run. Installing
+needs a person at a terminal, so an agent can't install a block for you.
 
-**4. Check it:** `board trust`, then `board add "first task"`, `board view`, `board doctor`. The CLI
+This protects how modBOARD loads blocks. It doesn't sandbox a block you
+installed: that runs with modBOARD's own access to your files, environment and
+network. And it doesn't stop a coding agent from running a project's code in
+other ways.
+
+**Moving from an older version:** a board whose `config.json` named a block by
+path (`"store": "./stores/my-block.mjs"`) or by a package in the project's
+`node_modules` now stops with exit 12. Read the block, install it with
+`board block add .modboard/stores/my-block.mjs` (or the package's folder),
+and change `store` to its name (`"my-block"`, or the package name).
+
+**4. Check it:** `board add "first task"`, `board view`, `board doctor`. The CLI
 refuses a block that won't load or is missing a method, and says which
 (exit 2).
 
 **5. Share it (optional).** Publish a package whose entry exports `createStore`
 (through `exports` or `main`), with `modboard` as a dev dependency for the
-contract tests. Others `npm install modboard-my-block` and name it in
-`config.json`. It's found the way Node finds any package: in `node_modules` of
-the project that holds the board, or a folder above it.
+contract tests. Others download it, read it, install it with
+`board block add <its folder>`, and name it in `config.json`.
 
 <details>
 <summary><b>Why the version check matters: two agents claim one task</b></summary>

@@ -65,10 +65,10 @@ function host(
   on('process.run', (_$, e: any) => {
     const argv: string[] = [...e.argv]
     calls.push(argv)
-    // A board whose storage block isn't trusted: every board command exits
+    // A board that names a storage block it may not run: every board command exits
     // 12, and one with --json says why as JSON on stdout, as the CLI does.
     if (untrusted && argv[1]?.endsWith('board.mjs')) {
-      const error = 'storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json'
+      const error = 'storage block "./cloned.mjs" is a file in this project, and modBOARD only runs blocks you installed yourself: read it, then run board block add at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json'
       return { value: argv.includes('--json') ? { exitCode: 12, stdout: JSON.stringify({ error, code: 12 }), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } : { exitCode: 12, stdout: '', stderr: `board: ${error}`, isStdoutTruncated: false, isStderrTruncated: false } }
     }
     // A board that cannot be read, while `broken.now` says so.
@@ -1841,21 +1841,21 @@ test('the done group shows the newest twenty, then how many more', async ($, on)
   expect(shown).toContain('… 5 more: board list --all')
 })
 
-test('an untrusted storage block is named in words, not JSON, in the toast and the pane', async ($, on) => {
+test('a storage block the board may not run is named in words, not JSON, in the toast and the pane', async ($, on) => {
   host(on, [], { untrusted: true })
   const rung = bell(on)
   await $.session.start(START)
-  const toast = rung.toasts.find(t => t.includes('runs code on this machine'))
-  expect(toast).toBe('board: storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json')
+  const toast = rung.toasts.find(t => t.includes('only runs blocks you installed'))
+  expect(toast).toBe('board: storage block "./cloned.mjs" is a file in this project, and modBOARD only runs blocks you installed yourself: read it, then run board block add at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json')
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const shown = (await texts(ui)) as string[]
   // A heading, the reason in words, then the files on rows of their own.
   const at = shown.indexOf('board not updating')
-  expect(shown[at + 1]).toBe('storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet: read it, then run board trust at a terminal.')
+  expect(shown[at + 1]).toBe('storage block "./cloned.mjs" is a file in this project, and modBOARD only runs blocks you installed yourself: read it, then run board block add at a terminal.')
   expect(shown.slice(at + 2, at + 6)).toEqual(['block', '/repo/.modboard/cloned.mjs', 'config', '/repo/.modboard/config.json'])
   expect(shown.some(t => t.includes('{"error"'))).toBe(false)
   // The reason wraps, never cut: it says what to do.
-  const line = await ui.find({ type: 'Text', text: `storage block "./cloned.mjs" runs code on this machine and isn't trusted yet: read it, then run board trust at a terminal.` })
+  const line = await ui.find({ type: 'Text', text: `storage block "./cloned.mjs" is a file in this project, and modBOARD only runs blocks you installed yourself: read it, then run board block add at a terminal.` })
   expect(line?.props.wrap).toBeUndefined()
 })
 
@@ -1895,6 +1895,7 @@ test('a long path in the board error is cut from the start to fit the pane', asy
   bell(on)
   await $.session.start(START)
   expect(splitProblem('cannot read it')).toEqual({ message: 'cannot read it', files: [] })
+  expect(splitProblem('storage block "x" isn\'t installed: ask. Named in /r/.modboard/config.json')).toEqual({ message: 'storage block "x" isn\'t installed: ask.', files: [['config', '/r/.modboard/config.json']] })
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 30 } } as any)
   const shown = (await texts(ui)) as string[]
   const path = shown[shown.indexOf('block') + 1]!

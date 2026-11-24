@@ -10,131 +10,181 @@ import { fileURLToPath } from 'node:url'
 
 import { storeContract } from '../lib/contract.mjs'
 import { fileStore } from '../lib/store-file.mjs'
-import { trustBoard } from '../lib/load-store.mjs'
+import { installBlock } from '../lib/load-store.mjs'
 import { createStore as memory } from '../examples/store-memory.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'board-'))
-// Trust is recorded in the user's config; these tests keep their own. The
-// CLI's trust asks a person at a terminal, so the tests trust through the
-// library, as that person's yes would.
-const TRUST = path.join(tmp(), 'trusted.json')
-process.env.BOARD_TRUST_FILE = TRUST
-const trust = dir => trustBoard(dir)
+// Your own blocks folder, which the tests keep apart. board block add asks a
+// person at a terminal, so the tests install through the library, as that
+// person's yes would.
+const BLOCKS = path.join(tmp(), 'blocks')
+process.env.BOARD_BLOCKS_DIR = BLOCKS
+const install = (src, name) => installBlock(src, name)
 
 storeContract('file', () => fileStore(path.join(tmp(), '.modboard')))
 storeContract('memory (example)', () => memory())
 
-function board(dir, args) {
+function board(dir, args, cwd) {
   try {
-    return { code: 0, out: execFileSync('node', [path.join(ROOT, 'bin/board.mjs'), ...args], { env: { ...process.env, BOARD_DIR: dir, BOARD_TRUST_FILE: TRUST }, encoding: 'utf8', stdio: 'pipe' }) }
+    return { code: 0, out: execFileSync('node', [path.join(ROOT, 'bin/board.mjs'), ...args], { env: { ...process.env, BOARD_DIR: dir, BOARD_BLOCKS_DIR: BLOCKS }, encoding: 'utf8', stdio: 'pipe', ...(cwd ? { cwd } : {}) }) }
   } catch (err) {
     return { code: err.status, out: String(err.stderr) }
   }
 }
 
-test('config.json can name a block file, which the CLI loads', () => {
-  const dir = path.join(tmp(), '.modboard')
+// A block that saves under a folder of its choosing and, when it runs,
+// leaves a marker, so a test can tell whether its code ran at all.
+const blockSource = (marker = '') =>
+  (marker ? `import fs from 'node:fs'\nfs.writeFileSync(${JSON.stringify(marker)}, 'ran')\n` : '') +
+  `import { fileStore } from ${JSON.stringify(path.join(ROOT, 'lib/store-file.mjs'))}\n` +
+  `export const createStore = (config, { dir }) => fileStore(dir + '/' + (config.folder ?? 'data'))\n`
+
+// A project with a board, its config naming `store`.
+function project(store, extra = {}) {
+  const root = tmp()
+  const dir = path.join(root, '.modboard')
   fs.mkdirSync(dir, { recursive: true })
-  // A block of its own: the file block, saving under a folder of its choosing.
-  fs.writeFileSync(
-    path.join(dir, 'my-block.mjs'),
-    `import { fileStore } from ${JSON.stringify(path.join(ROOT, 'lib/store-file.mjs'))}\n` +
-      `export const createStore = (config, { dir }) => fileStore(dir + '/' + config.folder)\n`,
-  )
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './my-block.mjs', folder: 'elsewhere' }))
-  trust(dir)
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store, ...extra }))
+  return { root, dir }
+}
+
+test('a block file you installed loads by name', () => {
+  const src = path.join(tmp(), 'my-block.mjs')
+  fs.writeFileSync(src, blockSource())
+  assert.equal(install(src).name, 'my-block')
+  const { dir } = project('my-block', { folder: 'elsewhere' })
   assert.equal(board(dir, ['add', 'hello']).code, 0)
   assert.ok(fs.existsSync(path.join(dir, 'elsewhere', 'board.json')))
-  assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, './my-block.mjs')
+  assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, 'my-block')
+  assert.match(board(dir, ['block', 'list']).out, /my-block/)
 })
 
-test('config.json can name a block package installed in the project, not beside modboard', () => {
-  const project = tmp()
-  const dir = path.join(project, '.modboard')
-  fs.mkdirSync(dir, { recursive: true })
-  const block = `import { fileStore } from ${JSON.stringify(path.join(ROOT, 'lib/store-file.mjs'))}\n` +
-    `export const createStore = (config, { dir }) => fileStore(dir + '/' + config.folder)\n`
-  // Two common shapes: conditional exports (scoped name), and a plain main.
+test('a package folder you installed loads by its name, in either common shape', () => {
   const shapes = {
     '@acme/board-store': { exports: { '.': { import: './dist/index.mjs', require: './dist/index.cjs' } }, file: 'dist/index.mjs' },
     'plain-store': { main: 'lib/store.mjs', file: 'lib/store.mjs' },
   }
   for (const [name, { file, ...pkg }] of Object.entries(shapes)) {
-    const pkgDir = path.join(project, 'node_modules', name)
-    fs.mkdirSync(path.dirname(path.join(pkgDir, file)), { recursive: true })
-    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name, type: 'module', ...pkg }))
-    fs.writeFileSync(path.join(pkgDir, file), block)
-    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: name, folder: name.replace('/', '_') }))
-    trust(dir)
+    const src = path.join(tmp(), 'pkg')
+    fs.mkdirSync(path.dirname(path.join(src, file)), { recursive: true })
+    fs.writeFileSync(path.join(src, 'package.json'), JSON.stringify({ name, type: 'module', ...pkg }))
+    fs.writeFileSync(path.join(src, file), blockSource())
+    assert.equal(install(src).name, name)
+    const { dir } = project(name, { folder: 'x' })
     assert.equal(board(dir, ['add', 'hello']).code, 0, name)
-    assert.ok(fs.existsSync(path.join(dir, name.replace('/', '_'), 'board.json')), name)
     assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, name)
   }
 })
 
 test('a block that cannot load, or breaks the contract shape, is refused by name', () => {
-  const dir = path.join(tmp(), '.modboard')
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './missing.mjs' }))
-  trust(dir)
-  const missing = board(dir, ['list'])
-  assert.equal(missing.code, 2)
-  assert.match(missing.out, /cannot load storage block "\.\/missing\.mjs"/)
+  const src = path.join(tmp(), 'broken.mjs')
+  fs.writeFileSync(src, 'export const createStore = () => { throw new Error("nope") }\nimport "./not-there.mjs"\n')
+  install(src)
+  const broken = board(project('broken').dir, ['list'])
+  assert.equal(broken.code, 2)
+  assert.match(broken.out, /cannot load storage block "broken"/)
 
-  fs.writeFileSync(path.join(dir, 'half.mjs'), 'export const createStore = () => ({ now: () => 0, snapshot: () => ({}) })\n')
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './half.mjs' }))
-  trust(dir)
-  const half = board(dir, ['list'])
-  assert.equal(half.code, 2)
-  assert.match(half.out, /is missing: commit, events, verify/)
+  const half = path.join(tmp(), 'half.mjs')
+  fs.writeFileSync(half, 'export const createStore = () => ({ now: () => 0, snapshot: () => ({}) })\n')
+  install(half)
+  const shape = board(project('half').dir, ['list'])
+  assert.equal(shape.code, 2)
+  assert.match(shape.out, /is missing: commit, events, verify/)
 })
 
-test("a project's block runs only once trusted, and a change to it asks again", () => {
-  const dir = path.join(tmp(), '.modboard')
-  fs.mkdirSync(dir, { recursive: true })
+// The security boundary: a project names a block, but only code you installed runs.
+
+test("a downloaded project's own block never runs: by path, absolute path, or climbing out", () => {
+  for (const store of ['./evil.mjs', 'evil.mjs/../evil.mjs', '../evil.mjs', 'sub/evil.mjs']) {
+    const { dir } = project(store)
+    const marker = path.join(dir, 'ran')
+    fs.writeFileSync(path.join(dir, 'evil.mjs'), blockSource(marker))
+    const r = board(dir, ['list'])
+    assert.equal(r.code, 12, store)
+    assert.match(r.out, /only runs blocks you installed yourself/, store)
+    assert.equal(fs.existsSync(marker), false, `${store}: the block never ran`)
+  }
+  const { dir } = project('placeholder')
   const marker = path.join(dir, 'ran')
-  const block = extra =>
-    `import fs from 'node:fs'\nfs.writeFileSync(${JSON.stringify(marker)}, 'yes')\n` +
-    `import { fileStore } from ${JSON.stringify(path.join(ROOT, 'lib/store-file.mjs'))}\n` +
-    `export const createStore = (config, { dir }) => fileStore(dir + '/data')\n${extra}`
-  fs.writeFileSync(path.join(dir, 'cloned.mjs'), block(''))
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './cloned.mjs' }))
+  fs.writeFileSync(path.join(dir, 'evil.mjs'), blockSource(marker))
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: path.join(dir, 'evil.mjs') }))
+  assert.equal(board(dir, ['list']).code, 12, 'absolute path')
+  assert.equal(fs.existsSync(marker), false)
+})
 
-  const refused = board(dir, ['list'])
-  assert.equal(refused.code, 12)
-  assert.match(refused.out, /runs code on this machine.*board trust/)
-  assert.equal(fs.existsSync(marker), false, 'the block never ran')
+test('a name that tries to climb out of the blocks folder is refused', () => {
+  for (const store of ['..', '.hidden', '@x/../../evil', 'a\\..\\evil']) {
+    const r = board(project(store).dir, ['list'])
+    assert.ok(r.code === 2 || r.code === 12, `${store}: ${r.code} ${r.out}`)
+  }
+})
 
-  trust(dir)
+test("a project can't stand in for a block through node_modules, installed or not", () => {
+  const { root, dir } = project('board-store')
+  const marker = path.join(root, 'ran')
+  const pkgDir = path.join(root, 'node_modules', 'board-store')
+  fs.mkdirSync(pkgDir, { recursive: true })
+  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: 'board-store', type: 'module', main: 'index.mjs' }))
+  fs.writeFileSync(path.join(pkgDir, 'index.mjs'), blockSource(marker))
+
+  // Not installed: refused, though the project ships one by that name.
+  const r = board(dir, ['list'], root)
+  assert.equal(r.code, 12)
+  assert.match(r.out, /isn't installed/)
+  assert.equal(fs.existsSync(marker), false)
+
+  // Installed: yours runs, never the project's.
+  const mine = path.join(tmp(), 'board-store.mjs')
+  const mineMarker = path.join(tmp(), 'mine-ran')
+  fs.writeFileSync(mine, blockSource(mineMarker))
+  install(mine)
+  assert.equal(board(dir, ['list'], root).code, 0)
+  assert.equal(fs.existsSync(mineMarker), true)
+  assert.equal(fs.existsSync(marker), false)
+})
+
+test('an installed block is a copy: changing the original in the project changes nothing', () => {
+  const src = path.join(tmp(), 'copied.mjs')
+  fs.writeFileSync(src, blockSource())
+  install(src)
+  const marker = path.join(tmp(), 'ran')
+  fs.writeFileSync(src, blockSource(marker))
+  assert.equal(board(project('copied').dir, ['list']).code, 0)
+  assert.equal(fs.existsSync(marker), false)
+})
+
+test('a symlink in the blocks folder pointing out of it is refused', () => {
+  const outside = path.join(tmp(), 'outside.mjs')
+  const marker = path.join(tmp(), 'ran')
+  fs.writeFileSync(outside, blockSource(marker))
+  fs.mkdirSync(BLOCKS, { recursive: true })
+  fs.symlinkSync(outside, path.join(BLOCKS, 'linked.mjs'))
+  const r = board(project('linked').dir, ['list'])
+  assert.equal(r.code, 12)
+  assert.match(r.out, /outside your blocks folder/)
+  assert.equal(fs.existsSync(marker), false)
+})
+
+test("an agent can't install a block: board block add asks a person at a terminal", () => {
+  const src = path.join(tmp(), 'sneaky.mjs')
+  fs.writeFileSync(src, blockSource())
+  const r = board(project('file').dir, ['block', 'add', src])
+  assert.equal(r.code, 2)
+  assert.match(r.out, /asks a person to confirm/)
+  assert.doesNotMatch(board(project('file').dir, ['block', 'list']).out, /sneaky/)
+})
+
+test('the built-in file block needs nothing installed, and a removed block stops loading', () => {
+  assert.equal(board(project('file').dir, ['add', 'x']).code, 0)
+  assert.equal(board(path.join(tmp(), '.modboard'), ['add', 'x']).code, 0)
+  const src = path.join(tmp(), 'gone.mjs')
+  fs.writeFileSync(src, blockSource())
+  install(src)
+  const { dir } = project('gone')
   assert.equal(board(dir, ['list']).code, 0)
-  assert.equal(fs.existsSync(marker), true)
-
-  fs.writeFileSync(path.join(dir, 'cloned.mjs'), block('// changed'))
-  const changed = board(dir, ['list'])
-  assert.equal(changed.code, 12)
-  assert.match(changed.out, /changed since you trusted it/)
-
-  // A helper beside the block is covered too.
-  trust(dir)
-  fs.writeFileSync(path.join(dir, 'helper.mjs'), 'export const x = 1\n')
+  assert.equal(board(dir, ['block', 'remove', 'gone']).code, 0)
   assert.equal(board(dir, ['list']).code, 12)
-  trust(dir)
-  // The board's own data changing is not a change to the code.
-  assert.equal(board(dir, ['add', 'y']).code, 0)
-  assert.equal(board(dir, ['list']).code, 0)
-
-  // An agent's shell has no terminal, so it can't trust a block itself.
-  fs.writeFileSync(path.join(dir, 'helper.mjs'), 'export const x = 2\n')
-  const agent = board(dir, ['trust'])
-  assert.equal(agent.code, 2)
-  assert.match(agent.out, /asks a person to confirm/)
-  assert.equal(board(dir, ['list']).code, 12)
-
-  // The built-in block needs none.
-  const plain = path.join(tmp(), '.modboard')
-  assert.equal(board(plain, ['add', 'x']).code, 0)
-  assert.match(board(plain, ['trust']).out, /needs no trust/)
 })
 
 // The file block's own failure modes: a writer that stalls holding the lock,

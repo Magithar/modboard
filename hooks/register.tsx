@@ -120,7 +120,7 @@ async function joined($: EngineInterface) {
   try {
     if (out.ok) return (JSON.parse(out.text) as { name: string }).name
   } catch {}
-  // A project's storage block that isn't trusted yet: say so once, at start.
+  // A storage block the project names that isn't installed: say so once, at start.
   if (out.code === 12) $.ui.toast(`board: ${reason(out.text)}`)
   return `claude:${session.slice(0, 8)}`
 }

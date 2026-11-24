@@ -43,14 +43,15 @@ This repo has a shared task board (modBOARD). Work from it:
 - Note progress with `board note <id> "..."`; record passing checks with `board check <id> "<command>"`.
 - Finish with `board done <id> --note "how you verified it"`, or stop with `board release <id> --handoff "done X; left Y; see Z"`.
 - Run long commands (a full test suite, a build) as `board run <id> -- <command>`, which keeps your claim alive while they run.
-- Never run `board trust`. If a command exits 12, tell the person: they trust a storage block themselves.
+- Never run `board block add`. If a command exits 12, tell the person: they install a storage block themselves.
 
 Agents other than Codex: set `BOARD_AGENT` to your name first.
 ```
 
-Don't run `board trust` during setup either. If the project's
+Don't install a storage block during setup either. If the project's
 `.modboard/config.json` names a storage block other than `file`, tell the
-person to read it and run `board trust` themselves; it asks at a terminal.
+person to read it and install it themselves with `board block add`; it asks
+at a terminal.
 
 If the project has a `CLAUDE.md` and the person uses Claude Code, tell them
 about the Claude Code mod (step 5) rather than adding the protocol there.

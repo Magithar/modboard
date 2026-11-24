@@ -14,7 +14,7 @@ import path from 'node:path'
 import readline from 'node:readline/promises'
 
 import { BoardError, createEngine } from '../lib/engine.mjs'
-import { loadStore, trustBoard, trustFile, trustPreview } from '../lib/load-store.mjs'
+import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
 
 function boardDir() {
@@ -214,10 +214,14 @@ const SAY = {
     r.file
       ? [r.file, ...r.items.map(i => `${'  '.repeat(i.depth)}${i.done === null ? '-' : i.done ? '[x]' : '[ ]'} ${i.priority === null ? '' : `P${i.priority} `}${i.text}`)].join('\n')
       : '(no task.md here)',
-  trust: r =>
-    r.needed
-      ? `trusted storage block ${r.block} (${r.code}) for ${DIR}\nrecorded in ${trustFile()}; a change to it or to config.json asks again`
-      : `this board uses the built-in ${r.block} block, which needs no trust`,
+  block: r =>
+    r.blocks
+      ? r.blocks.length
+        ? [`in ${r.dir}:`, ...r.blocks.map(b => `  ${b}`)].join('\n')
+        : `no blocks installed (${r.dir})`
+      : r.removed
+        ? `removed ${r.removed}`
+        : `installed ${r.name} at ${r.at}\nname it in a board's .modboard/config.json: "store": "${r.name}"`,
   doctor: r =>
     [`storage block: ${r.block}`, ...(r.tasks !== undefined ? [`${r.tasks} ${r.tasks === 1 ? 'task' : 'tasks'}, ${r.events ?? '?'} events`] : []), r.ok ? 'ok: the ledger and the state agree' : 'problems:', ...r.problems.map(p => `- ${p}`)].join('\n'),
 }
@@ -396,32 +400,41 @@ const commands = {
   },
   doctor: async (board, _, __, store) => ({ block: store, ...(await board.doctor()) }),
   where: () => DIR,
-  // Run the storage block this board's config.json names. It is code from the
-  // project, so it waits for this; a change to it asks again.
-  // A person confirms, at a terminal: an agent's shell has none, so an agent
-  // talked into it by a repo's text can't trust that repo's code.
-  async trust() {
-    const preview = trustPreview(DIR)
-    if (!preview.needed) return trustBoard(DIR)
+  // Your own storage blocks, in your blocks folder (never the project's):
+  //   board block add <file or folder> [--name n]   install one; asks first
+  //   board block list                               what is installed
+  //   board block remove <name>
+  // A project's config.json can name only what is installed here. Adding asks
+  // a person at a terminal: an agent's shell has none, so an agent talked
+  // into it by a repo's text can't install that repo's code.
+  async block(_, [sub, arg], flags) {
+    if (sub === 'list') return listBlocks()
+    if (sub === 'remove') {
+      if (!arg) throw new BoardError(2, 'usage: board block remove <name>')
+      return { removed: removeBlock(arg).name }
+    }
+    if (sub !== 'add' || !arg) throw new BoardError(2, 'usage: board block add <file or folder> [--name <name>] | board block list | board block remove <name>')
+    const plan = blockPlan(arg, text(flags.name))
     if (!process.stdin.isTTY || !process.stderr.isTTY)
-      throw new BoardError(2, `board trust asks a person to confirm, at a terminal. Read ${preview.code}, then run board trust yourself`)
-    const shown = preview.files.slice(0, 20)
+      throw new BoardError(2, `board block add asks a person to confirm, at a terminal. Read ${plan.from}, then run board block add yourself`)
+    const shown = plan.files.slice(0, 20)
     console.error(
       [
-        `${path.join(DIR, 'config.json')} names storage block ${preview.block}:`,
-        `  ${preview.code}`,
-        ...(preview.files.length ? [`code it covers (${preview.files.length} files):`, ...shown.map(f => `  ${f}`), ...(preview.files.length > shown.length ? [`  … ${preview.files.length - shown.length} more`] : [])] : []),
-        'Every board command will run it on this machine.',
+        `Install storage block "${plan.name}" from ${plan.from}`,
+        `into ${blocksDir()}?`,
+        ...(plan.files.length ? [`its code (${plan.files.length} files):`, ...shown.map(f => `  ${path.relative(process.cwd(), f) || f}`), ...(plan.files.length > shown.length ? [`  … ${plan.files.length - shown.length} more`] : [])] : []),
+        'It runs with modBOARD\'s own access: your files, environment and network.',
+        `Any board whose config.json says "store": "${plan.name}" will run it.`,
       ].join('\n'),
     )
     const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
     // Ctrl+D or Ctrl+C is a no.
     const answer = await rl
-      .question('Trust it? Type yes: ')
+      .question('Install it? Type yes: ')
       .catch(() => '')
       .finally(() => rl.close())
-    if (answer.trim().toLowerCase() !== 'yes') throw new BoardError(2, 'not trusted; nothing changed')
-    return trustBoard(DIR)
+    if (answer.trim().toLowerCase() !== 'yes') throw new BoardError(2, 'not installed; nothing changed')
+    return installBlock(arg, text(flags.name))
   },
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
@@ -440,6 +453,7 @@ const FLAGS = {
   release: ['handoff'],
   check: ['passed'],
   run: [],
+  block: ['name'],
   done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],
@@ -457,7 +471,7 @@ function checkFlags(cmd, flags) {
 }
 
 // Commands that read no board, so no storage block is loaded for them.
-const BOARDLESS = new Set(['where', 'taskfile', 'trust'])
+const BOARDLESS = new Set(['where', 'taskfile', 'block'])
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2)

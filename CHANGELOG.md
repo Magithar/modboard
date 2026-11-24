@@ -11,6 +11,10 @@ ask for a review.
 
 ### Added
 
+- **`board block add / list / remove`** installs your own storage blocks
+  into your blocks folder, a file or a package folder, copied so later changes
+  in a project don't reach them. Adding shows the code and asks you to type
+  `yes`.
 - **`board run T-004 -- <command>`** runs any command on a task you hold and
   keeps the claim alive however long it takes, then exits with the command's
   code. For Codex and other CLI agents running a long build or test suite.
@@ -37,9 +41,6 @@ ask for a review.
 
 ### Fixed
 
-- **An untrusted storage block is explained in words** in Claude Code's toast
-  and the pane, not as raw JSON, and the message starts with what to do, so a
-  narrow pane no longer cuts off "board trust" behind a long path.
 - **Claude Code keeps its claims through a long tool call.** A Bash call
   longer than the lease (a 20-minute test run) used to let the claim expire,
   since the heartbeat came only after each call. Now each presence ping
@@ -60,16 +61,17 @@ ask for a review.
   about 220 ms to 60 ms. `board show` and `board who` still read the whole task.
 - **`board tail` reads only the end of the ledger** for new events, not the
   whole file every half second.
-- **`board trust` asks a person, at a terminal,** and covers every code file
-  in the block's folder or package, so a changed helper asks again too. An
-  agent's shell has no terminal, so it can't trust a block itself.
 - **The board's own files never count as changed files** in notes and
   `board who`, even where `.modboard/` isn't in `.gitignore`.
-- **A project's storage block runs only once you trust it.** `.modboard/config.json`
-  could name a block file, and every `board` command (and Claude Code, at
-  session start) ran it, so a cloned repo could run its code. Now
-  `board trust` records a fingerprint of the config and the block in your
-  own config, and a change asks again (exit 12). The built-in block needs none.
+- **A downloaded project can no longer run its own code through modBOARD.**
+  `.modboard/config.json` could name a block file or a package in the
+  project's `node_modules`, and every `board` command (and Claude Code, at
+  session start) ran it. Now `config.json` can only name a block, and the code
+  comes from your own blocks folder (`~/.config/modboard/blocks`), which only
+  `board block add` fills, after a person types `yes` at a terminal. Paths,
+  path tricks and symlinks out of the folder are refused (exit 12), and the
+  pane and Claude Code's toast say why in words. **Moving:** install your
+  block with `board block add`, then name it in `store`.
 - **The file store survives a writer that stalls.** An agent frozen
   mid-commit for over 10 seconds (a sleeping laptop) could overwrite another
   agent's write and reuse its event number. The lock now carries a token, and

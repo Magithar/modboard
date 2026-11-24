@@ -3,14 +3,18 @@ import { tilde } from './attention'
 
 // Why the board couldn't be read, laid out to be read: a red heading, the
 // reason under it, and any files it names on rows of their own, cut from the
-// start to fit (the end of a path is what tells it apart). The storage-block
-// message ends "… The block: <file>, named in <file>"; those become rows.
-const FILES = /^(.*?)\. The block: (.+), named in (.+)$/s
+// start to fit (the end of a path is what tells it apart). A storage-block
+// message ends "… The block: <file>, named in <file>", or "… Named in <file>"
+// when there is no file to name; those become rows.
+const BOTH = /^(.*?)\. The block: (.+), named in (.+)$/s
+const CONFIG = /^(.*?)\. Named in (.+)$/s
 
 export function splitProblem(text: string): { message: string; files: [string, string][] } {
-  const m = FILES.exec(text)
-  if (!m) return { message: text, files: [] }
-  return { message: `${m[1]}.`, files: [['block', m[2]!], ['config', m[3]!]] }
+  const both = BOTH.exec(text)
+  if (both) return { message: `${both[1]}.`, files: [['block', both[2]!], ['config', both[3]!]] }
+  const config = CONFIG.exec(text)
+  if (config) return { message: `${config[1]}.`, files: [['config', config[2]!]] }
+  return { message: text, files: [] }
 }
 
 const LABEL = 8
