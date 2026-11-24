@@ -14,7 +14,7 @@ import path from 'node:path'
 import readline from 'node:readline/promises'
 
 import { BoardError, createEngine } from '../lib/engine.mjs'
-import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock } from '../lib/load-store.mjs'
+import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock, storeStatus } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
 
 function boardDir() {
@@ -408,7 +408,8 @@ const commands = {
   // a person at a terminal: an agent's shell has none, so an agent talked
   // into it by a repo's text can't install that repo's code.
   async block(_, [sub, arg], flags) {
-    if (sub === 'list') return listBlocks()
+    // What's installed, and which one this board names.
+    if (sub === 'list') return { ...listBlocks(), board: storeStatus(DIR) }
     if (sub === 'remove') {
       if (!arg) throw new BoardError(2, 'usage: board block remove <name>')
       return { removed: removeBlock(arg).name }

@@ -761,7 +761,9 @@ board block remove db
 ```
 
 `board block add` shows the code it's about to install and asks you to type
-`yes`. It copies the block into your folder, so later changes in the project
+`yes`. In Claude Code, the **Storage** tab on the block list (`blocks` on the
+band) shows which block this board uses, whether it's installed, and what's in
+your blocks folder. It's read-only: installing stays at a terminal. It copies the block into your folder, so later changes in the project
 don't reach it. Then name it in `.modboard/config.json`. Everything besides
 `store` is passed to your block:
 

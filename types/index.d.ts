@@ -50,10 +50,14 @@ export type Weather = { temp: number; high: number; code: number; place: string;
 // A one-off alarm an agent set with board_alarm: it rings once at `at`, then goes.
 // `due`: when it rings, in ms, so one missed while the machine slept is
 // known as missed, not rung a day late. Older ones have only `at`.
+// The Storage tab's reading: your blocks folder, what's installed there, and
+// which block this board's config.json names, with where it stands.
+export type Storage = { dir: string; blocks: string[]; board: { uses: string; status: string } }
+
 export type Reminder = { at: string; note: string; due?: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; commandState: Record<string, { ok: number | null; failing: number | null }>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean>; boardError: string; copied: string; home: string; paneView: string; paneBlocks: string[]; weather: Weather | null; alarms: string[]; ringing: string; minute: string; reminders: Reminder[]; located: boolean; seenDone: string[] | null; moved: string; listStart: string[] }
+    modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; commandState: Record<string, { ok: number | null; failing: number | null }>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean>; boardError: string; copied: string; home: string; paneView: string; paneBlocks: string[]; weather: Weather | null; alarms: string[]; ringing: string; minute: string; reminders: Reminder[]; located: boolean; seenDone: string[] | null; moved: string; listStart: string[]; storage: Storage | null }
   }
 }

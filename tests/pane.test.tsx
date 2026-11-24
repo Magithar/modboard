@@ -29,11 +29,12 @@ function host(
     taskfile = { file: null, items: [] },
     broken = { now: false },
     untrusted = false,
+    storage,
     home,
     live = [{ name: 'codex', lastSeen: '' }],
     time,
     shell,
-  }: { untrusted?: boolean; time?: { now: number }; shell?: { failing: Set<string> }; live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
+  }: { storage?: unknown; untrusted?: boolean; time?: { now: number }; shell?: { failing: Set<string> }; live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -65,6 +66,9 @@ function host(
   on('process.run', (_$, e: any) => {
     const argv: string[] = [...e.argv]
     calls.push(argv)
+    // board block list: what the Storage tab reads.
+    if (storage && argv[2] === 'block' && argv[3] === 'list')
+      return { value: { exitCode: 0, stdout: JSON.stringify(storage), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     // A board that names a storage block it may not run: every board command exits
     // 12, and one with --json says why as JSON on stdout, as the CLI does.
     if (untrusted && argv[1]?.endsWith('board.mjs')) {
@@ -1634,11 +1638,11 @@ const openOrder = async ($: any, on: On) => {
 }
 const order = async (pane: any) => ((await texts(pane)) as string[]).filter(t => /^ ?\d+  /.test(t)).map(t => t.trim().split(/\s+/)[1])
 
-test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbered, in the board order', ORDER, async ($, on) => {
+test('the list has three tabs: Blocks ticks, Order lists the ticked blocks numbered, in the board order; then Storage', ORDER, async ($, on) => {
   host(on, [])
   store(on)
   const pane = await openOrder($, on)
-  expect(((await texts(pane)) as string[]).slice(0, 3)).toEqual(['Blocks', 'Order', `${' '.repeat(10)}━━━━━`])
+  expect(((await texts(pane)) as string[]).slice(0, 4)).toEqual(['Blocks', 'Order', 'Storage', `${' '.repeat(10)}━━━━━`])
   // The two bars are one row, as the pane draws them under one Limits heading.
   expect(await order(pane)).toEqual(['work', 'limits', 'pixel-clock'])
   expect(((await texts(pane)) as string[]).some(t => t.startsWith(' 2  limits (usage, compact)'))).toBe(true)
@@ -1646,7 +1650,7 @@ test('the list has two tabs: Blocks ticks, Order lists the ticked blocks numbere
   for (const [key, there] of [['up-work', false], ['down-work', true], ['up-pixel-clock', true], ['down-pixel-clock', false], ['top-compact', false], ['bottom-usage', false]] as const)
     expect(!!(await pane.find({ key }))).toBe(there)
   await pane.press({ key: 'tab-blocks' })
-  expect(((await texts(pane)) as string[])[2]).toBe('━━━━━━')
+  expect(((await texts(pane)) as string[])[3]).toBe('━━━━━━')
   expect(await pane.find({ key: 'pick-agents' })).toBeTruthy()
 })
 
@@ -1928,4 +1932,45 @@ test('the board error rows copy their file paths, like a handoff path; nothing o
   pass()
   await second
   await ui.unmount()
+})
+
+test('the Storage tab shows which block the board uses, what is installed, and where; nothing installs from it', { options: { band: 'summary,board' } } as any, async ($, on) => {
+  const calls = host(on, [], {
+    home: '/Users/me',
+    storage: { dir: '/Users/me/.config/modboard/blocks', blocks: ['my-block', 'supabase'], board: { uses: 'supabase', status: 'installed' } },
+  })
+  store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await pane.press({ key: 'tab-storage' })
+  await settle()
+  const shown = (await texts(pane)) as string[]
+  expect(shown).toContain('Storage')
+  expect(shown).toContain('supabase')
+  expect(shown).toContain(' · installed')
+  expect(shown).toContain('my-block · supabase')
+  expect(shown).toContain('~/.config/modboard/blocks')
+  expect(shown.some(t => t.startsWith('Install one at a terminal: board block add'))).toBe(true)
+  // Read-only: the tab asked for the list, and nothing else touched blocks.
+  expect(calls.filter(argv => argv[2] === 'block').map(argv => argv[3])).toEqual(['list'])
+  // The underline sits under Storage: past "Blocks" and "Order", 4 apart.
+  expect(shown).toContain(`${' '.repeat(19)}━━━━━━━`)
+})
+
+test("the Storage tab says when the board names a block that won't run", { options: { band: 'summary,board' } } as any, async ($, on) => {
+  host(on, [], { storage: { dir: '/b', blocks: [], board: { uses: './evil.mjs', status: 'path' } } })
+  store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  await pane.press({ key: 'tab-storage' })
+  await settle()
+  const line = await pane.find({ type: 'Text', text: " · a file in this project: it won't run" })
+  expect(line?.props.color).toBe('error')
+  expect(await texts(pane)).toContain('none yet')
 })
