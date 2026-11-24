@@ -886,13 +886,10 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     },
     // A worktree's path under a handoff: copies `cd '<path>'`, and the row says
     // ✓ copied for a moment. Where the surface can't copy, a toast gives the path.
-    copyPath: async (id: string, path: string, surface: string) => {
-      const out = await $.ui.copy({ text: `cd '${path.replace(/'/g, `'\\''`)}'`, surface: surface as any }).catch(() => ({ isCopied: false }))
-      if (!out.isCopied) return void $.ui.toast(`board: couldn't copy; the worktree is ${path}`)
-      await update($, copied, () => id)
-      await $.clock.sleep(COPIED_MS)
-      await update($, copied, now => (now === id ? '' : now))
-    },
+    copyPath: (id: string, path: string, surface: string) => copyText($, id, `cd ${shellQuote(path)}`, surface, `the worktree is ${path}`),
+    // Any text, the same way: ✓ copied on the row named `key` for a moment;
+    // where the surface can't copy, a toast says `instead`.
+    copy: (key: string, text: string, surface: string, instead: string) => copyText($, key, text, surface, instead),
     stopAlarm: () => stopAlarm($),
     toggleGroup: async (name: string) => {
       await update($, groupsOpen, chosen => ({ ...chosen, [name]: !groupOpen(chosen, name as GroupName) }))
@@ -913,6 +910,16 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       void refresh($).catch(() => {})
     },
   }
+}
+
+const shellQuote = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`
+
+async function copyText($: EngineInterface, key: string, text: string, surface: string, instead: string) {
+  const out = await $.ui.copy({ text, surface: surface as any }).catch(() => ({ isCopied: false }))
+  if (!out.isCopied) return void $.ui.toast(`board: couldn't copy; ${instead}`)
+  await update($, copied, () => key)
+  await $.clock.sleep(COPIED_MS)
+  await update($, copied, now => (now === key ? '' : now))
 }
 
 // Everything a drawing reads, asked for at once: a pane is drawn again on

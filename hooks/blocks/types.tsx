@@ -50,7 +50,7 @@ export type Ctx = {
   problem: string
   // What a pressed block can do: each switches the session the way the
   // matching slash command would.
-  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; openBlocks: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void>; stopAlarm: () => Promise<void> }
+  act: { nextModel: () => Promise<void>; nextEffort: () => Promise<void>; toggleTaskfile: () => Promise<void>; nextTier: () => Promise<void>; toggleGroup: (name: string) => Promise<void>; showGroup: (name: string) => Promise<void>; compact: () => Promise<void>; openBoard: () => Promise<void>; openBlocks: () => Promise<void>; copyPath: (id: string, path: string, surface: string) => Promise<void>; copy: (key: string, text: string, surface: string, instead: string) => Promise<void>; stopAlarm: () => Promise<void> }
 }
 
 export type CommandState = { ok: number | null; failing: number | null }
