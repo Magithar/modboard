@@ -66,9 +66,9 @@ function Row(c: Ctx, t: Task, kindW = 0) {
         </Box>
       ) : null}
       <Box flexGrow={1} flexShrink={1}>
-        {/* Every title bold: the task is what the row is about. Yours says
-            "you" at the right, so bold need not mark it. */}
-        <Text bold wrap="truncate">
+        {/* Titles plain: bold is for the group headings alone. Yours says
+            "you" at the right. */}
+        <Text wrap="truncate">
           {t.title}
           {/* Other labels after the title, grey (see label below). */}
           {(t.labels ?? []).filter(l => !(kindW && kind && l.startsWith('kind='))).map(l => {

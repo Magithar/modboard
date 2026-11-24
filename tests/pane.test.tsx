@@ -242,12 +242,13 @@ test('a kind shows by its value in a column after the ID: feature green, bug red
   await ui.unmount()
 })
 
-test('every task title is bold, yours or not, and yours says you at the right', async ($, on) => {
+test('only the group headings are bold: no task title is, yours or not, and yours says you at the right', async ($, on) => {
   host(on, [task('T-001', 'claimed', 'codex'), task('T-002', 'claimed', 'claude 1'), task('T-003', 'todo')])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
   await ui.press({ key: 'group-not-started' })
-  for (const id of ['T-001', 'T-002', 'T-003']) expect((await ui.find({ type: 'Text', text: `title of ${id}` }))?.props.bold).toBe(true)
+  for (const id of ['T-001', 'T-002', 'T-003']) expect((await ui.find({ type: 'Text', text: `title of ${id}` }))?.props.bold).toBeFalsy()
+  expect((await ui.find({ type: 'Text', text: '▾ In progress' }))?.props.bold).toBe(true)
   expect(await texts(ui)).toContain('you')
   await ui.unmount()
 })
