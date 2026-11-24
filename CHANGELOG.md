@@ -11,13 +11,10 @@ ask for a review.
 
 ### Added
 
-- **A Storage tab on the block list** in Claude Code: which storage block this
-  board uses and whether it will run, the blocks you installed, and your
-  blocks folder. Read-only; installing stays at a terminal.
 - **`board block add / list / remove`** installs your own storage blocks
   into your blocks folder, a file or a package folder, copied so later changes
   in a project don't reach them. Adding shows the code and asks you to type
-  `yes`.
+  `yes`. `list` also says which block this board uses and whether it will run.
 - **`board run T-004 -- <command>`** runs any command on a task you hold and
   keeps the claim alive however long it takes, then exits with the command's
   code. For Codex and other CLI agents running a long build or test suite.

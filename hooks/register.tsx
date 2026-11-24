@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Agent, Reminder, Storage, Task, TaskFile, Weather } from '../types'
+import type { Agent, Reminder, Task, TaskFile, Weather } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import type { CommandState } from './blocks/types'
 import { CAP } from './blocks/board'
@@ -66,9 +66,6 @@ const MOVED_MS = 1_500
 // what changed since.
 const listStart = atom({ plugin: 'modboard', key: 'listStart' } as const, [] as string[])
 const paneBlocks = atom({ plugin: 'modboard', key: 'paneBlocks' } as const, [] as string[])
-// The Storage tab: your installed storage blocks, and which one this board
-// names. Read when the tab opens, never polled.
-const storage = atom({ plugin: 'modboard', key: 'storage' } as const, null as Storage | null)
 
 // The pixel clock's minute, written when it turns, so the clock redraws then
 // and not on every poll; the weather; the alarm times; and the one ringing.
@@ -594,15 +591,6 @@ async function askLocation($: EngineInterface): Promise<string> {
 
 // Done on the list of blocks with the pixel clock ticked asks once, while no
 // location is set and the person hasn't answered before.
-async function readStorage($: EngineInterface) {
-  const out = await cli($, ['block', 'list', '--json']).catch(() => undefined)
-  let next: Storage | null = null
-  try {
-    next = out?.ok ? (JSON.parse(out.text) as Storage) : null
-  } catch {}
-  if (!same(await read($, storage), next)) await update($, storage, () => next)
-}
-
 // What changed on the list since it opened, in one line beside the tabs:
 // "added agents · removed todo · order changed", or '' for nothing.
 function changes(before: string[], after: string[]) {
@@ -1242,24 +1230,12 @@ export const register: Register = (on, options) => {
     // The list of blocks, alone, on two tabs. Blocks: each row ticks its block
     // on or off. Order: the ticked blocks, numbered, with buttons to move them.
     // Done turns the pane to the board, as modBOARD does.
-    if (view === 'blocks' || view === 'order' || view === 'storage') {
+    if (view === 'blocks' || view === 'order') {
       const offered = choosable.filter(b => b.listed !== false)
       const names = offered.map(b => b.name)
       const ticked = chosen.filter(n => names.includes(n))
-      const TABS = [
-        ['blocks', 'Blocks'],
-        ['order', 'Order'],
-        ['storage', 'Storage'],
-      ] as const
-      const tab = (to: (typeof TABS)[number][0], label: string) => (
-        <Button
-          key={`tab-${to}`}
-          plain
-          onPress={async () => {
-            await update($, paneView, () => to)
-            if (to === 'storage') await readStorage($)
-          }}
-        >
+      const tab = (to: 'blocks' | 'order', label: string) => (
+        <Button key={`tab-${to}`} plain onPress={() => update($, paneView, () => to)}>
           <Text bold={view === to} dimColor={view !== to}>
             {label}
           </Text>
@@ -1273,7 +1249,8 @@ export const register: Register = (on, options) => {
       const tabs = (
         <Box flexDirection="column">
           <Box gap={4}>
-            {TABS.map(([to, label]) => tab(to, label))}
+            {tab('blocks', 'Blocks')}
+            {tab('order', 'Order')}
             {changed ? (
               <Box flexGrow={1} justifyContent="flex-end">
                 <Text color="warning" wrap="truncate">
@@ -1282,64 +1259,9 @@ export const register: Register = (on, options) => {
               </Box>
             ) : null}
           </Box>
-          {/* The current tab underlined: its offset is the labels before it, 4 apart. */}
-          <Text color={CAP}>{(() => {
-            const at = TABS.findIndex(([to]) => to === view)
-            const offset = TABS.slice(0, at).reduce((n, [, label]) => n + label.length + 4, 0)
-            return `${' '.repeat(offset)}${'━'.repeat(TABS[at]![1].length)}`
-          })()}</Text>
+          <Text color={CAP}>{view === 'blocks' ? '━━━━━━' : `${' '.repeat(10)}━━━━━`}</Text>
         </Box>
       )
-      // Storage: read-only. Which block keeps this board, what you installed,
-      // and where; installing is done at a terminal (board block add), where a
-      // person reads the code and types yes.
-      if (view === 'storage') {
-        const [st, homeDir] = await Promise.all([read($, storage), read($, home)])
-        const STATUS: Record<string, { text: string; color?: string }> = {
-          'built-in': { text: 'built-in' },
-          installed: { text: 'installed', color: 'success' },
-          'not installed': { text: "not installed: the board won't load", color: 'warning' },
-          path: { text: "a file in this project: it won't run", color: 'error' },
-          outside: { text: "points outside your blocks folder: it won't run", color: 'error' },
-          'not a name': { text: "not a block name: it won't run", color: 'error' },
-          unreadable: { text: 'config.json is not valid JSON', color: 'error' },
-        }
-        const row = (label: string, value: any) => (
-          <Box>
-            <Box width={18} flexShrink={0}>
-              <Text dimColor>{label}</Text>
-            </Box>
-            {value}
-          </Box>
-        )
-        const status = st ? (STATUS[st.board.status] ?? { text: st.board.status }) : null
-        const dir = st ? (homeDir && st.dir.startsWith(`${homeDir}/`) ? `~${st.dir.slice(homeDir.length)}` : st.dir) : ''
-        return (
-          <Box flexDirection="column" paddingX={1} paddingBottom={1}>
-            {tabs}
-            <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-              {!st ? (
-                <Text dimColor>Reading your storage blocks…</Text>
-              ) : (
-                <Box flexDirection="column">
-                  {row(
-                    'this board uses',
-                    <Box flexShrink={1}>
-                      <Text bold>{st.board.uses || '–'}</Text>
-                      {status ? <Text color={status.color} dimColor={!status.color} wrap="truncate">{` · ${status.text}`}</Text> : null}
-                    </Box>,
-                  )}
-                  <Box marginTop={1}>{row('installed', <Text wrap="truncate">{st.blocks.length ? st.blocks.join(' · ') : 'none yet'}</Text>)}</Box>
-                  <Box marginTop={1}>{row('folder', <Text dimColor wrap="truncate">{dir}</Text>)}</Box>
-                  <Box marginTop={1}>
-                    <Text dimColor>{'Install one at a terminal: board block add <file or folder>. It shows the code and asks you first.'}</Text>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          </Box>
-        )
-      }
       if (view === 'blocks') {
         const pad = Math.max(...offered.map(b => b.name.length)) + 2
         return (
