@@ -216,7 +216,7 @@ test('a handoff written with semicolons shows one point a line', async ($, on) =
   await ui.unmount()
 })
 
-test('a kind shows by its value: feature green, bug red, review orange, any other kind grey; other labels keep key=value', async ($, on) => {
+test('a kind shows by its value in a column after the ID: feature green, bug red, review orange, any other kind grey; other labels keep key=value after the title', async ($, on) => {
   host(on, [
     { ...task('T-001', 'todo'), labels: ['kind=feature'] },
     { ...task('T-002', 'todo'), labels: ['kind=bug', 'area=auth'] },
@@ -230,11 +230,28 @@ test('a kind shows by its value: feature green, bug red, review orange, any othe
   expect(shown.some(t => t.includes('kind='))).toBe(false)
   // The label's own Text, not the title line that holds it.
   const colour = async (text: string) => ((await ui.findAll({ type: 'Text' })) as any[]).find(t => t.text === text)?.props
-  expect((await colour('  feature'))?.color).toBe('success')
-  expect((await colour('  bug'))?.color).toBe('error')
-  expect((await colour('  review'))?.color).toBe('#F27238')
-  expect((await colour('  docs'))?.dimColor).toBe(true)
+  expect((await colour('feature'))?.color).toBe('success')
+  expect((await colour('bug'))?.color).toBe('error')
+  expect((await colour('review'))?.color).toBe('#F27238')
+  expect((await colour('docs'))?.dimColor).toBe(true)
   expect((await colour('  area=auth'))?.dimColor).toBe(true)
+  // The kind sits after the ID, the title after the kind.
+  const at = (text: string) => shown.indexOf(text)
+  expect(at('T-002')).toBeLessThan(at('bug'))
+  expect(at('bug')).toBeLessThan(shown.findIndex(t => t.startsWith('title of T-002')))
+  await ui.unmount()
+})
+
+test('a group with no kinds has no kind column, so the board looks as before', async ($, on) => {
+  host(on, [task('T-001', 'todo'), { ...task('T-002', 'todo'), labels: ['area=auth'] }])
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  await ui.press({ key: 'group-not-started' })
+  const widths = ((await ui.findAll({ type: 'Box' })) as any[]).map(b => b.props.width).filter(w => w !== undefined)
+  // Only the ID column (7) on a task row: no kind column beside it.
+  expect(widths.filter((w: number) => w === 7).length).toBe(2)
+  expect(widths.some((w: number) => w === 9 || w === 6)).toBe(false)
+  expect(await texts(ui)).toContain('  area=auth')
   await ui.unmount()
 })
 
@@ -245,7 +262,7 @@ test('a task not ready yet says what it waits on, and labels show beside the tit
   await ui.press({ key: 'group-not-started' })
   const shown = await texts(ui)
   expect(shown).toContain('waits on T-001')
-  expect(shown).toContain('  bug')
+  expect(shown).toContain('bug')
   // Waiting is not a warning: nothing has gone wrong.
   expect((await ui.find({ type: 'Text', text: 'waits on T-001' }))?.props.color).toBeUndefined()
   await ui.unmount()

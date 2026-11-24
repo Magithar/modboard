@@ -7,10 +7,13 @@ modboard was called agent-board until 0.5.0.
 
 ### Changed
 
-- **A task's kind reads at a glance in the pane:** `kind=feature` shows as
-  `feature` in green, `kind=bug` as `bug` in red and `kind=review` as
-  `review` in orange. Any other kind shows its value in grey, and other
-  labels keep `key=value`. `board list` and the tools keep the full label.
+- **A task's kind reads at a glance in the pane**, in a column after the ID
+  (`T-001  feature  Add password reset`): `kind=feature` shows as `feature`
+  in green, `kind=bug` as `bug` in red and `kind=review` as `review` in
+  orange. Any other kind shows its value in grey. The column only appears in
+  a group where some task has a kind, and the handoff under a task lines up
+  with its title. Other labels follow the title as `key=value`. `board list`
+  and the tools keep the full label.
 
 ### Fixed
 

@@ -29,15 +29,25 @@ function status(t: Task, { now, who }: Ctx): { text: string; warn: boolean } {
 // logo's orange; any other kind grey. Other labels keep key=value, in grey.
 // The CLI and the tools keep the full label (kind=bug), since agents filter by it.
 const KINDS: Record<string, string> = { feature: 'success', bug: 'error', review: CAP }
+// A task's kind, the first kind= label, as the pane shows it; or none.
+export const kindOf = (t: Task) => {
+  const k = (t.labels ?? []).find(l => l.startsWith('kind=') && l.length > 5)
+  return k ? label(k) : undefined
+}
+
 export function label(l: string): { text: string; color?: string } {
   const [key, value] = l.split('=')
   if (key !== 'kind' || !value) return { text: l }
   return { text: value, color: KINDS[value] }
 }
 
-function Row(c: Ctx, t: Task) {
+// `kindW`: the width of the kind column after the ID, 0 when the group has no kinds.
+function Row(c: Ctx, t: Task, kindW = 0) {
   const { Box, Text } = c.ui
   const isMine = t.claim?.owner === c.who
+  const kind = kindW ? kindOf(t) : undefined
+  // Handoff points and facts line up under the title.
+  const under = 7 + kindW
   const { text, warn } = status(t, c)
   // Work left partway shows its handoff under the title: what is done and what
   // is left, as the agent wrote it, one point a line where it used semicolons.
@@ -50,11 +60,17 @@ function Row(c: Ctx, t: Task) {
       <Box width={7} flexShrink={0}>
         <Text dimColor>{t.id}</Text>
       </Box>
+      {/* The kind, in its own column after the ID, so the colours line up. */}
+      {kindW ? (
+        <Box width={kindW} flexShrink={0}>
+          {kind ? <Text color={kind.color} dimColor={!kind.color}>{kind.text}</Text> : null}
+        </Box>
+      ) : null}
       <Box flexGrow={1} flexShrink={1}>
         <Text bold={isMine} wrap="truncate">
           {t.title}
-          {/* Labels after the title: what kind of work it is (see label below). */}
-          {(t.labels ?? []).map(l => {
+          {/* Other labels after the title, grey (see label below). */}
+          {(t.labels ?? []).filter(l => !(kindW && kind && l.startsWith('kind='))).map(l => {
             const { text, color } = label(l)
             return (
               <Text color={color} dimColor={!color}>
@@ -81,14 +97,14 @@ function Row(c: Ctx, t: Task) {
           task reads in three even parts: title, handoff, facts. */}
       <Box flexDirection="column" marginTop={1}>
         {points.map(p => (
-          <Box paddingLeft={7}>
+          <Box paddingLeft={under}>
             <Text dimColor wrap="truncate">
               {points.length > 1 ? `· ${p}` : p}
             </Text>
           </Box>
         ))}
       </Box>
-      {Facts(c, t, note!)}
+      {Facts(c, t, note!, under)}
     </Box>
   )
 }
@@ -140,7 +156,7 @@ function Fact(c: Ctx, label: string, value: string) {
 // commit, then the worktree's path, which copies as a cd), and the last check
 // that passed. A check made before the handoff's commit, or before changes
 // left uncommitted, says so. Nothing to say, nothing drawn.
-function Facts(c: Ctx, t: Task, note: Note) {
+function Facts(c: Ctx, t: Task, note: Note, under = 7) {
   const { Box, Button, Text } = c.ui
   const where = note.where
   const check = lastCheck(t)
@@ -154,7 +170,7 @@ function Facts(c: Ctx, t: Task, note: Note) {
   }
   const copied = c.copied === t.id
   return (
-    <Box flexDirection="column" marginTop={1} paddingLeft={7}>
+    <Box flexDirection="column" marginTop={1} paddingLeft={under}>
       {where && Fact(c, 'where', branchOf(where))}
       {where && (
         <Box key={`path-${t.id}`} flexDirection="column" marginTop={1}>
@@ -168,14 +184,14 @@ function Facts(c: Ctx, t: Task, note: Note) {
                   folder is what tells them apart. Underlined under the pointer. */}
               <Button key={`copy-${t.id}`} plain onPress={(press: { surface: string }) => c.act.copyPath(t.id, where.worktree, press.surface)}>
                 <Text color={copied ? 'success' : undefined} wrap="truncate" hover={{ underline: true }}>
-                  {copied ? '✓ copied' : cutStart(tilde(where.worktree, c.home), c.width - INDENT)}
+                  {copied ? '✓ copied' : cutStart(tilde(where.worktree, c.home), c.width - INDENT - (under - 7))}
                 </Text>
               </Button>
             </Box>
           </Box>
         </Box>
       )}
-      {where?.files?.length ? <Box marginTop={1}>{Fact(c, 'files', fileList(where.files, c.width - INDENT))}</Box> : null}
+      {where?.files?.length ? <Box marginTop={1}>{Fact(c, 'files', fileList(where.files, c.width - INDENT - (under - 7)))}</Box> : null}
       {/* A blank line between the rows, so each reads on its own. */}
       {check && <Box marginTop={where ? 1 : 0}>{Fact(c, 'check', passed)}</Box>}
     </Box>
@@ -214,6 +230,10 @@ function Group(c: Ctx, name: GroupName, list: Task[], last = false) {
   // Done only grows: the newest few, then how many more. The rest is drawn
   // nowhere, so a board with thousands done opens as fast as a new one.
   const shown = name === 'done' ? list.slice(0, DONE_SHOWN) : list
+  // A kind column after the ID only in a group where some task has a kind: as
+  // wide as its longest kind, then a gap. A board without kinds looks as before.
+  const kinds = shown.map(t => kindOf(t)?.text.length ?? 0)
+  const kindW = Math.max(0, ...kinds) ? Math.max(...kinds) + 2 : 0
   const more = list.length - shown.length
   return (
     <Box flexDirection="column">
@@ -229,7 +249,7 @@ function Group(c: Ctx, name: GroupName, list: Task[], last = false) {
         // reads as its own block; the last leaves that to what follows the pane.
         <Box flexDirection="column" paddingLeft={2} marginTop={1} marginBottom={last ? 0 : 1}>
           {/* Work left partway carries its handoff, so each task there sits apart. */}
-          {shown.map((t, i) => (name === 'partway' && i > 0 ? <Box marginTop={1}>{Row(c, t)}</Box> : Row(c, t)))}
+          {shown.map((t, i) => (name === 'partway' && i > 0 ? <Box marginTop={1}>{Row(c, t, kindW)}</Box> : Row(c, t, kindW)))}
           {more > 0 ? <Text dimColor>{`… ${more} more: board list --all`}</Text> : null}
         </Box>
       )}

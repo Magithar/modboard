@@ -168,8 +168,10 @@ board done T-001 --note "..." --review    # also adds a review task, never hande
 board tail                                # follow the board as it changes; --json for scripts
 ```
 
-In the pane, a kind shows by its value alone, coloured: `feature` in green,
-`bug` in red, `review` in orange; any other kind, and any other label, in grey.
+In the pane, a kind shows by its value alone, in a column after the ID:
+`feature` in green, `bug` in red, `review` in orange, any other kind in grey.
+The column is only there in a group where some task has a kind. Other labels
+follow the title, in grey.
 `board list` and the tools keep the full `kind=bug`, since agents filter by it.
 
 `board tail` prints one line an event (`14:05  claude 1  claimed T-004`) until
