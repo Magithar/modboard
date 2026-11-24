@@ -47,8 +47,8 @@ const taskfileOpen = atom({ plugin: 'modboard', key: 'taskfileOpen' } as const, 
 const paneOpen = atom({ plugin: 'modboard', key: 'paneOpen' } as const, false)
 const taskfileTier = atom({ plugin: 'modboard', key: 'taskfileTier' } as const, '')
 const groupsOpen = atom({ plugin: 'modboard', key: 'groupsOpen' } as const, {} as Record<string, boolean>)
-// On the Blocks tab, a group whose ▸ was pressed to open or fold it. A group
-// with no entry opens while it's ticked; ticking or unticking it clears this.
+// On the Blocks tab, the groups whose ▶ was pressed to open their rows. Only
+// the arrow opens or folds them: ticking a group leaves this alone.
 const listOpen = atom({ plugin: 'modboard', key: 'listOpen' } as const, {} as Record<string, boolean>)
 // The task whose worktree path was just copied, for a moment; and the home
 // directory, so a path reads ~/code/app.
@@ -255,7 +255,6 @@ async function toggleReady($: EngineInterface, id: string) {
 // The limits row on the Blocks tab: with any bar shown, hides them all; with
 // none, shows them all, side by side at the end.
 async function toggleBars($: EngineInterface, bars: string[]) {
-  await update($, listOpen, ({ limits: _, ...rest }) => rest)
   const now = await read($, paneBlocks)
   const names = now.some(n => bars.includes(n)) ? now.filter(n => !bars.includes(n)) : [...now, ...bars]
   await update($, paneBlocks, () => names)
@@ -264,7 +263,6 @@ async function toggleBars($: EngineInterface, bars: string[]) {
 }
 
 async function toggleBlock($: EngineInterface, name: string) {
-  if (name === 'project') await update($, listOpen, ({ project: _, ...rest }) => rest)
   const now = await read($, paneBlocks)
   const names = now.includes(name) ? now.filter(n => n !== name) : [...now, name]
   // The tick changes first; saving follows.
@@ -1362,23 +1360,23 @@ export const register: Register = (on, options) => {
         // Grouped as the pane draws them: the bars under one `limits` row, and
         // the ready-made blocks and your own command blocks under `project`.
         // A group's row shows or hides the group; the rows under it pick
-        // what's in it. They open while the group is ticked, and its ▸ opens
-        // or folds them either way.
+        // what's in it. Only the group's ▶ opens or folds them; its tick
+        // never does.
         const [ready, unfolded] = await Promise.all([read($, readyList), read($, listOpen)])
         const bars = offered.filter(b => BARS.has(b.name))
         const pad = Math.max(...offered.map(b => b.name.length), ...ready.map(b => b.id.length), ...commandNames.map(n => n.length), 'limits'.length) + 2
-        // Every top row starts with a two-column gutter; a group's holds its
-        // ▸ (folded) or ▾ (open), pressed to open or fold the rows under it
-        // without ticking anything, so what a group holds can be seen first.
+        // Every top row starts with a three-column gutter; a group's holds its
+        // ▶ (folded) or ▼ (open), the larger arrows, pressed to open or fold
+        // the rows under it, so what a group holds can be seen first.
         const row = (key: string, ticked: boolean, name: string, about: string, depth: number, press?: () => unknown, fold?: { open: boolean; group: string }) => {
           const text = `${ticked ? '[x]' : '[ ]'} ${name.padEnd(pad - depth * 2)}${about}`
           return (
-            <Box key={`row-${key}`} paddingLeft={depth * 4}>
+            <Box key={`row-${key}`} paddingLeft={depth * 5}>
               {depth === 0 ? (
-                <Box width={2} flexShrink={0}>
+                <Box width={3} flexShrink={0}>
                   {fold ? (
                     <Button key={`fold-${fold.group}`} plain onPress={() => update($, listOpen, all => ({ ...all, [fold.group]: !fold.open }))}>
-                      <Text>{fold.open ? '▾' : '▸'}</Text>
+                      <Text>{fold.open ? '▼' : '▶'}</Text>
                     </Button>
                   ) : null}
                 </Box>
@@ -1400,25 +1398,18 @@ export const register: Register = (on, options) => {
             </Box>
           )
         }
-        const isOpen = (group: string, ticked: boolean) => unfolded[group] ?? ticked
         const rows: any[] = []
         for (const b of offered) {
           if (BARS.has(b.name)) {
             if (b !== bars[0]) continue
             const any = bars.some(x => chosen.includes(x.name))
-            const open = isOpen('limits', any)
+            const open = !!unfolded.limits
             rows.push(row('pick-limits', any, 'limits', 'context and usage bars', 0, () => toggleBars($, bars.map(x => x.name)), { open, group: 'limits' }))
-            if (open) for (const x of bars) rows.push(
-                // Unticking the last bar unticks limits; its rows stay open.
-                row(`pick-${x.name}`, chosen.includes(x.name), x.name, x.about ?? '', 1, async () => {
-                  await update($, listOpen, all => ({ ...all, limits: true }))
-                  await toggleBlock($, x.name)
-                }),
-              )
+            if (open) for (const x of bars) rows.push(row(`pick-${x.name}`, chosen.includes(x.name), x.name, x.about ?? '', 1, () => toggleBlock($, x.name)))
             continue
           }
           const kids = b.name === 'project' && ready.length + commandNames.length > 0
-          const open = kids && isOpen('project', chosen.includes('project'))
+          const open = kids && !!unfolded.project
           rows.push(row(`pick-${b.name}`, chosen.includes(b.name), b.name, b.about ?? '', 0, () => toggleBlock($, b.name), kids ? { open, group: 'project' } : undefined))
           if (open) {
             for (const r of ready) rows.push(row(`pick-ready-${r.id}`, r.enabled, r.id, r.about, 1, () => toggleReady($, r.id)))

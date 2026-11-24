@@ -1073,9 +1073,9 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   // Only the list: no board under it.
   expect(list[0]).toBe('Blocks')
   expect(await pane.find({ key: 'group-in-progress' })).toBeUndefined()
-  // The default pane: work, todo, and the bars (the limits row, compact and
-  // usage under it) ticked; the rest not.
-  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(5)
+  // The default pane: work, todo and the bars ticked; the rest not. The
+  // bars' own rows are folded under limits until its ▶ is pressed.
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(3)
   expect(list.some(t => t.startsWith('[x] limits'))).toBe(true)
   expect(list).toContain('[ ] agents       who is live')
   // What the band or another block shows already is left off the list.
@@ -1087,7 +1087,7 @@ test('blocks opens the pane at the list of blocks alone; ticks change the board;
   await pane.press({ key: 'pick-agents' })
   await pane.press({ key: 'pick-work' })
   list = (await texts(pane)) as string[]
-  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(5)
+  expect(list.filter(t => t.startsWith('[x] '))).toHaveLength(3)
   // There is no Done: each tick is saved as it is made. The logo, modBOARD, shows the board: work gone, agents there.
   expect(await pane.find({ key: 'blocks-done' })).toBeFalsy()
   await band.press({ key: 'board' })
@@ -1171,10 +1171,11 @@ test('blocks of your own are on the list under project, which shows them under a
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const listed = (await texts(pane)) as string[]
   expect(listed.some(t => t.startsWith('[ ] project'))).toBe(true)
-  // Unticked, its rows are folded away.
+  // Folded, its rows are hidden.
   expect(listed.some(t => t.startsWith('[x] ci'))).toBe(false)
   await pane.press({ key: 'pick-project' })
-  // Ticked, your own block shows under it, set in /config, so not pressable here.
+  await pane.press({ key: 'fold-project' })
+  // Opened, your own block shows under it, set in /config, so not pressable here.
   expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] ci') && t.endsWith('your own · /config'))).toBe(true)
   expect(await pane.find({ key: 'mine-ci' })).toBeUndefined()
   await band.press({ key: 'board' })
@@ -1774,6 +1775,7 @@ test('at the right of the tabs, in yellow, what was saved: added, removed, order
   const note = async () => ((await pane.findAll({ type: 'Text' })) as any[]).find(t => t.props.color === 'warning')
   expect(await note()).toBeUndefined()
   await pane.press({ key: 'pick-agents' })
+  await pane.press({ key: 'fold-limits' })
   await pane.press({ key: 'pick-usage' })
   expect((await note())?.text).toBe('saved · added agents · removed usage')
   await pane.press({ key: 'tab-order' })
@@ -1966,8 +1968,9 @@ test('ready-made blocks are listed on the Blocks tab; a tick turns one on, puts 
   const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  // Project ticked, its rows open: the ready-made blocks, all off.
+  // Project ticked and opened: the ready-made blocks, all off.
   await pane.press({ key: 'pick-project' })
+  await pane.press({ key: 'fold-project' })
   const shown = (await texts(pane)) as string[]
   expect(shown.some(t => t.startsWith('[ ] ci') && t.includes('latest GitHub Actions run'))).toBe(true)
   await pane.press({ key: 'pick-ready-ci' })
@@ -2028,36 +2031,39 @@ test('the Blocks tab groups as the pane does: limits over the bars, project over
   await band.press({ key: 'blocks' })
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   let list = (await texts(pane)) as string[]
-  // The children come right after their group's row.
   const at = (start: string) => list.findIndex(t => t.startsWith(start))
-  expect([at('[x] usage'), at('[x] compact')].sort((a, b) => a - b)).toEqual([at('[x] limits') + 1, at('[x] limits') + 2])
-  // project is unticked: its rows are folded away, its arrow says ▸.
+  // Every group starts folded, with a ▶, whether ticked or not.
+  expect(await label(pane, 'fold-limits')).toBe('▶')
+  expect(await label(pane, 'fold-project')).toBe('▶')
+  expect(at('[x] usage')).toBe(-1)
   expect(at('[x] branch')).toBe(-1)
-  expect(await label(pane, 'fold-project')).toBe('▸')
-  expect(await label(pane, 'fold-limits')).toBe('▾')
-  // The arrow opens them without ticking project, and folds them again.
+  // The arrow opens the rows, right after their group's row, and says ▼.
+  await pane.press({ key: 'fold-limits' })
+  list = (await texts(pane)) as string[]
+  expect([at('[x] usage'), at('[x] compact')].sort((a, b) => a - b)).toEqual([at('[x] limits') + 1, at('[x] limits') + 2])
+  expect(await label(pane, 'fold-limits')).toBe('▼')
+  // It opens project's rows without ticking project.
   await pane.press({ key: 'fold-project' })
   list = (await texts(pane)) as string[]
   expect(at('[x] branch')).toBe(at('[ ] project') + 1)
-  expect(await label(pane, 'fold-project')).toBe('▾')
-  await pane.press({ key: 'fold-project' })
-  list = (await texts(pane)) as string[]
-  expect(at('[x] branch')).toBe(-1)
-  // Ticking it opens them.
+  expect(at('[ ] ci')).toBe(at('[ ] project') + 2)
+  // Ticking or unticking a group leaves its rows as they are.
   await pane.press({ key: 'pick-project' })
   list = (await texts(pane)) as string[]
   expect(at('[x] branch')).toBe(at('[x] project') + 1)
-  expect(at('[ ] ci')).toBe(at('[x] project') + 2)
-  // limits hides both bars, and folds their rows away; ticked again, both come back.
   await pane.press({ key: 'pick-limits' })
   expect((kept.get('paneBlocks') as any).blocks).toEqual(['work', 'todo', 'project'])
-  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[ ] usage') || t.startsWith('[x] usage'))).toBe(false)
+  list = (await texts(pane)) as string[]
+  expect(list.some(t => t.startsWith('[ ] usage'))).toBe(true)
   await pane.press({ key: 'pick-limits' })
   const back = (kept.get('paneBlocks') as any).blocks as string[]
   expect(back.slice(0, 3)).toEqual(['work', 'todo', 'project'])
   expect([...back.slice(3)].sort()).toEqual(['compact', 'usage'])
+  // The arrow folds them again.
+  await pane.press({ key: 'fold-project' })
   list = (await texts(pane)) as string[]
-  expect(list.some(t => t.startsWith('[x] usage'))).toBe(true)
+  expect(at('[x] branch')).toBe(-1)
+  expect(await label(pane, 'fold-project')).toBe('▶')
 })
 
 test('with the Project group off the pane, its blocks never run; shown again, they run at once', { options: { pane: 'work' } } as any, async ($, on) => {
