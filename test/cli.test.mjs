@@ -216,6 +216,21 @@ test('done needs a note saying how the task was verified, against its acceptance
   assert.equal(b.json(['show', 'T-001']).notes.at(-1).text, 'VERIFIED: ran ./greet.sh, got hello')
 })
 
+test('a note or handoff that already starts with the board\'s marker keeps one, not two', () => {
+  const b = fresh()
+  b.run(['add', 'one'])
+  b.run(['add', 'two'])
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  b.run(['release', 'T-001', '--as', 'alice', '--handoff', 'HANDOFF: half done'])
+  assert.equal(b.json(['show', 'T-001']).notes.at(-1).text, 'HANDOFF: half done')
+  b.run(['claim', 'T-002', '--as', 'alice'])
+  assert.equal(b.run(['done', 'T-002', '--as', 'alice', '--note', 'verified: tests pass']).code, 0)
+  assert.equal(b.json(['show', 'T-002']).notes.at(-1).text, 'VERIFIED: tests pass')
+  // A note that is only the marker says nothing, so done still asks for one.
+  b.run(['claim', 'T-001', '--as', 'alice'])
+  assert.equal(b.run(['done', 'T-001', '--as', 'alice', '--note', 'VERIFIED:']).code, 2)
+})
+
 test('release-all frees every task an ending session holds, with a handoff', () => {
   const b = fresh()
   for (const title of ['one', 'two', 'three']) b.run(['add', title])

@@ -3,6 +3,18 @@
 All notable changes to modboard. Versions follow [semantic versioning](https://semver.org/).
 modboard was called agent-board until 0.5.0.
 
+## 0.11.1 — 2026-11-25
+
+### Fixed
+
+- **A done note or handoff that already says `VERIFIED:` or `HANDOFF:`
+  shows it once.** The board writes the word itself, so
+  `board done --note "VERIFIED: tests pass"` used to read
+  `VERIFIED: VERIFIED: tests pass`. A note that is only the word still
+  counts as no note.
+- **A handoff's points line up with its title's words**, past the `▾`
+  before it, as a group's rows sit under its heading.
+
 ## 0.11.0 — 2026-11-25
 
 ### Changed

@@ -84,8 +84,9 @@ const task = (id, kind, title, who, { warn, handoff } = {}) =>
     [['  '], [id, 'dim'], ['  '], [(kind ?? '').padEnd(9), kind ? KIND[kind] : ''], ...(handoff ? [[`${handoff === 'open' ? '▾' : '▸'} ${title}`, 'bold']] : [[title]])],
     [[who, warn ? 'warn' : 'dim']],
   )
-// Under a handoff, lined up with the title: its points, then its facts.
-const UNDER = ' '.repeat(2 + 7 + 9)
+// Under a handoff, lined up with the title's words past its arrow: its
+// points, then its facts.
+const UNDER = ' '.repeat(2 + 7 + 9 + 2)
 const point = text => line([[UNDER], [`· ${text}`, 'dim']])
 const fact = (label, value) => line([[UNDER], [label.padEnd(7), 'dim'], [value]])
 // A Limits row: label, a 10-cell bar, the figure, then what goes with it.

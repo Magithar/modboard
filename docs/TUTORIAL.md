@@ -328,16 +328,16 @@ waiting or in progress, it disappears.
  ▾ Unfinished · 1
 
    T-005  ▾ Ghost task                          claude 3
-          · layout done
-          · saving isn't wired yet
+            · layout done
+            · saving isn't wired yet
 
-          where  settings @ 4f2a9c1, uncommitted changes
+            where  settings @ 4f2a9c1, uncommitted changes
 
-          path   ~/code/app-settings
+            path   ~/code/app-settings
 
-          files  src/settings.tsx, src/settings.css
+            files  src/settings.tsx, src/settings.css
 
-          check  npm test passed at 4f2a9c1, before uncommitted changes
+            check  npm test passed at 4f2a9c1, before uncommitted changes
 
  ▸ Not started · 12
 

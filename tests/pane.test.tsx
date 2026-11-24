@@ -213,6 +213,11 @@ test('a handoff written with semicolons shows one point a line', async ($, on) =
   const shown = await texts(ui)
   expect(shown).toContain('· layout done in src/settings.tsx')
   expect(shown).toContain('· saving is not wired yet')
+  // The points start under the title's words, past its arrow ("▾ "): the
+  // ID's 7 columns, then the arrow's 2.
+  const pads = ((await ui.findAll({ type: 'Box' })) as any[]).map(x => x.props.paddingLeft).filter(Boolean)
+  expect(pads).toContain(9)
+  expect(pads).not.toContain(7)
   await ui.unmount()
 })
 

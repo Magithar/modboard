@@ -48,8 +48,9 @@ export function label(l: string): { text: string; color?: string } {
 function Row(c: Ctx, t: Task, kindW = 0) {
   const { Box, Button, Text } = c.ui
   const kind = kindW ? kindOf(t) : undefined
-  // Handoff points and facts line up under the title.
-  const under = 7 + kindW
+  // Handoff points and facts line up under the title's text, past its arrow
+  // ("▾ "), as a group's rows sit under its heading's words.
+  const under = 7 + kindW + 2
   const { text, warn } = status(t, c)
   // Work left partway shows its handoff under the title: what is done and what
   // is left, as the agent wrote it, one point a line where it used semicolons.
