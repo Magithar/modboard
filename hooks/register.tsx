@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Agent, Reminder, Task, TaskFile, Weather } from '../types'
+import type { Agent, ReadyBlock, ReadyValue, Reminder, Task, TaskFile, Weather } from '../types'
 import { BLOCKS, type BandForm, type Block, type Ctx } from './blocks'
 import type { CommandState } from './blocks/types'
 import { CAP } from './blocks/board'
@@ -66,6 +66,10 @@ const MOVED_MS = 1_500
 // what changed since.
 const listStart = atom({ plugin: 'modboard', key: 'listStart' } as const, [] as string[])
 const paneBlocks = atom({ plugin: 'modboard', key: 'paneBlocks' } as const, [] as string[])
+// Ready-made blocks (board blocks): the registry as the CLI reports it, with
+// which are on; and each one's last line, for this session's project.
+const readyList = atom({ plugin: 'modboard', key: 'readyList' } as const, [] as ReadyBlock[])
+const readyValues = atom({ plugin: 'modboard', key: 'readyValues' } as const, {} as Record<string, ReadyValue>)
 
 // The pixel clock's minute, written when it turns, so the clock redraws then
 // and not on every poll; the weather; the alarm times; and the one ringing.
@@ -180,6 +184,68 @@ async function loadPane($: EngineInterface) {
 
 // A row on the list of blocks pressed: ticked, the block goes last, below
 // the others; unticked, it leaves the pane. Kept between sessions.
+// ── Ready-made blocks ────────────────────────────────────────────────────────
+// The registry and which blocks are on come from the CLI (board blocks), the
+// same list every agent reads. Each block that's on runs through the CLI in
+// this session's folder, on its own schedule, never twice at once; one that's
+// off never runs. A command block of your own with the same name wins, and
+// the ready-made one is left out.
+const READY_TICK_MS = 5_000
+const readyRunning = new Set<string>()
+const readyLastRun = new Map<string, number>()
+
+async function loadReady($: EngineInterface) {
+  const out = await cli($, ['blocks', '--all', '--json']).catch(() => undefined)
+  let list: ReadyBlock[] = []
+  try {
+    list = out?.ok ? ((JSON.parse(out.text) as { all: ReadyBlock[] }).all ?? []).filter(b => !commandNames.includes(b.id)) : []
+  } catch {}
+  if (!same(await read($, readyList), list)) await update($, readyList, () => list)
+  // A block turned off drops its line.
+  const on = new Set(list.filter(b => b.enabled).map(b => b.id))
+  const values = await read($, readyValues)
+  if (Object.keys(values).some(id => !on.has(id))) await update($, readyValues, all => Object.fromEntries(Object.entries(all).filter(([id]) => on.has(id))))
+}
+
+async function runReady($: EngineInterface, force = false) {
+  const now = await $.clock.now()
+  const due = (await read($, readyList)).filter(
+    b => b.enabled && !readyRunning.has(b.id) && (force || now - (readyLastRun.get(b.id) ?? 0) >= b.every),
+  )
+  await Promise.all(
+    due.map(async b => {
+      readyRunning.add(b.id)
+      readyLastRun.set(b.id, now)
+      try {
+        const out = await cli($, ['blocks', 'run', b.id, '--json'])
+        let value: ReadyValue = { state: 'error', text: reason(out.text) || 'the block failed', at: await $.clock.now() }
+        try {
+          if (out.ok) value = { ...(JSON.parse(out.text) as Omit<ReadyValue, 'at'>), at: await $.clock.now() }
+        } catch {}
+        const before = (await read($, readyValues))[b.id]
+        if (!before || before.state !== value.state || before.text !== value.text) await update($, readyValues, all => ({ ...all, [b.id]: value }))
+      } finally {
+        readyRunning.delete(b.id)
+      }
+    }),
+  )
+}
+
+// A ready-made block's row on the Blocks tab, pressed: on or off, for every
+// agent (your own settings). Turned on, it shows under Checks, which the pane
+// gains if it hadn't it, and it runs at once.
+async function toggleReady($: EngineInterface, id: string) {
+  const on = !(await read($, readyList)).find(b => b.id === id)?.enabled
+  const out = await cli($, ['blocks', on ? 'on' : 'off', id])
+  if (!out.ok) return void $.ui.toast(`board: ${reason(out.text) || `could not turn ${id} ${on ? 'on' : 'off'}`}`)
+  await loadReady($)
+  if (on) {
+    const shown = await read($, paneBlocks)
+    if (!shown.includes('checks')) await toggleBlock($, 'checks')
+    await runReady($, true)
+  }
+}
+
 async function toggleBlock($: EngineInterface, name: string) {
   const now = await read($, paneBlocks)
   const names = now.includes(name) ? now.filter(n => n !== name) : [...now, name]
@@ -942,7 +1008,7 @@ async function copyText($: EngineInterface, key: string, text: string, surface: 
 // Everything a drawing reads, asked for at once: a pane is drawn again on
 // every wheel tick, so reads one after another would slow scrolling.
 async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ctx['act']): Promise<Ctx> {
-  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, commandStateNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow, movedNow, problemNow] =
+  const [now, who, tasksNow, agentsNow, usageNow, modelNow, effortNow, customNow, commandStateNow, taskfileNow, taskfileOpenNow, taskfileTierNow, groupsOpenNow, homeNow, copiedNow, weatherNow, alarmsNow, ringingNow, remindersNow, locatedNow, movedNow, problemNow, readyNow, readyValuesNow] =
     await Promise.all([
       $.clock.now(),
       read($, me),
@@ -966,6 +1032,8 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
       read($, located),
       read($, moved),
       read($, boardError),
+      read($, readyList),
+      read($, readyValues),
       // Read so a drawing of the clock redraws when the minute turns.
       read($, minute),
     ])
@@ -996,6 +1064,8 @@ async function context($: EngineInterface, width: number, ui: Ctx['ui'], act: Ct
     located: locatedNow,
     moved: movedNow,
     problem: problemNow,
+    ready: readyNow.filter(b => b.enabled),
+    readyValues: readyValuesNow,
     act,
   }
 }
@@ -1095,6 +1165,13 @@ export const register: Register = (on, options) => {
       void runCommands($, commands).catch(() => {})
       $.clock.every(COMMAND_MS, () => runCommands($, commands).catch(() => {}))
     }
+    // Ready-made blocks: the list, then each one that's on, on its own
+    // schedule. The list is read again now and then, so one turned on or off
+    // through the CLI shows here too. Not awaited: nothing here may hold up
+    // the session's start.
+    void loadReady($).then(() => runReady($)).catch(() => {})
+    $.clock.every(READY_TICK_MS, () => runReady($).catch(() => {}))
+    $.clock.every(60_000, () => loadReady($).catch(() => {}))
     // Presence: keeps this session's name while it is open, so no other
     // session can take it; leases stay tied to work (see tool.call below).
     $.clock.every(PRESENCE_MS, async () => {
@@ -1263,7 +1340,8 @@ export const register: Register = (on, options) => {
         </Box>
       )
       if (view === 'blocks') {
-        const pad = Math.max(...offered.map(b => b.name.length)) + 2
+        const ready = await read($, readyList)
+        const pad = Math.max(...offered.map(b => b.name.length), ...ready.map(b => b.id.length)) + 2
         return (
           // A blank line under the last row, on both tabs.
           <Box flexDirection="column" paddingX={1} paddingBottom={1}>
@@ -1276,6 +1354,17 @@ export const register: Register = (on, options) => {
                         bar: ticked rows orange, the rest grey. */}
                     <Text color={chosen.includes(b.name) ? CAP : undefined} dimColor={!chosen.includes(b.name)} wrap="truncate">
                       {`${chosen.includes(b.name) ? '[x]' : '[ ]'} ${b.name.padEnd(pad)}${b.about ?? ''}`}
+                    </Text>
+                  </Button>
+                </Box>
+              ))}
+              {/* Ready-made blocks, after the rest: ticked, one runs and shows
+                  under Checks, for every agent; unticked, it never runs. */}
+              {ready.map(b => (
+                <Box>
+                  <Button key={`pick-ready-${b.id}`} plain onPress={() => toggleReady($, b.id)}>
+                    <Text color={b.enabled ? CAP : undefined} dimColor={!b.enabled} wrap="truncate">
+                      {`${b.enabled ? '[x]' : '[ ]'} ${b.id.padEnd(pad)}${b.about}`}
                     </Text>
                   </Button>
                 </Box>

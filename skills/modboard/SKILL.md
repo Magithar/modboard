@@ -46,6 +46,13 @@ Anything else: `export BOARD_AGENT=<your name>` once, or pass `--as <name>`.
    - Stopping partway: `board release T-004 --handoff "done X; left Y; see Z"`.
      The next agent starts from your handoff.
 
+## What else is on the board
+
+`board blocks` prints the ready-made blocks the person turned on: the branch,
+working-tree changes, CI, pull requests and the last recorded test. Read it to
+see where the project stands. Turning blocks on or off is the person's choice;
+leave it to them.
+
 ## Rules
 
 - Never work on a task another agent holds (exit 6 on claim). Take another.

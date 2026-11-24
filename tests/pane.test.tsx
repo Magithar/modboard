@@ -29,11 +29,12 @@ function host(
     taskfile = { file: null, items: [] },
     broken = { now: false },
     untrusted = false,
+    ready,
     home,
     live = [{ name: 'codex', lastSeen: '' }],
     time,
     shell,
-  }: { untrusted?: boolean; time?: { now: number }; shell?: { failing: Set<string> }; live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
+  }: { ready?: { list: any[]; values?: Record<string, any>; hang?: Set<string> }; untrusted?: boolean; time?: { now: number }; shell?: { failing: Set<string> }; live?: { name: string; lastSeen: string }[]; home?: string; agent?: string; taken?: string[]; effort?: string; envEffort?: string; modelEffort?: string; taskfile?: TaskFile; broken?: { now: boolean } } = {},
 ) {
   const calls: string[][] = []
   // Claude Code's own /model and /effort, which the model and effort blocks run.
@@ -65,6 +66,21 @@ function host(
   on('process.run', (_$, e: any) => {
     const argv: string[] = [...e.argv]
     calls.push(argv)
+    // Ready-made blocks (board blocks): the registry, on/off, and one block's line.
+    if (argv[2] === 'blocks') {
+      const ok = (stdout: string) => ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } })
+      const list = ready?.list ?? []
+      if (argv[3] === '--all') return ok(JSON.stringify({ all: list }))
+      if (argv[3] === 'on' || argv[3] === 'off') {
+        const b = list.find(x => x.id === argv[4])
+        if (b) b.enabled = argv[3] === 'on'
+        return ok(JSON.stringify({ id: argv[4], enabled: argv[3] === 'on' }))
+      }
+      if (argv[3] === 'run') {
+        if (ready?.hang?.has(argv[4]!)) return new Promise(() => {}) as any
+        return ok(JSON.stringify(ready?.values?.[argv[4]!] ?? { id: argv[4], state: 'ok', text: `${argv[4]} line` }))
+      }
+    }
     // A board that names a storage block it may not run: every board command exits
     // 12, and one with --json says why as JSON on stdout, as the CLI does.
     if (untrusted && argv[1]?.endsWith('board.mjs')) {
@@ -1254,7 +1270,7 @@ test('checks with no blocks of your own says where to add one', { options: { pan
   host(on, [])
   await $.session.start(START)
   const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
-  expect(await texts(pane)).toContain('No command blocks yet: add one under Your own blocks in /config.')
+  expect(await texts(pane)).toContain('No blocks on yet: tick one on the blocks list (branch, ci, prs…), or add your own under Your own blocks in /config.')
 })
 
 test('agents is one line: Live, then a green dot for each agent seen lately and a grey one for the quiet', { options: { pane: 'agents' } } as any, async ($, on) => {
@@ -1928,4 +1944,69 @@ test('the board error rows copy their file paths, like a handoff path; nothing o
   pass()
   await second
   await ui.unmount()
+})
+
+// Ready-made blocks: the registry entry a host reports.
+const readyDef = (id: string, enabled = false, about = `about ${id}`) => ({ id, title: id, about, needs: ['git'], every: 10_000, timeout: 5_000, source: 'built-in', enabled })
+
+test('ready-made blocks are listed on the Blocks tab; a tick turns one on, puts Checks on the pane and shows its line', { options: { band: 'summary,board', pane: 'work' } } as any, async ($, on) => {
+  const calls = host(on, [], { ready: { list: [readyDef('branch', false, 'current git branch'), readyDef('ci', false, 'latest GitHub Actions run')], values: { ci: { id: 'ci', state: 'ok', text: 'success · CI · 2 min ago' } } } })
+  const kept = store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start(START)
+  await settle()
+  // Nothing is on, so nothing has run.
+  expect(calls.filter(argv => argv[2] === 'blocks' && argv[3] === 'run')).toEqual([])
+  const band = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...BAND } as any)
+  await band.press({ key: 'blocks' })
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const shown = (await texts(pane)) as string[]
+  expect(shown.some(t => t.startsWith('[ ] ci') && t.includes('latest GitHub Actions run'))).toBe(true)
+  await pane.press({ key: 'pick-ready-ci' })
+  await settle()
+  expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'on' && argv[4] === 'ci')).toBe(true)
+  expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'run' && argv[4] === 'ci')).toBe(true)
+  expect(calls.some(argv => argv[2] === 'blocks' && argv[3] === 'run' && argv[4] === 'branch')).toBe(false)
+  expect(((await texts(pane)) as string[]).some(t => t.startsWith('[x] ci'))).toBe(true)
+  expect((kept.get('paneBlocks') as any).blocks).toContain('checks')
+  // The board shows it under Checks, green for a success.
+  await band.press({ key: 'board' })
+  const line = await pane.find({ type: 'Text', text: 'success · CI · 2 min ago' })
+  expect(line?.props.color).toBe('success')
+})
+
+test('a ready block that needs something says so in yellow; a run still going is never started twice', { options: { pane: 'checks' } } as any, async ($, on) => {
+  const calls = host(on, [], { ready: { list: [readyDef('prs', true), readyDef('ci', true)], values: { prs: { id: 'prs', state: 'auth', text: 'gh not signed in · run gh auth login' } }, hang: new Set(['ci']) } })
+  let tick = async () => {}
+  on('clock.every', (_$, e: any) => (e.ms === 5_000 ? new Promise(resolve => (tick = async () => resolve({ value: undefined }))) : new Promise(() => {})) as any)
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  const warn = await pane.find({ type: 'Text', text: 'gh not signed in · run gh auth login' })
+  expect(warn?.props.color).toBe('warning')
+  // ci hangs: its line waits, prs still shows, and ci isn't started again.
+  expect(await texts(pane)).toContain('waiting for its first run')
+  await tick()
+  await settle()
+  expect(calls.filter(argv => argv[2] === 'blocks' && argv[3] === 'run' && argv[4] === 'ci').length).toBe(1)
+})
+
+test('a command block of your own named like a ready-made one wins, and the ready-made one is left out', { options: { blocks: '{"ci": "echo mine"}', pane: 'checks' } } as any, async ($, on) => {
+  const calls = host(on, [], { ready: { list: [readyDef('ci', true), readyDef('branch', true)] } })
+  await $.session.start(START)
+  await settle()
+  expect(calls.filter(argv => argv[2] === 'blocks' && argv[3] === 'run').map(argv => argv[4])).toEqual(['branch'])
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  expect(await texts(pane)).toContain('mine')
+})
+
+test('check lines are grey unless their colour says something: nothing under Checks is pressed', { options: { blocks: '{"mine": "echo hello"}', pane: 'checks' } } as any, async ($, on) => {
+  host(on, [], { ready: { list: [readyDef('branch', true), readyDef('ci', true)], values: { branch: { id: 'branch', state: 'ok', text: 'main' }, ci: { id: 'ci', state: 'ok', text: 'success · CI · 1 min ago' } } } })
+  await $.session.start(START)
+  await settle()
+  const pane = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
+  for (const text of ['main', 'hello']) expect((await pane.find({ type: 'Text', text }))?.props.dimColor).toBe(true)
+  const ci = await pane.find({ type: 'Text', text: 'success · CI · 1 min ago' })
+  expect(ci?.props.color).toBe('success')
+  expect(ci?.props.dimColor).toBe(false)
 })

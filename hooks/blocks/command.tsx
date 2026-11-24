@@ -75,7 +75,8 @@ export function commandRow(c: Ctx, name: string) {
         <Text dimColor>{name}</Text>
       </Box>
       <Box flexShrink={1}>
-        <Text color={outcome(s.text)} wrap="truncate">
+        {/* Grey unless its colour says something: nothing here is pressed, and white marks what is. */}
+        <Text color={outcome(s.text)} dimColor={!outcome(s.text)} wrap="truncate">
           {s.text}
         </Text>
       </Box>

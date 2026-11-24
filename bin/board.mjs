@@ -16,6 +16,7 @@ import readline from 'node:readline/promises'
 import { BoardError, createEngine } from '../lib/engine.mjs'
 import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock, storeStatus } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
+import { blockById, registry, runBlock, setEnabled, enabledIds } from '../lib/ready-blocks.mjs'
 
 function boardDir() {
   if (process.env.BOARD_DIR) return path.resolve(process.env.BOARD_DIR)
@@ -206,6 +207,12 @@ const SAY = {
   },
   done: t => `done ${line(t)}\n${t.notes.at(-1).text}${t.review ? `\nadded ${t.review} to review it` : ''}`,
   'release-all': r => `released ${ids(r.released)}`,
+  blocks: r => {
+    if (r.all) return r.all.map(b => `${b.enabled ? '[x]' : '[ ]'} ${b.id.padEnd(8)} ${b.about}${b.needs.length ? `  (needs ${b.needs.join(', ')})` : ''}`).join('\n')
+    if (r.lines) return r.lines.length ? r.lines.map(l => `${l.id.padEnd(8)} ${l.text}`).join('\n') : 'no blocks on; board blocks --all lists them, board blocks on <id> turns one on'
+    if (r.text !== undefined) return `${r.id.padEnd(8)} ${r.text}`
+    return `${r.id} is ${r.enabled ? 'on' : 'off'}`
+  },
   register: r => `you are ${r.name}`,
   join: r => `you are ${r.name}`,
   whoami: r => `you are ${r.name}`,
@@ -234,6 +241,14 @@ const DID = {
 const said = e => `${hhmm(e.at)}  ${e.actor}  ${DID[e.type] ?? e.type}${e.task ? ` ${e.task}` : ''}${e.holder ? ` (held by ${e.holder})` : ''}${e.reason === 'silent' ? ' (its session went silent)' : ''}`
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+// The board's tasks, read only when a block asks (tests): blocks run without
+// loading the board otherwise, and a board that can't load leaves the others
+// working.
+async function boardTasks() {
+  const { store } = await loadStore(DIR)
+  return createEngine(store, { leaseMs: LEASE_MS }).list({ all: true })
+}
 
 // Refuse, with the board's own words, unless actor holds the task.
 async function holding(board, id, actor) {
@@ -437,6 +452,32 @@ const commands = {
     if (answer.trim().toLowerCase() !== 'yes') throw new BoardError(2, 'not installed; nothing changed')
     return installBlock(arg, text(flags.name))
   },
+  // Ready-made blocks: reviewed commands that show a line about this project.
+  //   board blocks                 the ones you turned on, with their lines now
+  //   board blocks --all           every block, on or off (nothing runs)
+  //   board blocks on <id>         turn one on (off: off), in your own settings
+  //   board blocks run <id>        one block's line, for a display that polls
+  // Which are on is yours (~/.config/modboard/settings.json); a project can't
+  // turn one on. Each runs in this checkout, so it is about this project.
+  async blocks(_, [sub, id], flags) {
+    if (sub === 'on' || sub === 'off') {
+      if (!id) throw new BoardError(2, `usage: board blocks ${sub} <id>`)
+      try {
+        return setEnabled(id, sub === 'on')
+      } catch (err) {
+        throw new BoardError(err.code ?? 2, err.message)
+      }
+    }
+    const opts = { tasks: boardTasks }
+    if (sub === 'run') {
+      if (!id || !blockById(id)) throw new BoardError(id ? 4 : 2, id ? `no block "${id}"; board blocks --all lists them` : 'usage: board blocks run <id>')
+      return runBlock(id, process.cwd(), opts)
+    }
+    if (sub) throw new BoardError(2, 'usage: board blocks [--all] | board blocks on|off|run <id>')
+    if (flags.all) return { all: registry() }
+    // Every block that's on, at once: one that is slow or fails holds up none of the others.
+    return { lines: await Promise.all(enabledIds().map(b => runBlock(b, process.cwd(), opts))) }
+  },
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
 }
@@ -455,6 +496,7 @@ const FLAGS = {
   check: ['passed'],
   run: [],
   block: ['name'],
+  blocks: ['all'],
   done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],
@@ -472,7 +514,7 @@ function checkFlags(cmd, flags) {
 }
 
 // Commands that read no board, so no storage block is loaded for them.
-const BOARDLESS = new Set(['where', 'taskfile', 'block'])
+const BOARDLESS = new Set(['where', 'taskfile', 'block', 'blocks'])
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2)

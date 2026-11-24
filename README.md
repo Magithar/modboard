@@ -193,6 +193,8 @@ board release-all                         # free everything you hold
 board whoami                              # the name the board gave you
 board agents                              # who is live
 board view                                # every task and live agent, as JSON (done tasks with their last note)
+board blocks                              # the ready-made blocks you turned on, with their lines now
+board blocks on ci                        # turn one on (off to turn it off); --all lists them all
 board block add ./my-block.mjs            # install your own storage block (asks you first); list, remove
 board run T-001 -- npm test               # run any command, keeping your claim alive however long it takes
 board doctor                              # check the ledger against the state
@@ -551,6 +553,48 @@ agent, and how each finished task was checked. Everything else on the board is
 a block you choose.
 
 ---
+
+## Ready-made blocks
+
+Five blocks you turn on with one tick, nothing to write: on the band's
+**blocks** list in Claude Code, or `board blocks on <id>` from any agent or a
+terminal. They show under **Checks** in the pane, and `board blocks` prints
+them for Codex, OpenCode or a shell:
+
+```
+branch   main
+changes  3 modified · 1 untracked
+ci       success · CI · 12 min ago
+prs      2 open · 1 to review · #41 approved
+tests    npm test passed · 4 min ago · T-004
+```
+
+| Block | Shows | Needs |
+|---|---|---|
+| `branch` | the current git branch | git |
+| `changes` | modified and untracked files | git |
+| `ci` | the latest GitHub Actions run on this branch | git, gh |
+| `prs` | your open pull requests and the ones waiting for your review | git, gh |
+| `tests` | the last check an agent recorded with `board check`; it never runs your tests | nothing |
+
+Which are on is yours, kept in `~/.config/modboard/settings.json`: a project
+can't turn one on. Each runs in the folder it's shown for, so two sessions in
+two repos never show each other's lines. A block that's off never runs. Each
+one has its own refresh time and a timeout, never runs twice at once, and a
+slow or failing one holds up none of the others. One that needs something says
+what: `needs gh (GitHub CLI)`, `gh not signed in · run gh auth login`,
+`offline · can't reach GitHub`.
+
+**What they don't trust in a project.** They find `git` and `gh` on your PATH
+with the project's own folders left out (its `bin/`, `node_modules/.bin`,
+`.`), so a `git` a repo ships never runs. They run with a cleaned environment
+(no `GIT_*` overrides) and with git's program-running settings switched off
+(`core.fsmonitor`, hooks, pagers, external diff, network protocols). A repo
+whose own config sets a filter or diff driver, which `git status` could run,
+gets `not read: this repo's git config can run code` instead. `gh` runs
+outside the project, with the repo named.
+
+A command block of your own (below) with the same name as one of these wins.
 
 ## Make your own block
 

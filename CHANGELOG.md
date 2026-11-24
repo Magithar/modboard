@@ -11,6 +11,15 @@ ask for a review.
 
 ### Added
 
+- **Ready-made blocks you turn on with one tick:** `branch`, `changes`, `ci`,
+  `prs` and `tests`, on the blocks list in Claude Code or with
+  `board blocks on <id>`, shown under Checks and by `board blocks` for any
+  agent. Reviewed commands, no shell: a project's own `git` or `gh` never
+  runs, git's program-running settings are switched off, and a repo whose
+  config sets a filter or diff driver isn't read. Each block has its own
+  refresh and timeout, never overlaps, and says what it needs (gh missing, not
+  signed in, offline). `tests` shows the last `board check` and never runs
+  your tests. Which are on lives in your own settings, shared by every agent.
 - **`board block add / list / remove`** installs your own storage blocks
   into your blocks folder, a file or a package folder, copied so later changes
   in a project don't reach them. Adding shows the code and asks you to type
