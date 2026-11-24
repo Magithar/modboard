@@ -8,7 +8,7 @@ import { groupOpen } from './tasks'
 // is not updating is named in yellow. With none set yet, it says where to add one.
 export const checks: Block = {
   name: 'checks',
-  about: 'your command blocks, with their age',
+  about: 'tests, CI, your own commands',
   pane: c => {
     const { Box, Button, Text } = c.ui
     const open = groupOpen(c.groupsOpen, 'checks')
