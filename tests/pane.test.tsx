@@ -364,6 +364,8 @@ test("pressing a task's title hides its handoff, and pressing it again shows it"
   host(on, [{ ...task('T-005', 'todo'), notes: [{ at: '', by: 'claude 1', text: 'HANDOFF: half done; tests left', where: WHERE }] }])
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
+  // The title that opens is orange, as the band's buttons are; one with nothing to open stays plain.
+  expect(((await ui.findAll({ type: 'Text' })) as any[]).filter(t => t.text === 'title of T-005').map(t => t.props.color)).toContain('#F27238')
   // Open to start with: the handoff is why the task is there.
   expect((await texts(ui)).join('\n')).toContain('tests left')
   expect((await texts(ui)).join('\n')).toContain('/Users/me/code/app-login')

@@ -57,7 +57,7 @@ function Row(c: Ctx, t: Task, kindW = 0) {
   const open = !handoff || taskOpen(c.groupsOpen, t.id)
   const titleText = (
     <Text wrap="truncate" hover={handoff ? { underline: true } : undefined}>
-      {t.title}
+      {handoff ? <Text color={CAP}>{t.title}</Text> : t.title}
       {/* Other labels after the title, grey (see label below). */}
       {(t.labels ?? []).filter(l => !(kindW && kind && l.startsWith('kind='))).map(l => {
         const { text, color } = label(l)
@@ -85,7 +85,8 @@ function Row(c: Ctx, t: Task, kindW = 0) {
         {/* Titles plain: bold is for the group headings alone. Yours says
             "you" at the right. */}
         {/* With a handoff, the title is the button that shows or hides it:
-            plain, underlined under the pointer, as the path is. */}
+            in modBOARD's orange, so it reads as a button at a glance, and
+            underlined under the pointer, as the path is. */}
         {handoff ? (
           <Button key={`task-${t.id}`} plain onPress={() => c.act.toggleTask(t.id)}>
             {titleText}

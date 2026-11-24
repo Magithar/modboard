@@ -22,8 +22,8 @@ modboard was called agent-board until 0.5.0.
 - **A task's title shows or hides its handoff.** Under Unfinished, press
   `Add password reset` and the handoff points, `where`, `path`, `files` and
   `check` fold away, leaving the one row; press it again to bring them back.
-  Each task starts open and stays as you left it. The title is underlined
-  under the pointer; there's no arrow.
+  Each task starts open and stays as you left it. A title that opens is
+  in modBOARD's orange, and underlined under the pointer; there's no arrow.
 
 ### Fixed
 
