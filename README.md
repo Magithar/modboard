@@ -542,8 +542,15 @@ the CLI directly.
   every call shared, so a wrapper like `npx` or `make` drops out. When in
   doubt, it falls back to the lease and never frees work early. That
   includes calls under one name from unrelated processes or other machines,
-  a system with no `ps` (Windows), or a sandbox that blocks it. The machine
-  is stored as a hash, not its name.
+  or a system with no `ps` (Windows). The machine is stored as a hash, not
+  its name.
+- **Codex's sandbox** hides every other process, so from inside it the board
+  records the Codex thread instead. Codex keeps that thread's session file
+  open (in `~/.codex/sessions/`, or `$CODEX_HOME`), so the first board read
+  that can see processes, such as the Claude pane or you at a shell, uses
+  `lsof` to find the Codex process from that file. If nothing outside the
+  sandbox reads the board while Codex is alive, its claims wait out the
+  lease.
 - **A board made before the rename**, in `.agent-board/`, keeps working where
   it is.
 

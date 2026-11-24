@@ -129,6 +129,42 @@ test('a CLI agent whose process ends frees its claims at once, not at the end of
   assert.equal(b.json(['doctor']).ok, true)
 })
 
+test('a Codex agent in its sandbox, where no process can be seen, is found by its session file', async () => {
+  const b = fresh()
+  b.run(['add', 'sandboxed'])
+  const thread = '01a20e4b-b2bc-72f0-9aad-ce9018037645'
+  const home = path.join(b.dir, 'codex-home')
+  const day = path.join(home, 'sessions', '2026', '11', '24')
+  fs.mkdirSync(day, { recursive: true })
+  const file = path.join(day, `rollout-2026-11-24T21-32-51-${thread}.jsonl`)
+  fs.writeFileSync(file, '')
+  // The fake Codex keeps its session file open, as Codex does; BOARD_HOLDER_PS=''
+  // hides every process from its board calls, as the sandbox does.
+  const code = `
+    const fd = require('node:fs').openSync(${JSON.stringify(file)}, 'a')
+    require('node:child_process').execFileSync('node', [${JSON.stringify(BOARD)}, 'claim', 'T-001'], { stdio: 'ignore' })
+    console.log('ready')
+    setInterval(() => {}, 1000)`
+  const child = execFile('node', ['-e', code], { env: { ...b.env, CODEX_THREAD_ID: thread, CODEX_HOME: home, BOARD_HOLDER_PS: '' }, cwd: b.dir })
+  let err = ''
+  child.stderr.on('data', d => (err += d))
+  await new Promise((resolve, reject) => {
+    child.stdout.on('data', d => String(d).includes('ready') && resolve())
+    child.on('exit', code => reject(new Error(`fake Codex exited (${code}): ${err}`)))
+  })
+  // From inside the sandbox the claim names the thread, not a process.
+  const raw = () => JSON.parse(fs.readFileSync(path.join(b.env.BOARD_DIR, 'board.json'), 'utf8')).tasks['T-001'].claim
+  assert.equal(raw().holder.codex, thread)
+  assert.equal(raw().holder.pid, undefined)
+  // A reader outside it finds the process with the file open, and keeps it.
+  assert.equal(b.json(['show', 'T-001'], { CODEX_HOME: home }).claim.owner, 'codex 1')
+  assert.equal(raw().holder.pid, child.pid)
+  await new Promise(resolve => (child.on('exit', resolve), child.kill('SIGKILL')))
+  const t = b.json(['show', 'T-001'], { CODEX_HOME: home })
+  assert.equal(t.status, 'todo')
+  assert.match(t.notes.at(-1).text, /^codex 1 stopped responding \(its process, node, exited\)/)
+})
+
 test('a claim whose holder is unsure, or that has a presence ping, is not freed by a process ending', async () => {
   const b = fresh()
   for (const title of ['two trees', 'registered']) b.run(['add', title])
