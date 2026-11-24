@@ -1871,7 +1871,7 @@ test('a long path in the board error is cut from the start to fit the pane', asy
   expect(path.endsWith('cloned.mjs')).toBe(true)
 })
 
-test('the board error rows copy like a handoff path: the files, and the fix as a cd and board trust', async ($, on) => {
+test('the board error rows copy their file paths, like a handoff path; nothing offers to approve the code', async ($, on) => {
   host(on, [], { untrusted: true })
   on('ui.toast', () => ({ value: undefined }))
   const copies: string[] = []
@@ -1883,10 +1883,10 @@ test('the board error rows copy like a handoff path: the files, and the fix as a
   on('clock.sleep', () => new Promise(resolve => (pass = () => resolve({ value: undefined }))) as any)
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 100 } } as any)
-  expect(await texts(ui)).toContain('board trust')
-  const pressed = ui.press({ key: 'copy-problem-run' })
+  expect(await ui.find({ key: 'copy-problem-run' })).toBeFalsy()
+  const pressed = ui.press({ key: 'copy-problem-config' })
   await new Promise(resolve => setTimeout(resolve, 20))
-  expect(copies).toEqual([`cd '/repo' && board trust`])
+  expect(copies).toEqual(['/repo/.modboard/config.json'])
   expect(await texts(ui)).toContain('✓ copied')
   pass()
   await pressed
