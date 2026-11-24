@@ -41,11 +41,12 @@ export function Problem(c: Ctx) {
       </Box>
       {rows.length ? (
         <Box flexDirection="column" paddingLeft={INDENT} marginTop={1}>
-          {rows.map(row => {
+          {rows.map((row, i) => {
             const key = `problem-${row.label}`
             const copied = c.copied === key
             return (
-              <Box key={key}>
+              // A blank line between the rows, as between a handoff's facts.
+              <Box key={key} marginTop={i ? 1 : 0}>
                 <Box width={LABEL} flexShrink={0}>
                   <Text dimColor>{row.label}</Text>
                 </Box>
