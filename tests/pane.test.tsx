@@ -1844,3 +1844,12 @@ test('the board error sits under the work title when work comes first, and on to
   expect(shown.indexOf(ERROR)).toBeLessThan(shown.indexOf('modBOARD'))
   expect(shown.filter(t => t === ERROR).length).toBe(1)
 })
+
+test('a board that cannot be read is not called empty', { options: {} } as any, async ($, on) => {
+  host(on, [], { untrusted: true })
+  bell(on)
+  await $.session.start(START)
+  const shown = (await texts(await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any))) as string[]
+  expect(shown.some(t => t.startsWith('board not updating: storage block'))).toBe(true)
+  expect(shown.some(t => t.startsWith('No tasks yet'))).toBe(false)
+})

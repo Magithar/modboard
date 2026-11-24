@@ -261,7 +261,8 @@ export const tasks: Block = {
         <Box flexDirection="column">
           {title}
           {problem}
-          <Text dimColor>No tasks yet. Ask Claude to add some, or run `board add`.</Text>
+          {/* Unread isn't empty: with the board not answering, say nothing about its tasks. */}
+          {c.problem ? null : <Text dimColor>No tasks yet. Ask Claude to add some, or run `board add`.</Text>}
         </Box>
       )
     const groups = (
