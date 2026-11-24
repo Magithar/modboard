@@ -849,14 +849,13 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     // blocks on the band: the pane, open at the list of blocks alone.
     // Pressed again while the list shows, it closes the pane.
     openBlocks: async () => {
-      if ((await read($, paneOpen)) && (await read($, paneView)) !== 'board') {
+      const [isOpen, viewNow, shown] = await Promise.all([read($, paneOpen), read($, paneView), read($, paneBlocks)])
+      if (isOpen && viewNow !== 'board') {
         await $.ui.close({ id: PANE }).catch(() => {})
         return void (await update($, paneOpen, () => false))
       }
-      const shown = await read($, paneBlocks)
-      await update($, listStart, () => shown)
-      await update($, paneView, () => 'blocks')
-      if (await read($, paneOpen)) return
+      await Promise.all([update($, listStart, () => shown), update($, paneView, () => 'blocks')])
+      if (isOpen) return
       // Straight to the list: it needs no fresh read of the board, and the
       // board's 3-second poll keeps it current for Done.
       const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
@@ -1193,11 +1192,7 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
-    const [c, chosen, view] = await Promise.all([
-      context($, e.props.bodyColumns ?? 40, { Box, Text, Button }, actions($, cycles)),
-      read($, paneBlocks),
-      read($, paneView),
-    ])
+    const [chosen, view] = await Promise.all([read($, paneBlocks), read($, paneView)])
     // The list of blocks, alone: each row ticks its block on or off; Done
     // turns the pane to the board, as modBOARD does.
     // The list of blocks, alone, on two tabs. Blocks: each row ticks its block
@@ -1216,7 +1211,9 @@ export const register: Register = (on, options) => {
       )
       // What changed since the list opened, in yellow at the right end of the
       // tabs' line. Each tick and move is saved as it is made: there is no Done.
-      const changed = changes(await read($, listStart), chosen)
+      // The list needs only these two, not the whole board, so it opens fast.
+      const [start, movedNow] = await Promise.all([read($, listStart), read($, moved)])
+      const changed = changes(start, chosen)
       const tabs = (
         <Box flexDirection="column">
           <Box gap={4}>
@@ -1277,7 +1274,7 @@ export const register: Register = (on, options) => {
             {ticked.length ? (
               ticked.map((name, at) => (
                 <Box gap={1}>
-                  <Text color={c.moved === name ? CAP : undefined} bold={c.moved === name} wrap="truncate">
+                  <Text color={movedNow === name ? CAP : undefined} bold={movedNow === name} wrap="truncate">
                     {`${String(at + 1).padStart(2)}  ${name.padEnd(pad)}`}
                   </Text>
                   <Box flexShrink={0} gap={1}>
@@ -1293,6 +1290,7 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
+    const c = await context($, e.props.bodyColumns ?? 40, { Box, Text, Button }, actions($, cycles))
     const pane = chosen.map(name => choosable.find(b => b.name === name)).filter(b => b !== undefined)
     // The board's error goes under the work block's title when work is first,
     // else on top of the pane, never both.
