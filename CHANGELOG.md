@@ -34,6 +34,23 @@ ask for a review.
 
 ### Fixed
 
+- **A command block that hangs no longer holds anything up.** It used to
+  block the session's start and every other command block behind it, and a
+  new copy started every 30 seconds. Now each block runs alongside the others,
+  writes its own result, and isn't started again while it's still running. The
+  pane's board poll doesn't stack up either.
+- **Old finished tasks move to an archive.** A task done more than 14 days
+  ago (`BOARD_ARCHIVE_DAYS`, `off` for never) moves whole to
+  `archive.jsonl`, and `board.json` keeps a stub with its last note. On a
+  3,000-task board, `board.json` went from 18.7 MB to 1.3 MB and a write from
+  about 220 ms to 60 ms. `board show` and `board who` still read the whole task.
+- **`board tail` reads only the end of the ledger** for new events, not the
+  whole file every half second.
+- **`board trust` asks a person, at a terminal,** and covers every code file
+  in the block's folder or package, so a changed helper asks again too. An
+  agent's shell has no terminal, so it can't trust a block itself.
+- **The board's own files never count as changed files** in notes and
+  `board who`, even where `.modboard/` isn't in `.gitignore`.
 - **A project's storage block runs only once you trust it.** `.modboard/config.json`
   could name a block file, and every `board` command (and Claude Code, at
   session start) ran it, so a cloned repo could run its code. Now

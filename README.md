@@ -489,6 +489,7 @@ the model's own `effortLevel` under `modelSettings`, else the general
 | `BOARD_AGENT` | a number, given by the board | the name to use on the board |
 | `BOARD_DIR` | `.modboard/`, beside the repo's git folder | where the board lives |
 | `BOARD_LEASE_MS` | 15 minutes | how long a claim lasts without a note or heartbeat |
+| `BOARD_ARCHIVE_DAYS` | 14 | days after which a done task moves to the archive; `off` for never |
 | `BOARD_PRESENCE_MS` | 3 minutes | how long a Claude session can be silent before its claims go back |
 
 ---
@@ -505,6 +506,7 @@ the CLI directly.
 | | How it works |
 |---|---|
 | **Where the board lives** | `.modboard/`, beside the repo's git folder, so every worktree shares one board. Add it to `.gitignore`. |
+| **Old finished tasks** | Done more than 14 days ago, a task moves whole to `.modboard/archive.jsonl`; the board keeps a stub with its last note, so every write stays small. `board show` and `board who` still read all of it. `BOARD_ARCHIVE_DAYS` (or `archiveDays` in `config.json`) changes the 14; `off` keeps everything in `board.json`. |
 | **One claim wins** | Each change takes a lock and replaces the board in one step, so exactly one claimant wins. Only the holder can note, release or finish a task. |
 | **Claims expire** | A claim lasts 15 minutes; a note or heartbeat renews it. An expired claim goes back to waiting. If its agent had recorded work (a note or a check), the board writes a handoff for it, so the task shows under Unfinished with the last place the work was seen, marked *last known, may be stale*. |
 | **Crashes recover fast** | An open Claude session pings the board every minute. If it's killed, its claims go back after 3 minutes of silence. |
@@ -756,9 +758,11 @@ Give each `createStore` call a fresh table or folder, so each run starts empty.
 
 A block other than `file` is code, and `.modboard/` sits in the project, so a
 repo you clone could name one. It runs only after you've read it and run
-`board trust`, which records a fingerprint of `config.json` and the block's
-file in `~/.config/modboard/trusted.json`. A change to either asks again
-(exit 12, and a toast in Claude Code).
+`board trust`, which shows the block's code files and asks you to type
+`yes`, at a terminal (an agent's shell has none, so an agent can't trust a
+block for you). It records a fingerprint of `config.json` and every code file
+in the block's folder (or its package) in `~/.config/modboard/trusted.json`.
+A change to any of them asks again (exit 12, and a toast in Claude Code).
 
 **4. Check it:** `board trust`, then `board add "first task"`, `board view`, `board doctor`. The CLI
 refuses a block that won't load or is missing a method, and says which

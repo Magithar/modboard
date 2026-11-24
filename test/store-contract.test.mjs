@@ -10,12 +10,17 @@ import { fileURLToPath } from 'node:url'
 
 import { storeContract } from '../lib/contract.mjs'
 import { fileStore } from '../lib/store-file.mjs'
+import { trustBoard } from '../lib/load-store.mjs'
 import { createStore as memory } from '../examples/store-memory.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'board-'))
-// Trust is recorded in the user's config; these tests keep their own.
+// Trust is recorded in the user's config; these tests keep their own. The
+// CLI's trust asks a person at a terminal, so the tests trust through the
+// library, as that person's yes would.
 const TRUST = path.join(tmp(), 'trusted.json')
+process.env.BOARD_TRUST_FILE = TRUST
+const trust = dir => trustBoard(dir)
 
 storeContract('file', () => fileStore(path.join(tmp(), '.modboard')))
 storeContract('memory (example)', () => memory())
@@ -38,7 +43,7 @@ test('config.json can name a block file, which the CLI loads', () => {
       `export const createStore = (config, { dir }) => fileStore(dir + '/' + config.folder)\n`,
   )
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './my-block.mjs', folder: 'elsewhere' }))
-  assert.equal(board(dir, ['trust']).code, 0)
+  trust(dir)
   assert.equal(board(dir, ['add', 'hello']).code, 0)
   assert.ok(fs.existsSync(path.join(dir, 'elsewhere', 'board.json')))
   assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, './my-block.mjs')
@@ -61,7 +66,7 @@ test('config.json can name a block package installed in the project, not beside 
     fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name, type: 'module', ...pkg }))
     fs.writeFileSync(path.join(pkgDir, file), block)
     fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: name, folder: name.replace('/', '_') }))
-    assert.equal(board(dir, ['trust']).code, 0, name)
+    trust(dir)
     assert.equal(board(dir, ['add', 'hello']).code, 0, name)
     assert.ok(fs.existsSync(path.join(dir, name.replace('/', '_'), 'board.json')), name)
     assert.equal(JSON.parse(board(dir, ['doctor', '--json']).out).block, name)
@@ -72,14 +77,14 @@ test('a block that cannot load, or breaks the contract shape, is refused by name
   const dir = path.join(tmp(), '.modboard')
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './missing.mjs' }))
-  board(dir, ['trust'])
+  trust(dir)
   const missing = board(dir, ['list'])
   assert.equal(missing.code, 2)
   assert.match(missing.out, /cannot load storage block "\.\/missing\.mjs"/)
 
   fs.writeFileSync(path.join(dir, 'half.mjs'), 'export const createStore = () => ({ now: () => 0, snapshot: () => ({}) })\n')
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ store: './half.mjs' }))
-  board(dir, ['trust'])
+  trust(dir)
   const half = board(dir, ['list'])
   assert.equal(half.code, 2)
   assert.match(half.out, /is missing: commit, events, verify/)
@@ -101,7 +106,7 @@ test("a project's block runs only once trusted, and a change to it asks again", 
   assert.match(refused.out, /runs code on this machine.*board trust/)
   assert.equal(fs.existsSync(marker), false, 'the block never ran')
 
-  assert.equal(board(dir, ['trust']).code, 0)
+  trust(dir)
   assert.equal(board(dir, ['list']).code, 0)
   assert.equal(fs.existsSync(marker), true)
 
@@ -109,6 +114,22 @@ test("a project's block runs only once trusted, and a change to it asks again", 
   const changed = board(dir, ['list'])
   assert.equal(changed.code, 12)
   assert.match(changed.out, /changed since you trusted it/)
+
+  // A helper beside the block is covered too.
+  trust(dir)
+  fs.writeFileSync(path.join(dir, 'helper.mjs'), 'export const x = 1\n')
+  assert.equal(board(dir, ['list']).code, 12)
+  trust(dir)
+  // The board's own data changing is not a change to the code.
+  assert.equal(board(dir, ['add', 'y']).code, 0)
+  assert.equal(board(dir, ['list']).code, 0)
+
+  // An agent's shell has no terminal, so it can't trust a block itself.
+  fs.writeFileSync(path.join(dir, 'helper.mjs'), 'export const x = 2\n')
+  const agent = board(dir, ['trust'])
+  assert.equal(agent.code, 2)
+  assert.match(agent.out, /asks a person to confirm/)
+  assert.equal(board(dir, ['list']).code, 12)
 
   // The built-in block needs none.
   const plain = path.join(tmp(), '.modboard')
@@ -192,4 +213,12 @@ test('verify reports a seq used twice', () => {
   const [first, second] = fs.readFileSync(ledger, 'utf8').trim().split('\n')
   fs.writeFileSync(ledger, [first, second.replace('"seq":2', '"seq":1'), ''].join('\n'))
   assert.match(store.verify().problems.join('\n'), /seq 1 comes after seq 1/)
+})
+
+test('events after a seq read only the end of a long ledger, and match a full read', () => {
+  const dir = path.join(tmp(), '.modboard')
+  const store = fileStore(dir)
+  for (let i = 0; i < 2000; i++) store.commit({ writes: [], events: [{ type: 'tick', n: i, pad: 'x'.repeat(40) }] })
+  const all = store.events(0)
+  for (const since of [1, 500, 1990, 1999, 2000]) assert.deepEqual(store.events(since), all.filter(e => e.seq > since), `since ${since}`)
 })

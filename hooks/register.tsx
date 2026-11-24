@@ -217,7 +217,16 @@ function reason(text: string) {
 // readers, and a pane redrawn every few seconds for nothing scrolls in jerks.
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
-async function refresh($: EngineInterface) {
+// One read of the board at a time: a poll that comes round while the last
+// is still running (a slow disk, a big board) waits for the next one.
+let refreshing: Promise<void> | null = null
+
+function refresh($: EngineInterface) {
+  if (!refreshing) refreshing = readBoard($).finally(() => (refreshing = null))
+  return refreshing
+}
+
+async function readBoard($: EngineInterface) {
   let problem = ''
   try {
     const out = await cli($, ['view', '--json'])
@@ -363,27 +372,48 @@ const pick = (all: Block[], setting: unknown, fallback: string) =>
 // Each command block's first line of output. A failing command keeps its last
 // good line, and the time it last succeeded and since when it has failed are
 // kept beside it, so the block can say how old its result is.
+// Command blocks still running from an earlier round. One that hangs (a
+// network call with no answer) is left to finish and not started again on
+// top of itself every 30 seconds; the others run alongside it, and each
+// writes its own result when it ends, so none waits behind a slow one.
+const running = new Set<string>()
+
 async function runCommands($: EngineInterface, commands: Record<string, string>) {
-  const [before, was, now] = await Promise.all([read($, custom), read($, commandState), $.clock.now()])
-  const out: Record<string, string> = {}
-  const state: Record<string, CommandState> = {}
-  for (const [name, command] of Object.entries(commands)) {
-    const run = await $.process.run(['sh', '-c', command]).catch(() => undefined)
-    if (run && run.exitCode === 0) {
-      out[name] = firstLine(run.stdout)
-      // A success keeps its time until it is half way to stale: the age never
-      // shows while the command keeps working, and the pane isn't redrawn
-      // every 30 seconds for a time nobody sees (a redraw mid-scroll jolts it).
-      const prev = was[name]
-      const fresh = prev && prev.failing === null && prev.ok !== null && now - prev.ok < staleMs / 2
-      state[name] = fresh ? prev : { ok: now, failing: null }
-    } else {
-      if (before[name]) out[name] = before[name]
-      state[name] = { ok: was[name]?.ok ?? null, failing: was[name]?.failing ?? now }
-    }
-  }
-  if (!same(before, out)) await update($, custom, () => out)
-  if (!same(was, state)) await update($, commandState, () => state)
+  // Names no longer in the setting drop out.
+  const names = Object.keys(commands)
+  const keep = <T,>(all: Record<string, T>) => Object.fromEntries(Object.entries(all).filter(([n]) => names.includes(n)))
+  const [before, was] = await Promise.all([read($, custom), read($, commandState)])
+  if (!same(before, keep(before))) await update($, custom, all => keep(all))
+  if (!same(was, keep(was))) await update($, commandState, all => keep(all))
+  await Promise.all(
+    Object.entries(commands)
+      .filter(([name]) => !running.has(name))
+      .map(async ([name, command]) => {
+        running.add(name)
+        try {
+          const run = await $.process.run(['sh', '-c', command]).catch(() => undefined)
+          const now = await $.clock.now()
+          const prev = (await read($, commandState))[name]
+          let next: CommandState
+          if (run && run.exitCode === 0) {
+            const line = firstLine(run.stdout)
+            if ((await read($, custom))[name] !== line) await update($, custom, all => ({ ...all, [name]: line }))
+            // A success keeps its time until it is half way to stale: the age
+            // never shows while the command keeps working, and the pane isn't
+            // redrawn every 30 seconds for a time nobody sees (a redraw
+            // mid-scroll jolts it).
+            const fresh = prev && prev.failing === null && prev.ok !== null && now - prev.ok < staleMs / 2
+            next = fresh ? prev : { ok: now, failing: null }
+          } else {
+            // A failure keeps its last good line.
+            next = { ok: prev?.ok ?? null, failing: prev?.failing ?? now }
+          }
+          if (!same(prev, next)) await update($, commandState, all => ({ ...all, [name]: next }))
+        } finally {
+          running.delete(name)
+        }
+      }),
+  )
 }
 
 const GAP = 3
@@ -989,7 +1019,8 @@ export const register: Register = (on, options) => {
     $.clock.every(POLL_MS, () => refresh($).catch(() => {}))
     for (const problem of problems) $.ui.toast(`board: ${problem}`)
     if (Object.keys(commands).length) {
-      await runCommands($, commands)
+      // Not awaited: a command that hangs must not hold up the session's start.
+      void runCommands($, commands).catch(() => {})
       $.clock.every(COMMAND_MS, () => runCommands($, commands).catch(() => {}))
     }
     // Presence: keeps this session's name while it is open, so no other

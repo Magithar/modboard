@@ -1215,6 +1215,8 @@ test('a command that keeps working is not written again every run, so the pane i
     return next(e)
   })
   await $.session.start(START)
+  // The first run starts with the session but doesn't hold up its start.
+  await new Promise(resolve => setTimeout(resolve, 20))
   const before = writes.length
   // The first run is written: the test sees writes.
   expect(before).toBeGreaterThan(0)

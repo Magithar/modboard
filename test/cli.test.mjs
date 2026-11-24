@@ -568,7 +568,8 @@ test('a long check renews the claim while it runs', () => {
 test('view sends a done task with its last note only, and a newer file list replaces older ones', () => {
   const b = fresh()
   execFileSync('git', ['init', '-q', '-b', 'main', b.dir])
-  fs.writeFileSync(path.join(b.dir, '.gitignore'), '.modboard/\n.gitignore\n')
+  // No .gitignore for .modboard/: the board's own files still aren't the work.
+  fs.writeFileSync(path.join(b.dir, '.gitignore'), '.gitignore\n')
   b.run(['add', 'x'])
   b.run(['claim', 'T-001', '--as', 'bob'])
   fs.writeFileSync(path.join(b.dir, 'a.txt'), 'a')
@@ -586,3 +587,36 @@ test('view sends a done task with its last note only, and a newer file list repl
   assert.match(done.notes[0].text, /^VERIFIED: ok/)
   assert.equal(b.json(['show', 'T-001']).notes.length, 3)
 })
+
+test('a task done long enough ago is archived: a stub stays, show and who still have all of it', async () => {
+  const b = fresh()
+  execFileSync('git', ['init', '-q', '-b', 'main', b.dir])
+  fs.writeFileSync(path.join(b.dir, '.gitignore'), '.gitignore\n')
+  const soon = { BOARD_ARCHIVE_DAYS: '0.00001' } // under a second
+  b.run(['add', 'old work', '--desc', 'the long description'], soon)
+  b.run(['claim', 'T-001', '--as', 'alice'], soon)
+  fs.writeFileSync(path.join(b.dir, 'login.ts'), 'x')
+  b.run(['check', 'T-001', 'true', '--as', 'alice'], soon)
+  b.run(['note', 'T-001', 'halfway', '--as', 'alice'], soon)
+  b.run(['done', 'T-001', '--as', 'alice', '--note', 'ran it', '--review'], soon)
+  await new Promise(resolve => setTimeout(resolve, 1200))
+  b.run(['add', 'new work'], soon) // a commit, which archives what's due
+
+  const state = JSON.parse(fs.readFileSync(path.join(b.env.BOARD_DIR, 'board.json'), 'utf8'))
+  const stub = state.tasks['T-001']
+  assert.equal(stub.archived, true)
+  assert.equal(stub.notes.length, 1)
+  assert.equal(stub.description, undefined)
+  assert.equal(b.json(['add', 'after'], soon).id, 'T-004', 'ids keep counting')
+
+  const shown = b.json(['show', 'T-001'], soon)
+  assert.equal(shown.description, 'the long description')
+  assert.equal(shown.notes.length, 3)
+  assert.equal(b.json(['who', 'login.ts'], soon).hits[0].task, 'T-001')
+  assert.equal(b.json(['view'], soon).tasks.find(t => t.id === 'T-001').notes[0].by, 'alice')
+  // The review still knows who finished it, and the stub can't be rung.
+  assert.equal(b.run(['claim', 'T-002', '--as', 'alice'], soon).code, 11)
+  assert.equal(b.run(['ring', 'T-001'], soon).code, 5)
+  assert.equal(b.json(['doctor'], soon).ok, true)
+})
+

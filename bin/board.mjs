@@ -11,9 +11,10 @@
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import readline from 'node:readline/promises'
 
 import { BoardError, createEngine } from '../lib/engine.mjs'
-import { loadStore, trustBoard, trustFile } from '../lib/load-store.mjs'
+import { loadStore, trustBoard, trustFile, trustPreview } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
 
 function boardDir() {
@@ -60,7 +61,7 @@ function whereNow() {
     branch: or(() => git('symbolic-ref', '--short', '-q', 'HEAD'), ''),
     commit: or(() => git('rev-parse', '--short', 'HEAD'), ''),
     dirty: or(() => git('status', '--porcelain').length > 0, false),
-    files: or(() => changedFiles(raw, or), []),
+    files: or(() => changedFiles(raw, or).filter(f => !inBoardDir(worktree, f)), []),
   }
 }
 
@@ -80,6 +81,21 @@ function changedFiles(raw, or) {
   for (const l of or(() => raw('status', '--porcelain', '--untracked-files=all'), '').split('\n'))
     if (l.length > 3) files.add(l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''))
   return [...files].sort().slice(0, FILES_KEPT)
+}
+
+// The board's own files (board.json, the ledger) are never the work, even in
+// a repo that doesn't ignore .modboard/.
+function inBoardDir(worktree, file) {
+  // git answers with real paths (/private/var on macOS), so compare those.
+  const real = p => {
+    try {
+      return fs.realpathSync(p)
+    } catch {
+      return p
+    }
+  }
+  const rel = path.relative(real(worktree), real(DIR))
+  return !rel.startsWith('..') && (file === rel || file.startsWith(`${rel}/`))
 }
 
 // "/repo/wt-login · login @ a1b2c3d, uncommitted changes"
@@ -276,7 +292,10 @@ const commands = {
     const rel = path.relative(projectDir(), path.resolve(file))
     const wanted = rel && !rel.startsWith('..') ? rel : file
     const hits = []
-    for (const t of await board.list({ all: true })) {
+    // Archived tasks as they were, files and all.
+    const whole = new Map((await board.archived()).map(t => [t.id, t]))
+    for (const listed of await board.list({ all: true })) {
+      const t = whole.get(listed.id) ?? listed
       // Each task once: its latest note that changed the file.
       const at = t.notes.findLastIndex(n => n.where?.files?.some(f => f === wanted || f.endsWith(`/${wanted}`)))
       if (at < 0) continue
@@ -354,7 +373,31 @@ const commands = {
   where: () => DIR,
   // Run the storage block this board's config.json names. It is code from the
   // project, so it waits for this; a change to it asks again.
-  trust: () => trustBoard(DIR),
+  // A person confirms, at a terminal: an agent's shell has none, so an agent
+  // talked into it by a repo's text can't trust that repo's code.
+  async trust() {
+    const preview = trustPreview(DIR)
+    if (!preview.needed) return trustBoard(DIR)
+    if (!process.stdin.isTTY || !process.stderr.isTTY)
+      throw new BoardError(2, `board trust asks a person to confirm, at a terminal. Read ${preview.code}, then run board trust yourself`)
+    const shown = preview.files.slice(0, 20)
+    console.error(
+      [
+        `${path.join(DIR, 'config.json')} names storage block ${preview.block}:`,
+        `  ${preview.code}`,
+        ...(preview.files.length ? [`code it covers (${preview.files.length} files):`, ...shown.map(f => `  ${f}`), ...(preview.files.length > shown.length ? [`  … ${preview.files.length - shown.length} more`] : [])] : []),
+        'Every board command will run it on this machine.',
+      ].join('\n'),
+    )
+    const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
+    // Ctrl+D or Ctrl+C is a no.
+    const answer = await rl
+      .question('Trust it? Type yes: ')
+      .catch(() => '')
+      .finally(() => rl.close())
+    if (answer.trim().toLowerCase() !== 'yes') throw new BoardError(2, 'not trusted; nothing changed')
+    return trustBoard(DIR)
+  },
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
 }
