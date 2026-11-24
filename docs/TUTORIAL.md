@@ -369,8 +369,8 @@ waiting or in progress, it disappears.
   </tr>
 </table>
 
-- **The headings say what's happening; each row says who.** Your own tasks
-  are bold.
+- **The headings say what's happening; each row says who.** Titles are
+  bold, and your own tasks say `you` at the right.
 - **Yellow rows need you**: an agent gone idle (`codex 1 · idle`: no note or
   heartbeat for most of its lease), or work stopped partway that nobody has
   picked up.

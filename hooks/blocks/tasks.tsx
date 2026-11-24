@@ -44,7 +44,6 @@ export function label(l: string): { text: string; color?: string } {
 // `kindW`: the width of the kind column after the ID, 0 when the group has no kinds.
 function Row(c: Ctx, t: Task, kindW = 0) {
   const { Box, Text } = c.ui
-  const isMine = t.claim?.owner === c.who
   const kind = kindW ? kindOf(t) : undefined
   // Handoff points and facts line up under the title.
   const under = 7 + kindW
@@ -67,7 +66,9 @@ function Row(c: Ctx, t: Task, kindW = 0) {
         </Box>
       ) : null}
       <Box flexGrow={1} flexShrink={1}>
-        <Text bold={isMine} wrap="truncate">
+        {/* Every title bold: the task is what the row is about. Yours says
+            "you" at the right, so bold need not mark it. */}
+        <Text bold wrap="truncate">
           {t.title}
           {/* Other labels after the title, grey (see label below). */}
           {(t.labels ?? []).filter(l => !(kindW && kind && l.startsWith('kind='))).map(l => {

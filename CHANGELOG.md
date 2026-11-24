@@ -14,6 +14,8 @@ modboard was called agent-board until 0.5.0.
   a group where some task has a kind, and the handoff under a task lines up
   with its title. Other labels follow the title as `key=value`. `board list`
   and the tools keep the full label.
+- **Every task title is bold**, so the task stands out from its ID, kind and
+  owner. Your own tasks still say `you` at the right.
 
 ### Fixed
 
