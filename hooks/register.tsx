@@ -1337,7 +1337,8 @@ export const register: Register = (on, options) => {
         {/* First, in red, when the board stopped answering: what is below is old. */}
         {problem ? (
           <Box marginBottom={1}>
-            <Text color="error" wrap="truncate">{`board not updating: ${problem}`}</Text>
+            {/* Wrapped, not cut: the end may say what to do. */}
+            <Text color="error">{`board not updating: ${problem}`}</Text>
           </Box>
         ) : null}
         {sections.map((section, i) =>

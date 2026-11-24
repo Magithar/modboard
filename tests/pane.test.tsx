@@ -67,7 +67,7 @@ function host(
     // A board whose storage block isn't trusted: every board command exits
     // 12, and one with --json says why as JSON on stdout, as the CLI does.
     if (untrusted && argv[1]?.endsWith('board.mjs')) {
-      const error = 'storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet. Read /repo/.modboard/cloned.mjs, then run board trust at a terminal'
+      const error = 'storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json'
       return { value: argv.includes('--json') ? { exitCode: 12, stdout: JSON.stringify({ error, code: 12 }), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } : { exitCode: 12, stdout: '', stderr: `board: ${error}`, isStdoutTruncated: false, isStderrTruncated: false } }
     }
     // A board that cannot be read, while `broken.now` says so.
@@ -1813,9 +1813,12 @@ test('an untrusted storage block is named in words, not JSON, in the toast and t
   const rung = bell(on)
   await $.session.start(START)
   const toast = rung.toasts.find(t => t.includes('runs code on this machine'))
-  expect(toast).toBe('board: storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet. Read /repo/.modboard/cloned.mjs, then run board trust at a terminal')
+  expect(toast).toBe('board: storage block "./cloned.mjs" runs code on this machine and isn\'t trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json')
   const ui = await $.ui.mount({ plugin: 'modboard', surface: 'terminal', ...PANE } as any)
   const shown = (await texts(ui)) as string[]
   expect(shown.some(t => t.startsWith('board not updating: storage block "./cloned.mjs" runs code'))).toBe(true)
   expect(shown.some(t => t.includes('{"error"'))).toBe(false)
+  // The whole line, not cut short: it ends with what to do.
+  const line = await ui.find({ type: 'Text', text: `board not updating: storage block "./cloned.mjs" runs code on this machine and isn't trusted yet: read it, then run board trust at a terminal. The block: /repo/.modboard/cloned.mjs, named in /repo/.modboard/config.json` })
+  expect(line?.props.wrap).toBeUndefined()
 })
