@@ -815,11 +815,32 @@ async function alarmCommand($: EngineInterface, args: string) {
 // Ask for room for the whole board; the surface may give less, and the pane's
 // body scrolls with the wheel when it does.
 
+// TEMPORARY: how long a press takes to show the pane, as a toast. `mod` is the
+// mod's own work before it asks for the pane; `draw` is when the pane's first
+// drawing started; `open` is when Claude Code said the pane was placed.
+let probe: { name: string; at: number; asked?: number; drawn?: number } | null = null
+function probeStart(name: string) {
+  probe = { name, at: performance.now() }
+}
+function probeAsk() {
+  if (probe) probe.asked = performance.now()
+}
+function probeEnd($: EngineInterface) {
+  const p = probe
+  probe = null
+  if (!p || p.asked === undefined) return
+  const ms = (t: number | undefined) => (t === undefined ? '?' : `${Math.round(t - p.at)} ms`)
+  $.ui.toast(`${p.name} timing: mod ${ms(p.asked)} · draw ${ms(p.drawn)} · open ${ms(performance.now())}`, { timeoutMs: 10000 })
+}
+
 async function openBoard($: EngineInterface) {
   // Open at once on what the 3-second poll last read; the fresh read follows,
   // and the pane redraws when it lands.
+  if (!probe) probeStart('modBOARD')
   await update($, paneView, () => 'board')
+  probeAsk()
   const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
+  probeEnd($)
   if (opened.isPlaced) await update($, paneOpen, () => true)
   await refresh($)
   await estimateContext($)
@@ -856,6 +877,7 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
     // blocks on the band: the pane, open at the list of blocks alone.
     // Pressed again while the list shows, it closes the pane.
     openBlocks: async () => {
+      probeStart('blocks')
       const [isOpen, viewNow, shown] = await Promise.all([read($, paneOpen), read($, paneView), read($, paneBlocks)])
       if (isOpen && viewNow !== 'board') {
         await $.ui.close({ id: PANE }).catch(() => {})
@@ -865,7 +887,9 @@ function actions($: EngineInterface, cycles: { models: string[]; efforts: string
       if (isOpen) return
       // Straight to the list: it needs no fresh read of the board, and the
       // board's 3-second poll keeps it current for Done.
+      probeAsk()
       const opened = await $.ui.open({ id: PANE, title: 'modboard', rows: 30 })
+      probeEnd($)
       if (opened.isPlaced) await update($, paneOpen, () => true)
     },
     // A task's box on the band. With the pane closed, it opens the pane at
@@ -1206,6 +1230,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    if (probe && probe.drawn === undefined) probe.drawn = performance.now()
     const { Box, Text, Button } = $.ui.resolve(e)
     const [chosen, view] = await Promise.all([read($, paneBlocks), read($, paneView)])
     // The list of blocks, alone: each row ticks its block on or off; Done
