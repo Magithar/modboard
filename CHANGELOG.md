@@ -17,8 +17,9 @@ ask for a review.
   touches its value, and `prs` says `none open`.
 - **The blocks list groups as the pane does:** the bars under one `limits`
   row, and the ready-made blocks and your own command blocks under
-  `project`. A group's row shows or hides it; the rows under it, shown only
-  while it's ticked, pick what's in it. With `project` off the pane, Claude Code runs none of its blocks.
+  `project`. A group's row shows or hides it; the rows under it,
+  open while it's ticked, pick what's in it; the group's `▸` opens them
+  without ticking it, to see what's there. With `project` off the pane, Claude Code runs none of its blocks.
 - **Ready-made blocks you turn on with one tick:** `branch`, `changes`, `ci`,
   `prs` and `tests`, on the blocks list in Claude Code or with
   `board blocks on <id>`, shown under Project and by `board blocks` for any

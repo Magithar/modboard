@@ -2031,8 +2031,19 @@ test('the Blocks tab groups as the pane does: limits over the bars, project over
   // The children come right after their group's row.
   const at = (start: string) => list.findIndex(t => t.startsWith(start))
   expect([at('[x] usage'), at('[x] compact')].sort((a, b) => a - b)).toEqual([at('[x] limits') + 1, at('[x] limits') + 2])
-  // project is unticked: its rows are folded away until it's ticked.
+  // project is unticked: its rows are folded away, its arrow says ▸.
   expect(at('[x] branch')).toBe(-1)
+  expect(await label(pane, 'fold-project')).toBe('▸')
+  expect(await label(pane, 'fold-limits')).toBe('▾')
+  // The arrow opens them without ticking project, and folds them again.
+  await pane.press({ key: 'fold-project' })
+  list = (await texts(pane)) as string[]
+  expect(at('[x] branch')).toBe(at('[ ] project') + 1)
+  expect(await label(pane, 'fold-project')).toBe('▾')
+  await pane.press({ key: 'fold-project' })
+  list = (await texts(pane)) as string[]
+  expect(at('[x] branch')).toBe(-1)
+  // Ticking it opens them.
   await pane.press({ key: 'pick-project' })
   list = (await texts(pane)) as string[]
   expect(at('[x] branch')).toBe(at('[x] project') + 1)
