@@ -18,6 +18,10 @@ import { createHolder } from '../lib/holder.mjs'
 import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock, storeStatus } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
 import { blockById, registry, runBlock, setEnabled, enabledIds } from '../lib/ready-blocks.mjs'
+import { lineBlock, tasksBlock } from '../lib/block-data.mjs'
+import { createBench, listen } from '../lib/serve.mjs'
+import { createMcp, runStdio } from '../lib/mcp.mjs'
+import { boardActions } from '../lib/board-actions.mjs'
 
 function boardDir() {
   if (process.env.BOARD_DIR) return path.resolve(process.env.BOARD_DIR)
@@ -252,6 +256,27 @@ async function boardTasks() {
   return createEngine(store, { leaseMs: LEASE_MS }).list({ all: true })
 }
 
+// A display may ask every few seconds, and from many widgets at once: each
+// ready-made block runs at most once per its own `every` (gh calls count
+// against GitHub's hourly limit), and callers in between share that run.
+const blockRuns = new Map()
+function runBlockAtMostEvery(id, cwd, opts) {
+  const last = blockRuns.get(id)
+  if (last && Date.now() - last.at < (blockById(id)?.every ?? 0)) return last.line
+  const line = runBlock(id, cwd, opts)
+  blockRuns.set(id, { at: Date.now(), line })
+  return line
+}
+
+// Every block, in the shared shape (lib/block-data.mjs): the tasks, read
+// fresh each call, then the ready-made blocks that are on, for this project.
+const boardBlocks = (board, me) => async () => {
+  const cwd = process.cwd()
+  const tasks = await board.list({ all: true })
+  const lines = await Promise.all(enabledIds().map(id => runBlockAtMostEvery(id, cwd, { tasks: async () => tasks })))
+  return [tasksBlock(tasks, { me }), ...lines.map(l => lineBlock(l, { title: blockById(l.id)?.title }))]
+}
+
 // Refuse, with the board's own words, unless actor holds the task.
 async function holding(board, id, actor) {
   const t = await board.show(id)
@@ -482,6 +507,30 @@ const commands = {
   },
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
+  // board serve [--port 4477]: the board as a local web page, read-only, in
+  // the shared block shape (lib/block-data.mjs). Runs until stopped.
+  async serve(board, _, flags) {
+    const port = flags.port === undefined ? 4477 : typeof flags.port === 'string' && /^\d+$/.test(flags.port) ? Number(flags.port) : NaN
+    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new BoardError(2, 'usage: board serve [--port 4477]')
+    let url
+    try {
+      url = await listen(createBench(boardBlocks(board)), port)
+    } catch (err) {
+      throw new BoardError(2, err.code === 'EADDRINUSE' ? `port ${port} is in use; try board serve --port <another>` : err.message)
+    }
+    console.log(`modBOARD at ${url}  (this machine only, read-only; Ctrl-C stops it)`)
+    return new Promise(() => {})
+  },
+  // board mcp: the board as a local MCP server on stdio, drawn as an MCP App
+  // where the host can (codex mcp add modboard -- board mcp). Its buttons act
+  // for the person, as BOARD_AGENT, else "human". stdout carries the protocol
+  // only, so it exits when the host hangs up.
+  async mcp(board) {
+    const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+    const me = process.env.BOARD_AGENT || 'human'
+    await runStdio(createMcp({ read: boardBlocks(board, me), act: boardActions(board, me), version }))
+    process.exit(0)
+  },
 }
 
 // The flags each command reads, besides --as and --json, which every command
@@ -499,6 +548,8 @@ const FLAGS = {
   run: [],
   block: ['name'],
   blocks: ['all'],
+  serve: ['port'],
+  mcp: [],
   done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],
@@ -517,6 +568,9 @@ function checkFlags(cmd, flags) {
 
 // Commands that read no board, so no storage block is loaded for them.
 const BOARDLESS = new Set(['where', 'taskfile', 'block', 'blocks'])
+// Displays act for a person, who has no process to watch: their claims end by
+// lease alone, not when the app showing the board quits (lib/holder.mjs).
+const DISPLAYS = new Set(['serve', 'mcp'])
 
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2)
@@ -534,7 +588,7 @@ async function main() {
       createEngine(store, {
         leaseMs: LEASE_MS,
         presenceMs: Number(process.env.BOARD_PRESENCE_MS ?? 3 * 60 * 1000),
-        holder: createHolder(),
+        holder: DISPLAYS.has(cmd) ? undefined : createHolder(),
       })
     const out = await run(board, pos, flags, name)
     const say = !flags.json && SAY[cmd]

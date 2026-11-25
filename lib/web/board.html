@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>modBOARD</title>
+<!--
+  The shared renderer, first cut: it draws blocks in the contract shape
+  (lib/block-data.mjs), picking a view by each block's `type`. No business
+  logic lives here; it reads /blocks.json and draws. Plain on purpose: the
+  visual design comes from its own document. Text is only ever set with
+  textContent, never as HTML.
+-->
+<style>
+  :root { color-scheme: light dark; --fg: #111; --muted: #777; --line: #e4e4e4; --bg: #fff; --accent: #59C378; --warn: #c98a00; --bad: #d64545 }
+  @media (prefers-color-scheme: dark) { :root { --fg: #f2f2f2; --muted: #8a8a8a; --line: #2a2a2a; --bg: #141414 } }
+  * { box-sizing: border-box }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px }
+  h1 { margin: 0; font-size: 18px } h1 b { color: var(--accent) }
+  .muted { color: var(--muted) }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px }
+  .block { border: 1px solid var(--line); border-radius: 10px; padding: 14px }
+  .block.wide { grid-column: 1 / -1 }
+  .block h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted) }
+  .error { color: var(--bad) }
+  .counts { display: flex; gap: 28px; margin-bottom: 12px }
+  .counts div { font-size: 26px; font-weight: 700 } .counts span { display: block; font-size: 12px; font-weight: 400; color: var(--muted) }
+  .task { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line) }
+  .task .id { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 48px }
+  .task .title { flex: 1; font-weight: 600 }
+  .task .who { color: var(--warn) }
+  .note { display: flex; gap: 8px; padding: 0 0 8px 58px }
+  .note input { flex: 1; font: inherit; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--fg) }
+  #said { margin-left: auto }
+  button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--fg); cursor: pointer }
+  button:disabled { color: var(--muted); cursor: default }
+  pre { margin: 0; white-space: pre-wrap; color: var(--muted) }
+</style>
+</head>
+<body>
+<header><h1><b>mod</b>BOARD</h1><span class="muted" id="state">loading…</span><span class="muted" id="said"></span></header>
+<main class="grid" id="blocks"></main>
+<script type="module">
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag)
+  if (cls) e.className = cls
+  if (text !== undefined) e.textContent = text
+  return e
+}
+
+// One view per block type. An unknown type still shows, as its raw data.
+const VIEWS = {
+  tasks(block, body) {
+    const { counts, tasks } = block.data
+    const row = el('div', 'counts')
+    for (const [n, label] of [[counts.inProgress, 'In progress'], [counts.waiting, 'Waiting'], [counts.done, 'Done']]) {
+      const c = el('div', '', String(n))
+      c.append(el('span', '', label))
+      row.append(c)
+    }
+    body.append(row)
+    if (!tasks.length) body.append(el('div', 'muted', 'No open tasks'))
+    for (const t of tasks) {
+      const r = el('div', 'task')
+      r.append(el('span', 'id', t.id), el('span', 'title', t.title))
+      if (t.kind) r.append(el('span', 'muted', t.kind))
+      if (t.owner) r.append(el('span', 'who', t.owner))
+      else if (t.waitingOn.length) r.append(el('span', 'muted', `after ${t.waitingOn.join(', ')}`))
+      else if (t.handedOff) r.append(el('span', 'muted', 'unfinished'))
+      for (const a of block.actions.filter(a => a.target === t.id)) r.append(actionButton(a, r))
+      body.append(r)
+      if (note?.target === t.id && block.actions.some(a => a.id === 'note' && a.target === t.id)) {
+        body.append(note.form)
+        noteKept = true
+      }
+    }
+  },
+  line(block, body) {
+    body.append(el('div', '', block.data.text))
+  },
+}
+
+// A button for one action the board offers. It only asks: the server checks
+// it and answers with the board as it now is. Where nothing can carry the
+// request (the localhost bench), the button shows but stays off. While one
+// action is out, every button waits for its answer.
+let act = null
+let busy = false
+let note = null // the note being typed: { target, form, input }, kept across redraws
+let noteKept = false
+
+function actionButton(a, row) {
+  const b = el('button', 'act', a.label)
+  if (!act) {
+    b.disabled = true
+    b.title = 'read-only here'
+    return b
+  }
+  b.disabled = busy
+  b.onclick = () => {
+    if (a.input !== 'text') return act(a.id, a.target)
+    if (note?.target === a.target) return note.input.focus()
+    closeNote()
+    openNote(a.target, row)
+  }
+  return b
+}
+
+// A note: a line to type under the row, kept until saved or cancelled.
+function openNote(target, row) {
+  const form = el('form', 'note')
+  const input = el('input')
+  input.maxLength = 500
+  input.placeholder = `Note on ${target}`
+  const save = el('button', 'act', 'Save')
+  const cancel = el('button', '', 'Cancel')
+  cancel.type = 'button'
+  cancel.onclick = closeNote
+  form.onsubmit = e => {
+    e.preventDefault()
+    const text = input.value.trim()
+    if (!text || busy) return
+    closeNote()
+    act('note', target, text)
+  }
+  form.append(input, save, cancel)
+  note = { target, form, input }
+  row.after(form)
+  input.focus()
+}
+function closeNote() {
+  note?.form.remove()
+  note = null
+}
+
+function setBusy(on) {
+  busy = on
+  if (act) for (const b of document.querySelectorAll('button.act')) b.disabled = on
+}
+
+function draw(blocks) {
+  // The open note moves to the new rows with what was typed and the caret;
+  // it closes if its task no longer takes a note (released elsewhere).
+  const focused = note && document.activeElement === note.input
+  const caret = focused && [note.input.selectionStart, note.input.selectionEnd]
+  noteKept = false
+  const root = document.getElementById('blocks')
+  root.replaceChildren(
+    ...blocks.map(block => {
+      const card = el('section', `block${block.type === 'tasks' ? ' wide' : ''}`)
+      card.append(el('h2', '', block.title))
+      if (block.status === 'error') card.append(el('div', 'error', block.error))
+      else if (VIEWS[block.type]) VIEWS[block.type](block, card)
+      else card.append(el('pre', '', JSON.stringify(block.data, null, 2)))
+      return card
+    }),
+  )
+  if (note && !noteKept) note = null
+  if (note && focused) {
+    note.input.focus()
+    note.input.setSelectionRange(...caret)
+  }
+}
+
+function shown(blocks) {
+  draw(blocks)
+  const state = document.getElementById('state')
+  state.textContent = `updated ${new Date().toLocaleTimeString()}`
+  state.className = 'muted'
+}
+
+function failed(err) {
+  const state = document.getElementById('state')
+  state.textContent = `not updating: ${err.message ?? err}`
+  state.className = 'error'
+}
+
+function say(text, cls = 'muted') {
+  const said = document.getElementById('said')
+  said.textContent = text
+  said.className = cls
+}
+
+// Two ways to get the blocks, same drawing:
+//  - in an MCP Apps host (board mcp), the page sits in the host's iframe and
+//    speaks JSON-RPC over postMessage: the tool's result arrives as a
+//    notification, and a refresh calls board_view again through the host;
+//  - on its own (board serve), it reads /blocks.json.
+const inHost = window.parent !== window
+
+if (inHost) {
+  let nextId = 1
+  const waiting = new Map()
+  const post = msg => window.parent.postMessage({ jsonrpc: '2.0', ...msg }, '*')
+  // A host may hold the page's calls (Claude Desktop pauses a widget in the
+  // background). A read that gets no answer in ms fails visibly; ms = 0 waits
+  // for as long as it takes, for a call that must not be given up on.
+  const request = (method, params, ms = 15000) =>
+    new Promise((resolve, reject) => {
+      const id = nextId++
+      const timer = ms > 0 && setTimeout(() => {
+        waiting.delete(id)
+        reject(new Error('no answer from the host'))
+      }, ms)
+      const done = f => v => (clearTimeout(timer), f(v))
+      waiting.set(id, { resolve: done(resolve), reject: done(reject) })
+      post({ id, method, params })
+    })
+  const tellSize = () => post({ method: 'ui/notifications/size-changed', params: { height: document.documentElement.scrollHeight } })
+
+  // Answers can arrive out of order: each read is numbered when it is sent,
+  // and one older than the board already drawn is dropped.
+  let sent = 0
+  let drawn = 0
+  const fromResult = (result, seq) => {
+    if (result?.isError) throw new Error(result.content?.[0]?.text ?? 'board_view failed')
+    if (!Array.isArray(result?.structuredContent?.blocks)) throw new Error('no blocks in the result')
+    if (seq < drawn) return
+    drawn = seq
+    shown(result.structuredContent.blocks)
+    tellSize()
+  }
+
+  window.addEventListener('message', event => {
+    if (event.source !== window.parent) return
+    const msg = event.data
+    if (!msg || msg.jsonrpc !== '2.0') return
+    if (msg.id !== undefined && waiting.has(msg.id)) {
+      const { resolve, reject } = waiting.get(msg.id)
+      waiting.delete(msg.id)
+      msg.error ? reject(new Error(msg.error.message ?? 'request failed')) : resolve(msg.result)
+      return
+    }
+    if (msg.method === 'ui/notifications/tool-result') {
+      try { fromResult(msg.params, ++sent) } catch (err) { failed(err) }
+    }
+  })
+
+  // Refresh only while someone can see the board: in view, in a window that
+  // is showing, and with no action out (its answer brings the board).
+  let onScreen = true
+  const looking = () => onScreen && document.visibilityState === 'visible'
+  const refresh = () => {
+    if (busy || !looking()) return
+    const seq = ++sent
+    request('tools/call', { name: 'board_view', arguments: {} }).then(r => fromResult(r, seq)).catch(failed)
+  }
+
+  // Ask the board to act; it answers with what it did, or why not, and the
+  // board. The call is never given up on, since the host may only be holding
+  // it: after a while the person is told so, and the buttons free up.
+  act = async (action, target, text) => {
+    const seq = ++sent
+    setBusy(true)
+    say(`${action} ${target}…`)
+    const slow = setTimeout(() => say(`no answer from the host yet; ${action} ${target} may still go through`), 15000)
+    const giveUp = setTimeout(() => {
+      setBusy(false)
+      say(`no answer from the host; the board shows whether ${action} ${target} went through`, 'error')
+      refresh()
+    }, 60000)
+    try {
+      const result = await request('tools/call', { name: 'board_act', arguments: { action, target, ...(text !== undefined ? { text } : {}) } }, 0)
+      say(result?.content?.[0]?.text ?? '', result?.isError ? 'error' : 'muted')
+      if (result?.structuredContent?.blocks) fromResult({ structuredContent: result.structuredContent }, seq)
+    } catch (err) {
+      say(err.message, 'error')
+    } finally {
+      clearTimeout(slow)
+      clearTimeout(giveUp)
+      setBusy(false)
+    }
+  }
+
+  // The handshake waits as long as the host takes: until it answers, nothing
+  // else may be sent, and a paused host answers late, not never.
+  request('ui/initialize', { appInfo: { name: 'modboard', version: '1' }, appCapabilities: {}, protocolVersion: '2026-01-26' }, 0)
+    .then(() => {
+      post({ method: 'ui/notifications/initialized' })
+      setInterval(refresh, 10000)
+      // Back in view after a pause: catch up at once, not on the next tick.
+      document.addEventListener('visibilitychange', refresh)
+      window.addEventListener('focus', refresh)
+      new IntersectionObserver(([e]) => {
+        const was = onScreen
+        onScreen = e.isIntersecting
+        if (onScreen && !was) refresh()
+      }).observe(document.documentElement)
+    })
+    .catch(failed)
+  new ResizeObserver(tellSize).observe(document.body)
+} else {
+  const refresh = async () => {
+    try {
+      const res = await fetch('/blocks.json', { cache: 'no-store' })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error ?? res.statusText)
+      shown(body.blocks)
+    } catch (err) {
+      failed(err)
+    }
+  }
+  refresh()
+  setInterval(refresh, 5000)
+}
+</script>
+</body>
+</html>

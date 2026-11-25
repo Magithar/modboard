@@ -58,6 +58,27 @@ export type ReadyValue = { id: string; state: string; text: string; at: number }
 
 export type Reminder = { at: string; note: string; due?: number }
 
+// The block contract (lib/block-data.mjs): what every renderer gets for one
+// block. `type` picks the renderer; an action is a name the server checks,
+// never a command, and `target` is the item it acts on (a task id). `input:
+// 'text'`: the person types a line for it (a note).
+export type BlockAction = { id: string; label: string; target?: string; input?: 'text' }
+export type BlockData<T = unknown> = {
+  id: string
+  type: string
+  schemaVersion: 1
+  title: string
+  status: 'ready' | 'loading' | 'error'
+  error?: string
+  data: T
+  updatedAt: string
+  actions: BlockAction[]
+}
+export type TasksBlockData = {
+  counts: { inProgress: number; waiting: number; done: number }
+  tasks: { id: string; title: string; status: 'todo' | 'claimed'; kind: string | null; owner: string | null; since: string | null; waitingOn: string[]; handedOff: boolean }[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     modboard: { tasks: Task[]; agents: Agent[]; me: string; usage: Usage; model: string; effort: string; custom: Record<string, string>; commandState: Record<string, { ok: number | null; failing: number | null }>; taskfile: TaskFile; taskfileOpen: boolean; taskfileTier: string; paneOpen: boolean; groupsOpen: Record<string, boolean>; listOpen: Record<string, boolean>; boardError: string; copied: string; home: string; paneView: string; paneBlocks: string[]; weather: Weather | null; alarms: string[]; ringing: string; minute: string; reminders: Reminder[]; located: boolean; seenDone: string[] | null; moved: string; listStart: string[]; readyList: ReadyBlock[]; readyValues: Record<string, ReadyValue> }
