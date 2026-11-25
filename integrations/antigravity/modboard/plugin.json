@@ -1,0 +1,5 @@
+{
+  "name": "modboard",
+  "description": "The modBOARD shared task board in the side pane: who is on what, the project's blocks, and Claim, Note and Release buttons for you.",
+  "logo": "assets/logo.svg"
+}

@@ -60,7 +60,7 @@ async function session({ root, env }, messages) {
   const child = spawn(process.execPath, [BOARD, 'mcp'], { cwd: root, env, stdio: ['pipe', 'pipe', 'pipe'] })
   let out = ''
   child.stdout.on('data', c => (out += c))
-  const init = { jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } }
+  const init = { jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: { extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } } }, clientInfo: { name: 't', version: '0' } } }
   for (const m of [init, ...messages]) child.stdin.write(JSON.stringify(m) + '\n')
   child.stdin.end()
   await new Promise(resolve => child.on('close', resolve))

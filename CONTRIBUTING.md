@@ -54,6 +54,8 @@ Then:
 | Keep the board somewhere new | a storage block: see below |
 | Show something new in Claude Code | a display block: see below |
 | Change the mod's tools, heartbeat or settings | `hooks/register.tsx`, `.claude-plugin/plugin.json` |
+| Change the board widget or `board mcp` (Codex, Claude Desktop) | `lib/web/board.html`, `lib/mcp.mjs`, `lib/board-actions.mjs`; the contract is `lib/block-data.mjs` |
+| Change the Codex plugin | `integrations/codex/`, listed by `.agents/plugins/marketplace.json`. Its skill is a copy: after editing `skills/modboard`, run `cp -R skills/modboard integrations/codex/skills/`, and keep its version the package's (`test/codex-plugin.test.mjs` checks both) |
 
 ## Adding a block
 

@@ -137,6 +137,12 @@ Then type `/board` in Claude Code.
 want in `band` and `pane`, or name a command to make your own. See
 [Settings](#settings) and [Make your own block](#make-your-own-block).
 
+**5. See it in other apps (optional).** The board is also a live widget in
+the Codex desktop app and Claude Desktop, with Claim, Note and Release
+buttons. For Codex: `codex plugin marketplace add Magithar/modboard`, then
+`codex plugin add modboard@modboard`. [docs/HOSTS.md](docs/HOSTS.md) covers
+each app, and says which have been tried.
+
 ---
 
 ## Everyday use

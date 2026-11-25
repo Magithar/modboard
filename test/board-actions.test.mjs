@@ -81,6 +81,7 @@ test('mcp: board_act is for the widget only and refuses with the reason', async 
   const { board, act } = await setup()
   const read = async () => [tasksBlock(await board.list({ all: true }), { me: 'human' })]
   const handle = createMcp({ read, act, version: '0' })
+  await handle({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { capabilities: { extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } } } } })
   const call = (name, args) => handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
 
   const { result: list } = await handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
@@ -129,11 +130,38 @@ test('the buttons, the checks and the tool schema all come from one table', asyn
   const { ACTION_IDS } = await import('../lib/board-actions.mjs')
   const { board, act } = await setup()
   const handle = createMcp({ read: async () => [], act, version: '0' })
+  await handle({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { capabilities: { extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } } } } })
   const { result } = await handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
   const schema = result.tools.find(t => t.name === 'board_act').inputSchema.properties.action.enum
   assert.deepEqual(schema, Object.keys(TASK_ACTIONS))
   assert.deepEqual(ACTION_IDS, Object.keys(TASK_ACTIONS))
   for (const bad of [['claim'], { toString: () => 'claim' }, 'toString', 'hasOwnProperty'])
     await refused(act({ action: bad, target: 'T-001' }), /no action/)
+  assert.equal((await board.show('T-001')).status, 'todo')
+})
+
+// A host that doesn't draw MCP Apps would hand board_act to its model (seen in
+// Antigravity, 2026-11-26), so the tool is offered only to one that said, on
+// connecting, that it draws them; the widget is the only thing that may press.
+test("board_act is offered only to a host that draws MCP Apps, and can't be called by another", async () => {
+  const { drawsMcpApps } = await import('../lib/mcp.mjs')
+  for (const [caps, draws] of [
+    [{ extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app', 'text/html+skybridge'] } } }, true],
+    [{ extensions: { 'io.modelcontextprotocol/ui': {} } }, true],
+    [{ extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html+skybridge'] } } }, false],
+    [{ elicitation: { form: {} } }, false],
+    [{}, false],
+    [undefined, false],
+    [{ extensions: { 'io.modelcontextprotocol/ui': true } }, false],
+  ])
+    assert.equal(drawsMcpApps(caps), draws, JSON.stringify(caps))
+
+  const { board, act } = await setup()
+  const handle = createMcp({ read: async () => [], act, version: '0' })
+  await handle({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { capabilities: { elicitation: {} } } })
+  const { result } = await handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+  assert.deepEqual(result.tools.map(t => t.name), ['board_view'])
+  const res = await handle({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'board_act', arguments: { action: 'claim', target: 'T-001' } } })
+  assert.equal(res.error.code, -32602)
   assert.equal((await board.show('T-001')).status, 'todo')
 })

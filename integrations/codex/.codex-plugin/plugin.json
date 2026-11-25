@@ -1,0 +1,10 @@
+{
+  "name": "modboard",
+  "version": "0.11.1",
+  "description": "One shared task board for every agent and person on a project. Shows the board as a live widget, with Claim, Note and Release buttons, and teaches Codex to work from it.",
+  "author": { "name": "Magithar", "url": "https://github.com/Magithar" },
+  "homepage": "https://github.com/Magithar/modboard",
+  "license": "MIT",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

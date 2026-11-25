@@ -10,8 +10,10 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline/promises'
+import { fileURLToPath } from 'node:url'
 
 import { BoardError, createEngine } from '../lib/engine.mjs'
 import { createHolder } from '../lib/holder.mjs'
@@ -189,6 +191,34 @@ function describe(t) {
   return out.join('\n')
 }
 
+// Antigravity's plugins folder (BOARD_ANTIGRAVITY_PLUGINS for tests).
+const antigravityPlugins = () => process.env.BOARD_ANTIGRAVITY_PLUGINS ?? path.join(os.homedir(), '.gemini', 'config', 'plugins')
+
+function installAntigravity(flags = {}) {
+  const want = flags.dir === undefined ? projectDir() : typeof flags.dir === 'string' ? path.resolve(flags.dir) : ''
+  if (!want || !fs.statSync(want, { throwIfNoEntry: false })?.isDirectory()) throw new BoardError(2, 'usage: board antigravity [--dir <project folder>]')
+  const fallback = fs.realpathSync(want)
+  const home = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
+  const from = path.join(home, 'integrations', 'antigravity', 'modboard')
+  const dir = path.join(antigravityPlugins(), 'modboard')
+  const existing = fs.existsSync(dir)
+  if (existing) {
+    let ours = false
+    try {
+      ours = JSON.parse(fs.readFileSync(path.join(dir, 'plugin.json'), 'utf8')).name === 'modboard' && fs.existsSync(path.join(dir, 'sidecars', 'board', 'main.mjs'))
+    } catch {}
+    if (!ours) throw new BoardError(2, `${dir} holds another plugin; move it away first`)
+    fs.rmSync(dir, { recursive: true })
+  }
+  fs.mkdirSync(path.dirname(dir), { recursive: true })
+  fs.cpSync(from, dir, { recursive: true })
+  const manifest = path.join(dir, 'sidecars', 'board', 'sidecar.json')
+  const sidecar = JSON.parse(fs.readFileSync(manifest, 'utf8'))
+  sidecar.env = { ...(sidecar.env ?? {}), MODBOARD_HOME: fs.realpathSync(home), MODBOARD_DEFAULT_DIR: fallback }
+  fs.writeFileSync(manifest, JSON.stringify(sidecar, null, 2) + '\n')
+  return { dir, updated: existing, board: fallback }
+}
+
 // board mcp|serve --dir <project>: the project to show, for a host that
 // starts its servers somewhere else (Claude Desktop starts them in /, with no
 // setting for the folder). Read before anything else looks at the folder.
@@ -216,6 +246,13 @@ const ids = list => (list.length ? list.join(', ') : 'nothing')
 // What each command says to a person. --json prints the data instead, and
 // view and events (for programs) always do.
 const SAY = {
+  antigravity: r =>
+    [
+      `${r.updated ? 'updated' : 'installed'} the modBOARD panel in ${r.dir}`,
+      `where a conversation's folder has no board, it shows ${r.board}'s`,
+      'In Antigravity: Customizations > Installed, turn modboard on (off and on again after an update),',
+      'then in a conversation: the ⋮ menu (top right) > Plugins > modBOARD.',
+    ].join('\n'),
   add: t => `added ${line(t)}${t.ring ? '\nit rings an alarm when done' : ''}`,
   ring: t => (t.ring ? `${t.id} rings an alarm when done` : `${t.id} no longer rings when done`),
   claim: t => `claimed ${t.id}  ${t.title}\nit's yours until ${hhmm(t.claim.expiresAt)}; a note or heartbeat renews it`,
@@ -531,6 +568,13 @@ const commands = {
   },
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
+  // board antigravity [--dir <project>]: install (or update) modBOARD's side
+  // panel in Antigravity, which doesn't draw MCP Apps but runs plugins with a
+  // panel. The panel shows the conversation's project's board when it has
+  // one, else this one: --dir, or the project this is run in.
+  // Copies integrations/antigravity/modboard into its plugins folder and names
+  // this install in the panel's settings, so updating modboard updates it.
+  antigravity: (_, __, flags) => installAntigravity(flags),
   // board serve [--port 4477] [--dir <project>]: the board as a local web page, read-only, in
   // the shared block shape (lib/block-data.mjs). Runs until stopped.
   async serve(board, _, flags) {
@@ -574,6 +618,7 @@ const FLAGS = {
   blocks: ['all'],
   serve: ['port', 'dir'],
   mcp: ['dir'],
+  antigravity: ['dir'],
   done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],
@@ -591,7 +636,7 @@ function checkFlags(cmd, flags) {
 }
 
 // Commands that read no board, so no storage block is loaded for them.
-const BOARDLESS = new Set(['where', 'taskfile', 'block', 'blocks'])
+const BOARDLESS = new Set(['where', 'taskfile', 'block', 'blocks', 'antigravity'])
 // Displays act for a person, who has no process to watch: their claims end by
 // lease alone, not when the app showing the board quits (lib/holder.mjs).
 const DISPLAYS = new Set(['serve', 'mcp'])

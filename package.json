@@ -11,7 +11,7 @@
     "./examples/store-memory.mjs": "./examples/store-memory.mjs",
     "./package.json": "./package.json"
   },
-  "files": ["bin/", "lib/", "examples/", "hooks/", "skills/", "types/", ".claude-plugin/plugin.json", "tsconfig.json", "README.md", "CHANGELOG.md", "ROADMAP.md", "LICENSE"],
+  "files": ["bin/", "lib/", "examples/", "hooks/", "skills/", "types/", "integrations/", ".claude-plugin/plugin.json", "tsconfig.json", "README.md", "CHANGELOG.md", "ROADMAP.md", "LICENSE"],
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:mod": "claude plugin test .",

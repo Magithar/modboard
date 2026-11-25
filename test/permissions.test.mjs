@@ -28,6 +28,7 @@ async function setup() {
   let id = 0
   const rpc = (method, params) => handle({ jsonrpc: '2.0', id: ++id, method, params })
   const snapshot = async () => JSON.stringify(await board.list({ all: true }))
+  await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: { extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } } } })
   return { board, rpc, snapshot }
 }
 

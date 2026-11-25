@@ -92,6 +92,7 @@ Rules that keep it stable:
 | Refresh git or CI block | Server runs that block's fixed, reviewed operation |
 | Claim, note, release | The engine's existing ownership and validation |
 | Widget supplies a command or path | Never |
+| The widget's action tool (`board_act`) | Offered only to a host that announces MCP Apps; a host's own "app-only" marking isn't relied on |
 | Run an unapproved block | Denied |
 | Install an executable block | Explicit user approval |
 | Change block permissions | User only |
@@ -107,7 +108,7 @@ The localhost bench binds to `127.0.0.1` only and refuses any request whose
 | HTML rendering | Interactive board | CLI text board | **Pass** in Codex desktop and Claude Desktop; text in Codex CLI |
 | Widget tool calls | Act from the widget | Act through chat | **Pass** in both: Claim, Note, Release reach the real board |
 | Refresh | Live board | Manual refresh | **Pass**, with a caveat: Claude Desktop pauses a widget in the background. The widget now times out a held call (15 s) and refreshes when it comes back into view |
-| Persistence | Stays open | Inline snapshot | **Partly**: stays live in the same chat over ~15 min in both hosts; a long chat not checked |
+| Persistence | Stays open | Inline snapshot | **Pass**: stays live in the same chat over ~15 min in both hosts; in Codex, 240 lines further up the chat it still caught up when scrolled back into view, and its Claim reached the board (2026-11-26) |
 | Local connectivity | Local-first | Defer that host | **Pass**: stdio, no network. Claude Desktop gives no cwd, so its entry `cd`s into the repo |
 | Permission enforcement | Enable actions | Disable affected actions — **hard blocker** | **Pass**: `test/permissions.test.mjs`; both hosts keep the app-only `board_act` from the model |
 | Claude Code regression | Continue | Fix first — **hard blocker** | **Pass**: 119 unit, 122 mod |
@@ -164,19 +165,20 @@ depends on the go/no-go of the one before.
 | 2.7 | Cross-renderer compatibility tests | 8 | 1 | 80% | 1 | **6** | done: `test/renderers.test.mjs`; widget and bench get identical blocks |
 | 2.8 | Regression-test Claude Code mod | 10 | 3 | 100% | 0.25 | **120** | passing (137 + 122) |
 | 2.9 | `--dir` for hosts that give no folder (from §3) | 6 | 1 | 100% | 0.25 | **24** | done: `board mcp --dir <project>`, `board serve --dir`; replaces the `sh -c "cd …"` entry |
+| 2.10 | Lost click after saving a note (seen in Codex) | 6 | 2 | 100% | 0.25 | **48** | fixed (2026-11-26): a refresh on focus answered in milliseconds and redrew the board between press and release, taking the button from under the pointer. The page now redraws only when the board changed, and never mid-press. Checked in the fake host and in Codex: one Release click after a note saved with Enter lands |
 
 ### Phase 3 — Platform expansion (P1)
 
-| # | Task | R | I | C | E | RICE |
-|---|---|---|---|---|---|---|
-| 3.1 | Package Codex plugin (skill, hooks, MCP App) | 5 | 2 | 80% | 1 | **8** |
-| 3.2 | Verify Antigravity | 3 | 1 | 50% | 0.5 | **3** |
-| 3.3 | Verify OpenClaw | 2 | 1 | 50% | 0.5 | **2** |
-| 3.4 | Verify VS Code | 5 | 1 | 50% | 0.5 | **5** |
-| 3.5 | Evaluate Goose and other MCP hosts | 2 | 0.5 | 50% | 0.5 | **1** |
-| 3.6 | Document CLI agents (Gemini CLI, Cursor, Aider, Amp…) | 6 | 1 | 100% | 0.5 | **12** |
-| 3.7 | Presence hooks where hosts support them | 5 | 2 | 50% | 1 | **5** |
-| 3.8 | Regression-test Claude Code mod | 10 | 3 | 100% | 0.25 | **120** |
+| # | Task | R | I | C | E | RICE | Status |
+|---|---|---|---|---|---|---|---|
+| 3.1 | Package Codex plugin (skill, hooks, MCP App) | 5 | 2 | 80% | 1 | **8** | built: `integrations/codex`, listed by `.agents/plugins/marketplace.json`; installed with `codex plugin add`, its server and skill load in the Codex CLI, and in the desktop app the widget shows and Claim and Release reach the board (2026-11-26). The server is the installed `board mcp` (Codex 0.172 starts it in the project, doesn't expand `${PLUGIN_ROOT}`, drops symlinks) |
+| 3.2 | Verify Antigravity | 3 | 1 | 50% | 0.5 | **3** | done (2026-11-26): board as text; no MCP Apps. Found its model was handed the widget-only `board_act`; fixed in `board mcp`: `board_act` is offered only to a host that announces MCP Apps (`io.modelcontextprotocol/ui`). Codex desktop and Claude Desktop announce it, and Claim, Note and Release all still work in both; Antigravity's model now sees only `board_view`  Then built a side panel for it (Antigravity's own plugin and sidecar UI): `board antigravity` installs it, `lib/sidecar.mjs` runs `board mcp` behind it; the live board shows there, Claim reaches the board, and a default board shows where the conversation's folder has none |
+| 3.3 | Verify OpenClaw | 2 | 1 | 50% | 0.5 | **2** | deferred (2026-11-26): setup written in docs/HOSTS.md; not installed here, and not needed yet |
+| 3.4 | Verify VS Code | 5 | 1 | 50% | 0.5 | **5** | deferred (2026-11-26): setup written in docs/HOSTS.md; try it when someone asks for it |
+| 3.5 | Evaluate Goose and other MCP hosts | 2 | 0.5 | 50% | 0.5 | **1** | Goose draws MCP Apps (its docs); not installed here. Gemini CLI no longer works for individual accounts |
+| 3.6 | Document CLI agents (Gemini CLI, Cursor, Aider, Amp…) | 6 | 1 | 100% | 0.5 | **12** | done: `docs/HOSTS.md`, linked from the README, says per app how and whether tried |
+| 3.7 | Presence hooks where hosts support them | 5 | 2 | 50% | 1 | **5** | not now: Codex runs plugin hooks only in its desktop app after the person trusts them, and the process watch (`lib/holder.mjs`) already frees a stopped Codex's claims |
+| 3.8 | Regression-test Claude Code mod | 10 | 3 | 100% | 0.25 | **120** | passing (144 + 122) |
 
 ### Phase 4 — Block ecosystem (P2)
 

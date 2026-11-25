@@ -12,30 +12,30 @@
   textContent, never as HTML.
 -->
 <style>
-  :root { color-scheme: light dark; --fg: #111; --muted: #777; --line: #e4e4e4; --bg: #fff; --accent: #59C378; --warn: #c98a00; --bad: #d64545 }
-  @media (prefers-color-scheme: dark) { :root { --fg: #f2f2f2; --muted: #8a8a8a; --line: #2a2a2a; --bg: #141414 } }
+  :root { color-scheme: light dark; --mb-fg: var(--foreground, #111); --mb-muted: var(--muted-foreground, #777); --mb-line: var(--border, #e4e4e4); --mb-bg: var(--background, #fff); --mb-accent: #59C378; --mb-warn: #c98a00; --mb-bad: #d64545 }
+  @media (prefers-color-scheme: dark) { :root { --mb-fg: var(--foreground, #f2f2f2); --mb-muted: var(--muted-foreground, #8a8a8a); --mb-line: var(--border, #2a2a2a); --mb-bg: var(--background, #141414) } }
   * { box-sizing: border-box }
-  body { margin: 0; padding: 24px; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif }
+  body { margin: 0; padding: 24px; background: var(--mb-bg); color: var(--mb-fg); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif }
   header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px }
-  h1 { margin: 0; font-size: 18px } h1 b { color: var(--accent) }
-  .muted { color: var(--muted) }
+  h1 { margin: 0; font-size: 18px } h1 b { color: var(--mb-accent) }
+  .muted { color: var(--mb-muted) }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px }
-  .block { border: 1px solid var(--line); border-radius: 10px; padding: 14px }
+  .block { border: 1px solid var(--mb-line); border-radius: 10px; padding: 14px }
   .block.wide { grid-column: 1 / -1 }
-  .block h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted) }
-  .error { color: var(--bad) }
+  .block h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--mb-muted) }
+  .error { color: var(--mb-bad) }
   .counts { display: flex; gap: 28px; margin-bottom: 12px }
-  .counts div { font-size: 26px; font-weight: 700 } .counts span { display: block; font-size: 12px; font-weight: 400; color: var(--muted) }
-  .task { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line) }
-  .task .id { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 48px }
+  .counts div { font-size: 26px; font-weight: 700 } .counts span { display: block; font-size: 12px; font-weight: 400; color: var(--mb-muted) }
+  .task { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--mb-line) }
+  .task .id { color: var(--mb-muted); font-variant-numeric: tabular-nums; min-width: 48px }
   .task .title { flex: 1; font-weight: 600 }
-  .task .who { color: var(--warn) }
+  .task .who { color: var(--mb-warn) }
   .note { display: flex; gap: 8px; padding: 0 0 8px 58px }
-  .note input { flex: 1; font: inherit; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--fg) }
+  .note input { flex: 1; font: inherit; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--mb-line); background: none; color: var(--mb-fg) }
   #said { margin-left: auto }
-  button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--fg); cursor: pointer }
-  button:disabled { color: var(--muted); cursor: default }
-  pre { margin: 0; white-space: pre-wrap; color: var(--muted) }
+  button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--mb-line); background: none; color: var(--mb-fg); cursor: pointer }
+  button:disabled { color: var(--mb-muted); cursor: default }
+  pre { margin: 0; white-space: pre-wrap; color: var(--mb-muted) }
 </style>
 </head>
 <body>
@@ -139,7 +139,36 @@ function setBusy(on) {
   if (act) for (const b of document.querySelectorAll('button.act')) b.disabled = on
 }
 
+// A redraw replaces every button. One that lands between a press and its
+// release takes the button from under the pointer and the click is lost
+// (a refresh on focus answers in milliseconds), so the board is redrawn only
+// when it changed, and never mid-press: a change waits for the click to land.
+let drawnKey = null
+let pressing = false
+let waitingDraw = null
+document.addEventListener('pointerdown', () => (pressing = true), true)
+const released = () => {
+  pressing = false
+  if (!waitingDraw) return
+  const blocks = waitingDraw
+  waitingDraw = null
+  setTimeout(() => draw(blocks)) // after the click this release makes
+}
+document.addEventListener('pointerup', released, true)
+document.addEventListener('pointercancel', released, true)
+
+// What a board looks like on screen: its blocks without their read times,
+// and whether its buttons can act.
+const looksOf = blocks => JSON.stringify([!!act, blocks.map(({ updatedAt, ...b }) => b)])
+
 function draw(blocks) {
+  const key = looksOf(blocks)
+  if (key === drawnKey) return
+  if (pressing) {
+    waitingDraw = blocks
+    return
+  }
+  drawnKey = key
   // The open note moves to the new rows with what was typed and the caret;
   // it closes if its task no longer takes a note (released elsewhere).
   const focused = note && document.activeElement === note.input
@@ -166,11 +195,12 @@ function draw(blocks) {
 }
 
 let lastBlocks = null
+let project = null
 function shown(blocks) {
   lastBlocks = blocks
   draw(blocks)
   const state = document.getElementById('state')
-  state.textContent = `updated ${new Date().toLocaleTimeString()}`
+  state.textContent = `updated ${new Date().toLocaleTimeString()}${project ? ` · ${project}` : ''}`
   state.className = 'muted'
 }
 
@@ -186,32 +216,77 @@ function say(text, cls = 'muted') {
   said.className = cls
 }
 
-// Two ways to get the blocks, same drawing:
-//  - in an MCP Apps host (board mcp), the page sits in the host's iframe and
-//    speaks JSON-RPC over postMessage: the tool's result arrives as a
-//    notification, and a refresh calls board_view again through the host;
+// Three ways to get the blocks, same drawing:
+//  - in an MCP Apps host (board mcp in Codex, Claude Desktop), the page sits
+//    in the host's iframe and speaks JSON-RPC over postMessage: the tool's
+//    result arrives as a notification, and a refresh calls board_view again
+//    through the host;
+//  - in a host's own side panel (Antigravity), its bridge script gives the
+//    page window.sidecar: the same tool calls go to the panel's server, which
+//    passes them to board mcp for the conversation's project
+//    (lib/sidecar.mjs);
 //  - on its own (board serve), it reads /blocks.json.
-const inHost = window.parent !== window
+const sidecar = window.sidecar
+const inHost = !!sidecar || window.parent !== window
 
 if (inHost) {
-  let nextId = 1
-  const waiting = new Map()
-  const post = msg => window.parent.postMessage({ jsonrpc: '2.0', ...msg }, '*')
-  // A host may hold the page's calls (Claude Desktop pauses a widget in the
-  // background). A read that gets no answer in ms fails visibly; ms = 0 waits
-  // for as long as it takes, for a call that must not be given up on.
-  const request = (method, params, ms = 15000) =>
-    new Promise((resolve, reject) => {
-      const id = nextId++
-      const timer = ms > 0 && setTimeout(() => {
-        waiting.delete(id)
-        reject(new Error('no answer from the host'))
-      }, ms)
-      const done = f => v => (clearTimeout(timer), f(v))
-      waiting.set(id, { resolve: done(resolve), reject: done(reject) })
-      post({ id, method, params })
+  // callTool(name, args, ms) → the tool's result; ms as for request below.
+  let callTool
+  let tellSize = () => {}
+  let ready
+  if (sidecar) {
+    callTool = async (name, args) => {
+      // The conversation's folder, if it has one; the panel's server shows
+      // its board, or the default board when it has none.
+      const workspace = (await sidecar.getWorkspaceUris())[0] ?? null
+      const res = await sidecar.fetch('/api/call', { method: 'POST', body: JSON.stringify({ workspace, name, arguments: args }) })
+      const body = await res.json()
+      if (!res.ok) throw Object.assign(new Error(body.error ?? res.statusText), { code: body.code })
+      return body
+    }
+    sidecar.onWorkspaceChange?.(() => refresh())
+    ready = Promise.resolve()
+  } else {
+    let nextId = 1
+    const waiting = new Map()
+    const post = msg => window.parent.postMessage({ jsonrpc: '2.0', ...msg }, '*')
+    // A host may hold the page's calls (Claude Desktop pauses a widget in the
+    // background). A read that gets no answer in ms fails visibly; ms = 0
+    // waits for as long as it takes, for a call that must not be given up on.
+    const request = (method, params, ms = 15000) =>
+      new Promise((resolve, reject) => {
+        const id = nextId++
+        const timer = ms > 0 && setTimeout(() => {
+          waiting.delete(id)
+          reject(new Error('no answer from the host'))
+        }, ms)
+        const done = f => v => (clearTimeout(timer), f(v))
+        waiting.set(id, { resolve: done(resolve), reject: done(reject) })
+        post({ id, method, params })
+      })
+    callTool = (name, args, ms) => request('tools/call', { name, arguments: args }, ms)
+    tellSize = () => post({ method: 'ui/notifications/size-changed', params: { height: document.documentElement.scrollHeight } })
+
+    window.addEventListener('message', event => {
+      if (event.source !== window.parent) return
+      const msg = event.data
+      if (!msg || msg.jsonrpc !== '2.0') return
+      if (msg.id !== undefined && waiting.has(msg.id)) {
+        const { resolve, reject } = waiting.get(msg.id)
+        waiting.delete(msg.id)
+        msg.error ? reject(Object.assign(new Error(msg.error.message ?? 'request failed'), { code: msg.error.code })) : resolve(msg.result)
+        return
+      }
+      if (msg.method === 'ui/notifications/tool-result') {
+        try { fromResult(msg.params, ++sent) } catch (err) { failed(err) }
+      }
     })
-  const tellSize = () => post({ method: 'ui/notifications/size-changed', params: { height: document.documentElement.scrollHeight } })
+
+    // The handshake waits as long as the host takes: until it answers,
+    // nothing else may be sent, and a paused host answers late, not never.
+    ready = request('ui/initialize', { appInfo: { name: 'modboard', version: '1' }, appCapabilities: {}, protocolVersion: '2026-01-26' }, 0)
+      .then(() => post({ method: 'ui/notifications/initialized' }))
+  }
 
   // Answers can arrive out of order: each read is numbered when it is sent,
   // and one older than the board already drawn is dropped.
@@ -222,24 +297,11 @@ if (inHost) {
     if (!Array.isArray(result?.structuredContent?.blocks)) throw new Error('no blocks in the result')
     if (seq < drawn) return
     drawn = seq
+    // A side panel may show a board other than the conversation's: say whose.
+    project = typeof result._meta?.project === 'string' ? result._meta.project : project
     shown(result.structuredContent.blocks)
     tellSize()
   }
-
-  window.addEventListener('message', event => {
-    if (event.source !== window.parent) return
-    const msg = event.data
-    if (!msg || msg.jsonrpc !== '2.0') return
-    if (msg.id !== undefined && waiting.has(msg.id)) {
-      const { resolve, reject } = waiting.get(msg.id)
-      waiting.delete(msg.id)
-      msg.error ? reject(Object.assign(new Error(msg.error.message ?? 'request failed'), { code: msg.error.code })) : resolve(msg.result)
-      return
-    }
-    if (msg.method === 'ui/notifications/tool-result') {
-      try { fromResult(msg.params, ++sent) } catch (err) { failed(err) }
-    }
-  })
 
   // Refresh only while someone can see the board: in view, in a window that
   // is showing, and with no action out (its answer brings the board).
@@ -248,7 +310,7 @@ if (inHost) {
   const refresh = () => {
     if (busy || !looking() || snapshotOnly) return
     const seq = ++sent
-    request('tools/call', { name: 'board_view', arguments: {} }).then(r => fromResult(r, seq)).catch(unlessUnsupported(failed))
+    callTool('board_view', {}).then(r => fromResult(r, seq)).catch(unlessUnsupported(failed))
   }
 
   // What the host can do is learned from how it answers, not assumed: a host
@@ -256,6 +318,17 @@ if (inHost) {
   // board, buttons off, saying so, instead of an error every ten seconds.
   let snapshotOnly = false
   const unlessUnsupported = then => err => {
+    // No conversation, so no project yet (a side panel on its welcome
+    // screen): nothing is wrong, there is just nothing to show.
+    if (err?.code === 'no-project') {
+      lastBlocks = null
+      drawnKey = null
+      document.getElementById('blocks').replaceChildren()
+      const state = document.getElementById('state')
+      state.textContent = err.message
+      state.className = 'muted'
+      return
+    }
     if (err?.code !== -32601) return then(err)
     snapshotOnly = true
     act = null
@@ -279,9 +352,9 @@ if (inHost) {
       refresh()
     }, 60000)
     try {
-      const result = await request('tools/call', { name: 'board_act', arguments: { action, target, ...(text !== undefined ? { text } : {}) } }, 0)
+      const result = await callTool('board_act', { action, target, ...(text !== undefined ? { text } : {}) }, 0)
       say(result?.content?.[0]?.text ?? '', result?.isError ? 'error' : 'muted')
-      if (result?.structuredContent?.blocks) fromResult({ structuredContent: result.structuredContent }, seq)
+      if (result?.structuredContent?.blocks) fromResult({ structuredContent: result.structuredContent, _meta: result._meta }, seq)
     } catch (err) {
       unlessUnsupported(e => say(e.message, 'error'))(err)
       if (snapshotOnly) say('')
@@ -292,11 +365,10 @@ if (inHost) {
     }
   }
 
-  // The handshake waits as long as the host takes: until it answers, nothing
-  // else may be sent, and a paused host answers late, not never.
-  request('ui/initialize', { appInfo: { name: 'modboard', version: '1' }, appCapabilities: {}, protocolVersion: '2026-01-26' }, 0)
+  ready
     .then(() => {
-      post({ method: 'ui/notifications/initialized' })
+      // A sidecar gets no tool result to start from: it asks at once.
+      if (sidecar) refresh()
       setInterval(refresh, 10000)
       // Back in view after a pause: catch up at once, not on the next tick.
       document.addEventListener('visibilitychange', refresh)

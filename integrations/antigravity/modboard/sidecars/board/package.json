@@ -1,0 +1,7 @@
+{
+  "name": "modboard-antigravity-board",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "modBOARD's side panel for Antigravity."
+}

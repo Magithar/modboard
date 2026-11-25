@@ -1,0 +1,11 @@
+{
+  "name": "modboard",
+  "plugins": [
+    {
+      "name": "modboard",
+      "source": { "source": "local", "path": "./integrations/codex" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}
