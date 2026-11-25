@@ -804,6 +804,9 @@ function checkFlags(cmd, flags) {
 }
 
 // Commands that read no board, so no storage block is loaded for them.
+// Commands that work but aren't offered yet.
+const HIDDEN = new Set(['secret'])
+
 const BOARDLESS = new Set(['where', 'taskfile', 'block', 'blocks', 'antigravity', 'weather', 'secret'])
 // Displays act for a person, who has no process to watch: their claims end by
 // lease alone, not when the app showing the board quits (lib/holder.mjs).
@@ -814,7 +817,9 @@ async function main() {
   const { pos, flags } = parseArgs(rest)
   const run = commands[cmd]
   if (!run) {
-    console.error(`usage: board <${Object.keys(commands).join('|')}> ...   (--json for machine output)`)
+    // Kept out of the list: secrets wait for a block that needs a key (plan 4.1).
+    const listed = Object.keys(commands).filter(c => !HIDDEN.has(c))
+    console.error(`usage: board <${listed.join('|')}> ...   (--json for machine output)`)
     process.exit(2)
   }
   try {

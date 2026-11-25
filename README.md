@@ -718,23 +718,6 @@ and after 10 seconds it shows `timed out`.
 - `board blocks --all` lists it with the ready-made ones; `board blocks off
   deploy` hides it, and `board blocks remove deploy` deletes it.
 
-**A command that needs a key.** Keep the key in your OS keychain, and give
-it to the block by name:
-
-```bash
-board secret set github            # asks for it; nothing shows as you type
-board blocks add prs --run 'curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/…' --secret GH_TOKEN=github
-```
-
-- The value lives in the macOS Keychain (or the Secret Service on Linux,
-  through `secret-tool`); your settings keep only the name. It never goes in
-  a command's arguments, a file or your shell history. `--stdin` reads it
-  from a pipe instead of asking: `pass show github | board secret set github --stdin`.
-- The block gets it as `$GH_TOKEN` when it runs. If the command prints it,
-  the block shows `••••` in its place, and no display ever receives it.
-- There's no command that prints a secret back. `board secret list` shows
-  the names, and `board secret remove github` deletes one.
-- Windows isn't supported yet.
 
 ### A display block from a command (no code)
 
