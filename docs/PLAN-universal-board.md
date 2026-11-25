@@ -46,12 +46,12 @@ opinionated core and contract, open blocks on top.
 
 Independent of MCP Apps: the localhost page, MCP Apps hosts and the Claude
 Code mod are all renderers of the same data. Defined in
-`lib/block-data.mjs`, typed in `types/index.d.ts`.
+`lib/block-data.mjs`, typed in `types/index.d.ts`. **Stable since Phase 2.**
 
 ```ts
 interface BlockData<T = unknown> {
   id: string            // 'tasks', 'branch', …
-  type: string          // which renderer: 'tasks', 'line', …
+  type: string          // which view draws it: one of VIEW_TYPES ('tasks', 'line')
   schemaVersion: 1
   title: string
   status: 'ready' | 'loading' | 'error'
@@ -65,10 +65,23 @@ interface BlockAction {
   id: string            // a name the server knows, never a command
   label: string
   target?: string       // the item it acts on, e.g. 'T-005'
+  input?: 'text'        // the person types a line for it (a note)
 }
 ```
 
-Kept small on purpose. Phase 1 decides what it really needs.
+Rules that keep it stable:
+
+- Within v1 a field may be added, never removed, renamed or given a new
+  meaning. A renderer ignores fields it doesn't know.
+- Anything else is v2. A renderer shows a block of a version it doesn't
+  speak as "needs a newer modBOARD", never guesses.
+- Every display checks each block (`checkBlock`) before showing it; a
+  malformed one becomes an error card that says why (`safeBlock`), so a
+  block someone else wrote can only break its own card.
+- A task's actions come from one table (`TASK_ACTIONS`): the button, the
+  server's check and the widget tool's schema all read it.
+- Every renderer draws every view in `VIEW_TYPES`; an unknown type shows as
+  its raw data. `test/renderers.test.mjs` checks they agree.
 
 ## 2. Security model
 
@@ -140,16 +153,17 @@ depends on the go/no-go of the one before.
 
 ### Phase 2 — Shared foundation (P1)
 
-| # | Task | R | I | C | E | RICE |
-|---|---|---|---|---|---|---|
-| 2.1 | Stabilise versioned contract | 10 | 2 | 80% | 0.5 | **32** |
-| 2.2 | Extend block registry to describe renderers | 8 | 2 | 80% | 1 | **13** |
-| 2.3 | Reusable HTML renderer per block type | 8 | 2 | 80% | 1.5 | **11** |
-| 2.4 | Host capability detection | 6 | 1 | 50% | 1 | **3** |
-| 2.5 | Server-side action validation, all actions | 10 | 3 | 80% | 1 | **24** |
-| 2.6 | Test approved command execution | 10 | 3 | 100% | 0.5 | **60** |
-| 2.7 | Cross-renderer compatibility tests | 8 | 1 | 80% | 1 | **6** |
-| 2.8 | Regression-test Claude Code mod | 10 | 3 | 100% | 0.25 | **120** |
+| # | Task | R | I | C | E | RICE | Status |
+|---|---|---|---|---|---|---|---|
+| 2.1 | Stabilise versioned contract | 10 | 2 | 80% | 0.5 | **32** | done: v1 rules in §1; `checkBlock` / `safeBlock` on every display; the widget shows "needs a newer modBOARD" for another version, and `loading` |
+| 2.2 | Extend block registry to describe renderers | 8 | 2 | 80% | 1 | **13** | done: a block names its `view` (default `line`); the registry lists it |
+| 2.3 | Reusable HTML renderer per block type | 8 | 2 | 80% | 1.5 | **11** | done for today's views: one `VIEWS` table in the page, the contract's `VIEW_TYPES` lists what every renderer draws. Splitting views into their own files waits for a third view |
+| 2.4 | Host capability detection | 6 | 1 | 50% | 1 | **3** | done: learned from the host's answers, not its claims; a host that can't carry tool calls gets a still snapshot, buttons off, saying so |
+| 2.5 | Server-side action validation, all actions | 10 | 3 | 80% | 1 | **24** | done: one `TASK_ACTIONS` table drives buttons, checks and the tool schema; a new action without a run stops modBOARD at start; non-string action names refused |
+| 2.6 | Test approved command execution | 10 | 3 | 100% | 0.5 | **60** | done: `test/execution.test.mjs` runs `board mcp` as a host does; found and fixed: finding the board ran `git` from the plain PATH, so a project's own `git` could run |
+| 2.7 | Cross-renderer compatibility tests | 8 | 1 | 80% | 1 | **6** | done: `test/renderers.test.mjs`; widget and bench get identical blocks |
+| 2.8 | Regression-test Claude Code mod | 10 | 3 | 100% | 0.25 | **120** | passing (137 + 122) |
+| 2.9 | `--dir` for hosts that give no folder (from §3) | 6 | 1 | 100% | 0.25 | **24** | done: `board mcp --dir <project>`, `board serve --dir`; replaces the `sh -c "cd …"` entry |
 
 ### Phase 3 — Platform expansion (P1)
 

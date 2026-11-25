@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { SCHEMA_VERSION, blockData, lineBlock, tasksBlock } from '../lib/block-data.mjs'
+import { SCHEMA_VERSION, blockData, checkBlock, lineBlock, safeBlock, tasksBlock } from '../lib/block-data.mjs'
 
 const NOW = Date.parse('2026-11-25T12:00:00Z')
 const task = (id, over = {}) => ({ id, title: id, description: '', status: 'todo', claim: null, notes: [], ...over })
@@ -58,4 +58,35 @@ test('a ready block line: ok and empty are ready, anything else is an error with
   assert.equal(bad.status, 'error')
   assert.equal(bad.error, 'gh is not installed')
   assert.equal(bad.title, 'CI')
+})
+
+// v1 is stable: every block a display shows keeps it, and one that doesn't
+// becomes an error card that says why, so it can only break itself.
+test('every block modBOARD makes keeps the v1 contract', () => {
+  const t = { id: 'T-001', title: 'x', status: 'todo', notes: [], labels: ['kind=bug'] }
+  for (const b of [tasksBlock([t], { me: 'human' }), lineBlock({ id: 'ci', state: 'ok', text: 'green' }), lineBlock({ id: 'ci', state: 'auth', text: 'sign in' })])
+    assert.deepEqual(checkBlock(b), [], b.id)
+})
+
+test('a malformed block is named and shown as an error card, not passed on', () => {
+  const good = lineBlock({ id: 'ci', state: 'ok', text: 'green' })
+  const cases = [
+    [null, /not an object/],
+    [{ ...good, schemaVersion: 2 }, /schemaVersion is 2/],
+    [{ ...good, status: 'weird' }, /status/],
+    [{ ...good, status: 'error', error: undefined }, /error is not a string/],
+    [{ ...good, updatedAt: 'later' }, /updatedAt/],
+    [{ ...good, actions: [{ id: 'claim' }] }, /needs an id and a label/],
+    [{ ...good, actions: [{ id: 'run', label: 'Run', input: 'command' }] }, /malformed/],
+    [{ ...good, title: '' }, /title/],
+  ]
+  for (const [b, why] of cases) {
+    assert.match(checkBlock(b).join('; '), why)
+    const shown = safeBlock(b)
+    assert.deepEqual(checkBlock(shown), [])
+    assert.equal(shown.status, 'error')
+    assert.match(shown.error, /malformed/)
+    assert.deepEqual(shown.actions, [])
+  }
+  assert.equal(safeBlock(good), good)
 })

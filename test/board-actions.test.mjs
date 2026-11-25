@@ -122,3 +122,18 @@ test('the same claim or note twice is done once', async () => {
   assert.deepEqual((await board.show('T-001')).notes.map(n => n.text), ['looked at it', 'and fixed it'])
   await refused(act({ action: 'note', target: 'T-002', text: 'hi' }), /held by codex 1/)
 })
+
+// One table (TASK_ACTIONS) drives the buttons, the checks and the schema.
+test('the buttons, the checks and the tool schema all come from one table', async () => {
+  const { TASK_ACTIONS } = await import('../lib/block-data.mjs')
+  const { ACTION_IDS } = await import('../lib/board-actions.mjs')
+  const { board, act } = await setup()
+  const handle = createMcp({ read: async () => [], act, version: '0' })
+  const { result } = await handle({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+  const schema = result.tools.find(t => t.name === 'board_act').inputSchema.properties.action.enum
+  assert.deepEqual(schema, Object.keys(TASK_ACTIONS))
+  assert.deepEqual(ACTION_IDS, Object.keys(TASK_ACTIONS))
+  for (const bad of [['claim'], { toString: () => 'claim' }, 'toString', 'hasOwnProperty'])
+    await refused(act({ action: bad, target: 'T-001' }), /no action/)
+  assert.equal((await board.show('T-001')).status, 'todo')
+})

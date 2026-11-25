@@ -17,19 +17,26 @@ import { BoardError, createEngine } from '../lib/engine.mjs'
 import { createHolder } from '../lib/holder.mjs'
 import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock, storeStatus } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
-import { blockById, registry, runBlock, setEnabled, enabledIds } from '../lib/ready-blocks.mjs'
+import { blockById, findTool, projectRoot, registry, runBlock, setEnabled, enabledIds, viewOf } from '../lib/ready-blocks.mjs'
 import { lineBlock, tasksBlock } from '../lib/block-data.mjs'
 import { createBench, listen } from '../lib/serve.mjs'
 import { createMcp, runStdio } from '../lib/mcp.mjs'
 import { boardActions } from '../lib/board-actions.mjs'
 
+// git, found on PATH with the project's own folders left out (its bin/,
+// node_modules/.bin), so a git the project ships never runs, even just to
+// find the board (lib/ready-blocks.mjs). A missing git throws, as a failed
+// run does, and every caller falls back.
+function gitSync(args) {
+  const git = findTool('git', projectRoot(process.cwd()))
+  if (!git) throw Object.assign(new Error('git not found'), { code: 'ENOENT' })
+  return execFileSync(git, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+}
+
 function boardDir() {
   if (process.env.BOARD_DIR) return path.resolve(process.env.BOARD_DIR)
   try {
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim()
+    const common = gitSync(['rev-parse', '--path-format=absolute', '--git-common-dir']).trim()
     return inside(path.dirname(common))
   } catch {
     return inside(process.cwd())
@@ -40,7 +47,7 @@ function boardDir() {
 // repo), else the current directory: where a task.md is looked for.
 function projectDir() {
   try {
-    return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    return gitSync(['rev-parse', '--show-toplevel']).trim()
   } catch {
     return process.cwd()
   }
@@ -51,7 +58,7 @@ function projectDir() {
 // Nothing outside a git repo.
 const FILES_KEPT = 50
 function whereNow() {
-  const raw = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  const raw = (...args) => gitSync(args)
   const git = (...args) => raw(...args).trim()
   const or = (f, fallback) => {
     try {
@@ -182,6 +189,23 @@ function describe(t) {
   return out.join('\n')
 }
 
+// board mcp|serve --dir <project>: the project to show, for a host that
+// starts its servers somewhere else (Claude Desktop starts them in /, with no
+// setting for the folder). Read before anything else looks at the folder.
+function chdirFromFlag() {
+  const [cmd, ...rest] = process.argv.slice(2)
+  const dir = parseArgs(rest).flags.dir
+  if (dir === undefined || !DIR_COMMANDS.has(cmd)) return
+  const at = typeof dir === 'string' ? path.resolve(dir) : ''
+  if (!at || !fs.statSync(at, { throwIfNoEntry: false })?.isDirectory()) {
+    console.error(`board: --dir needs a folder that exists${typeof dir === 'string' ? ` (not ${dir})` : ''}`)
+    process.exit(2)
+  }
+  process.chdir(at)
+}
+const DIR_COMMANDS = new Set(['mcp', 'serve'])
+chdirFromFlag()
+
 const DIR = boardDir()
 const LEASE_MS = Number(process.env.BOARD_LEASE_MS ?? 15 * 60 * 1000)
 
@@ -274,7 +298,7 @@ const boardBlocks = (board, me) => async () => {
   const cwd = process.cwd()
   const tasks = await board.list({ all: true })
   const lines = await Promise.all(enabledIds().map(id => runBlockAtMostEvery(id, cwd, { tasks: async () => tasks })))
-  return [tasksBlock(tasks, { me }), ...lines.map(l => lineBlock(l, { title: blockById(l.id)?.title }))]
+  return [tasksBlock(tasks, { me }), ...lines.map(l => lineBlock(l, { title: blockById(l.id)?.title, type: viewOf(l.id) }))]
 }
 
 // Refuse, with the board's own words, unless actor holds the task.
@@ -507,7 +531,7 @@ const commands = {
   },
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
-  // board serve [--port 4477]: the board as a local web page, read-only, in
+  // board serve [--port 4477] [--dir <project>]: the board as a local web page, read-only, in
   // the shared block shape (lib/block-data.mjs). Runs until stopped.
   async serve(board, _, flags) {
     const port = flags.port === undefined ? 4477 : typeof flags.port === 'string' && /^\d+$/.test(flags.port) ? Number(flags.port) : NaN
@@ -521,7 +545,7 @@ const commands = {
     console.log(`modBOARD at ${url}  (this machine only, read-only; Ctrl-C stops it)`)
     return new Promise(() => {})
   },
-  // board mcp: the board as a local MCP server on stdio, drawn as an MCP App
+  // board mcp [--dir <project>]: the board as a local MCP server on stdio, drawn as an MCP App
   // where the host can (codex mcp add modboard -- board mcp). Its buttons act
   // for the person, as BOARD_AGENT, else "human". stdout carries the protocol
   // only, so it exits when the host hangs up.
@@ -548,8 +572,8 @@ const FLAGS = {
   run: [],
   block: ['name'],
   blocks: ['all'],
-  serve: ['port'],
-  mcp: [],
+  serve: ['port', 'dir'],
+  mcp: ['dir'],
   done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],

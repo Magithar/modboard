@@ -150,7 +150,9 @@ function draw(blocks) {
     ...blocks.map(block => {
       const card = el('section', `block${block.type === 'tasks' ? ' wide' : ''}`)
       card.append(el('h2', '', block.title))
-      if (block.status === 'error') card.append(el('div', 'error', block.error))
+      if (block.schemaVersion !== 1) card.append(el('div', 'error', `needs a newer modBOARD (block schema ${block.schemaVersion})`))
+      else if (block.status === 'error') card.append(el('div', 'error', block.error))
+      else if (block.status === 'loading') card.append(el('div', 'muted', 'loading…'))
       else if (VIEWS[block.type]) VIEWS[block.type](block, card)
       else card.append(el('pre', '', JSON.stringify(block.data, null, 2)))
       return card
@@ -163,7 +165,9 @@ function draw(blocks) {
   }
 }
 
+let lastBlocks = null
 function shown(blocks) {
+  lastBlocks = blocks
   draw(blocks)
   const state = document.getElementById('state')
   state.textContent = `updated ${new Date().toLocaleTimeString()}`
@@ -229,7 +233,7 @@ if (inHost) {
     if (msg.id !== undefined && waiting.has(msg.id)) {
       const { resolve, reject } = waiting.get(msg.id)
       waiting.delete(msg.id)
-      msg.error ? reject(new Error(msg.error.message ?? 'request failed')) : resolve(msg.result)
+      msg.error ? reject(Object.assign(new Error(msg.error.message ?? 'request failed'), { code: msg.error.code })) : resolve(msg.result)
       return
     }
     if (msg.method === 'ui/notifications/tool-result') {
@@ -242,9 +246,23 @@ if (inHost) {
   let onScreen = true
   const looking = () => onScreen && document.visibilityState === 'visible'
   const refresh = () => {
-    if (busy || !looking()) return
+    if (busy || !looking() || snapshotOnly) return
     const seq = ++sent
-    request('tools/call', { name: 'board_view', arguments: {} }).then(r => fromResult(r, seq)).catch(failed)
+    request('tools/call', { name: 'board_view', arguments: {} }).then(r => fromResult(r, seq)).catch(unlessUnsupported(failed))
+  }
+
+  // What the host can do is learned from how it answers, not assumed: a host
+  // that can't carry the page's tool calls (method not found) gets a still
+  // board, buttons off, saying so, instead of an error every ten seconds.
+  let snapshotOnly = false
+  const unlessUnsupported = then => err => {
+    if (err?.code !== -32601) return then(err)
+    snapshotOnly = true
+    act = null
+    if (lastBlocks) draw(lastBlocks)
+    const state = document.getElementById('state')
+    state.textContent = 'a snapshot: this app doesn\'t let the board refresh or act'
+    state.className = 'muted'
   }
 
   // Ask the board to act; it answers with what it did, or why not, and the
@@ -265,7 +283,8 @@ if (inHost) {
       say(result?.content?.[0]?.text ?? '', result?.isError ? 'error' : 'muted')
       if (result?.structuredContent?.blocks) fromResult({ structuredContent: result.structuredContent }, seq)
     } catch (err) {
-      say(err.message, 'error')
+      unlessUnsupported(e => say(e.message, 'error'))(err)
+      if (snapshotOnly) say('')
     } finally {
       clearTimeout(slow)
       clearTimeout(giveUp)
