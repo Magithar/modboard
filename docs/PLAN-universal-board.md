@@ -96,7 +96,8 @@ Rules that keep it stable:
 | Run an unapproved block | Denied |
 | Install an executable block | Explicit user approval |
 | Change block permissions | User only |
-| Read block secrets | Never; widgets get no raw credentials |
+| Read block secrets | Never; widgets get no raw credentials. Kept in the OS keychain, given to a block at run time, masked in its output; no command prints one back |
+| A block reaches the network | Only the hosts it names, over HTTPS, no redirects; none while `board blocks network off` |
 
 The localhost bench binds to `127.0.0.1` only and refuses any request whose
 `Host` isn't local (no DNS rebinding).
@@ -182,13 +183,14 @@ depends on the go/no-go of the one before.
 
 ### Phase 4 — Block ecosystem (P2)
 
-| # | Task | R | I | C | E | RICE |
-|---|---|---|---|---|---|---|
-| 4.1 | Block secrets storage (OS keychain) | 6 | 3 | 80% | 1.5 | **10** |
-| 4.2 | Network permissions per block | 6 | 3 | 80% | 1 | **14** |
+| # | Task | R | I | C | E | RICE | Status |
+|---|---|---|---|---|---|---|---|
+| 4.1 | Block secrets storage (OS keychain) | 6 | 3 | 80% | 1.5 | **10** | done (2026-11-26): `board secret set\|remove\|list` keeps a value in the macOS Keychain or Linux Secret Service, set by a hidden prompt or `--stdin`, never in arguments, files or history; settings keep names only; no command reads one back. Its first user: a block of your own takes `--secret VAR=name`, gets it as an environment variable, and its value is masked in the line. Live: a round trip through the real Keychain, quotes and backslash intact, then removed |
+| 4.2 | Network permissions per block | 6 | 3 | 80% | 1 | **14** | done (2026-11-26): a block names its `hosts` and gets only a guarded fetch (HTTPS, those hosts, default port, no redirects, no credentials in the URL); `board blocks network off\|on` stops every block's network; `--all` shows what each reaches. Blocks of your own (shell commands) aren't limited, and the docs say so. Live: weather through the guard, and stopped with the network off |
 | 4.3 | OAuth where a provider needs it | 3 | 1 | 50% | 2 | **0.8** |
-| 4.4 | Release localhost dashboard | 8 | 2 | 80% | 0.5 | **26** |
-| 4.5 | Clock, timer, weather | 6 | 1 | 80% | 1 | **5** |
+| 4.4 | Release localhost dashboard | 8 | 2 | 80% | 0.5 | **26** | done (2026-11-26): `board serve --open`; buttons act as you through one POST that needs the run's token, this page's origin and JSON; `--read-only` turns them off. Tried in the browser: Claim, Note (Enter), Release reach the board; requests without the token or from another site get 403. README: The dashboard |
+| 4.11 | Your own blocks in every app (from the Phase 4 order) | 8 | 2 | 80% | 0.5 | **26** | built: `board blocks add <name> --run "<command>"`, confirmed at a terminal, kept in your settings; shown by board mcp, the dashboard, the Antigravity panel and the Claude Code mod. Runs in the project root, project folders off PATH, 10 s timeout, first line. Tried (2026-11-26): a block added to your settings showed in the CLI, the dashboard and through board mcp as the apps run it |
+| 4.5 | Clock, timer, weather | 6 | 1 | 80% | 1 | **5** | done (2026-11-26), seen in Codex, Claude Desktop, Antigravity and the dashboard, with a block of your own using a keychain secret, masked, in each: `clock` and `timer` are new views drawn and ticking in the page (VIEW_TYPES now tasks, line, clock, timer); `weather` is a line from Open-Meteo for a place set with `board weather <place>`, declaring its hosts for 4.2. Tried in the dashboard: clock ticks, timer counts down through refreshes and ends, weather reads live. The Claude Code mod lists only line blocks |
 | 4.6 | Calendar and appointments | 4 | 1 | 50% | 2 | **1** |
 | 4.7 | EPL and cricket tickers | 3 | 0.5 | 50% | 1 | **0.8** |
 | 4.8 | Radio and Spotify | 3 | 0.5 | 50% | 2 | **0.4** |

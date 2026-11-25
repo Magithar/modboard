@@ -201,7 +201,9 @@ async function loadReady($: EngineInterface) {
   const out = await cli($, ['blocks', '--all', '--json']).catch(() => undefined)
   let list: ReadyBlock[] = []
   try {
-    list = out?.ok ? ((JSON.parse(out.text) as { all: ReadyBlock[] }).all ?? []).filter(b => !commandNames.includes(b.id)) : []
+    // Only blocks that are a line of text: a clock or a timer is drawn by the
+    // board page (board serve, the apps), and Claude Code has its own clock.
+    list = out?.ok ? ((JSON.parse(out.text) as { all: ReadyBlock[] }).all ?? []).filter(b => !commandNames.includes(b.id) && (b.view ?? 'line') === 'line') : []
   } catch {}
   if (!same(await read($, readyList), list)) await update($, readyList, () => list)
   // A block turned off drops its line.

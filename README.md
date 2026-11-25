@@ -254,6 +254,29 @@ prompt, and the `/board` pane. Both are lists of blocks you choose in
 [Settings](#settings). With the default blocks, the display shows only what
 needs you, and everything else waits until you ask.
 
+Outside Claude Code, the same board is a page: in your browser (the
+dashboard, below), and as a live widget in Codex, Claude Desktop and
+Antigravity ([docs/HOSTS.md](docs/HOSTS.md)).
+
+### The dashboard
+
+```bash
+board serve --open
+```
+
+The board in your own browser, refreshing every few seconds: who's on what,
+the blocks you turned on, and Claim, Note and Release buttons that act for
+you (`BOARD_AGENT`, else `human`). It's the same page the apps draw.
+
+- **This machine only.** It listens on `127.0.0.1`, and refuses a request
+  whose Host isn't this machine.
+- **Only its own page can press the buttons.** Each run makes a secret token
+  that only the page it serves carries; a request without it, from another
+  site, or not JSON is refused. Every press is then checked like any other
+  claim, note or release.
+- `--port 4477` picks the port, `--dir <project>` the project, and
+  `--read-only` turns the buttons off. Ctrl-C stops it.
+
 ### The band
 
 One line above the prompt, while there's work on the board:
@@ -588,7 +611,7 @@ a block you choose.
 
 ## Ready-made blocks
 
-Five blocks you turn on with one tick, nothing to write: on the band's
+Eight blocks you turn on with one tick, nothing to write: on the band's
 **blocks** list in Claude Code, or `board blocks on <id>` from any agent or a
 terminal. They show under **Project** in the pane, and `board blocks` prints
 them for Codex, OpenCode or a shell:
@@ -608,6 +631,29 @@ tests    npm test passed · 4 min ago · T-004
 | `ci` | the latest GitHub Actions run on this branch | git, gh |
 | `prs` | your open pull requests and the ones waiting for your review | git, gh |
 | `tests` | the last check an agent recorded with `board check`; it never runs your tests | nothing |
+| `weather` | the weather where you set, from Open-Meteo: `☀ 24° clear · H 30° · Bengaluru` | `board weather <place>` |
+| `clock` | the time where you are, ticking (the board page only) | nothing |
+| `timer` | a countdown: 5, 15, 25 min or your own (the board page only) | nothing |
+
+**Weather.** `board weather Bengaluru` (or `board weather 12.97,77.59`, and
+`--fahrenheit`) sets the place in your settings and turns the block on;
+`board weather off` turns it off. Nothing is sent anywhere until you name a
+place: then the name goes once to Open-Meteo's geocoding, and after that only
+the coordinates, to its forecast, every 15 minutes. No key, no account, and
+no guess from your IP.
+
+**Network.** A block that needs the network names the hosts it reaches, and
+gets only a guarded fetch: HTTPS, to those hosts, on the usual port, with no
+redirects. `board blocks --all` shows what each reaches (weather:
+`api.open-meteo.com`, `geocoding-api.open-meteo.com`). `board blocks network
+off` stops every block's network at once (they say `network off for blocks`);
+`board blocks network on` brings it back. Blocks of your own are shell
+commands you wrote and run with your access, so this doesn't limit them.
+
+**Clock and timer** are drawn by the board page itself (the dashboard, and
+the widget in Codex, Claude Desktop and Antigravity), ticking every second in
+your own time zone. A timer belongs to the window it runs in and changes
+nothing on the board. Claude Code has its own clock, so they don't show there.
 
 On the blocks list the groups sit below the single blocks, folded: `▶ Project`
 holds these, `▶ Limits` the bars. Press a group's row to open or fold it. A
@@ -640,6 +686,7 @@ matches what you want:
 
 | I want to… | Make | You write |
 |---|---|---|
+| show a command's output in every app (Codex, Claude Desktop, Antigravity, the dashboard, Claude Code) | [a block of your own](#a-block-of-your-own-every-app) | one command, no code |
 | show a command's output (CI status, git branch…) | [a command block](#a-display-block-from-a-command-no-code) | two settings, no code |
 | show something from the board, or react to a click | [a display block in code](#a-display-block-in-code) | one `.tsx` file |
 | keep the board somewhere else (a database, a server) | [a storage block](#a-storage-block-an-adapter) | one `.mjs` file |
@@ -647,6 +694,47 @@ matches what you want:
 ![How blocks work: the three ways to make your own, how a storage block (an adapter) is found, what the engine asks of it, where display blocks come from and how the band fits them on one line](docs/blocks.png)
 
 The diagram's source is plain text, [`docs/blocks.txt`](docs/blocks.txt).
+
+### A block of your own (every app)
+
+One command, and the block shows everywhere the board does:
+
+```bash
+board blocks add deploy --run "curl -s https://example.com/version" --title Deploy
+```
+
+It asks you to confirm at a terminal (an agent can't add one for you), then
+turns the block on. Every 30 seconds (`--every 1m` changes it) while a
+display shows the board, the command runs in that project's folder and the
+block shows the first line it prints, cut to 60 characters. When the
+command fails, the block shows the first line of its error output instead,
+and after 10 seconds it shows `timed out`.
+
+- It's kept in your own settings (`~/.config/modboard/settings.json`), never
+  in a project: opening someone else's repo can't add or run one.
+- It runs with your access, through your shell, except that the project's
+  own folders (its `bin/`, `node_modules/.bin`) are left off `PATH`, so a
+  tool a repo ships never stands in for yours.
+- `board blocks --all` lists it with the ready-made ones; `board blocks off
+  deploy` hides it, and `board blocks remove deploy` deletes it.
+
+**A command that needs a key.** Keep the key in your OS keychain, and give
+it to the block by name:
+
+```bash
+board secret set github            # asks for it; nothing shows as you type
+board blocks add prs --run 'curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/…' --secret GH_TOKEN=github
+```
+
+- The value lives in the macOS Keychain (or the Secret Service on Linux,
+  through `secret-tool`); your settings keep only the name. It never goes in
+  a command's arguments, a file or your shell history. `--stdin` reads it
+  from a pipe instead of asking: `pass show github | board secret set github --stdin`.
+- The block gets it as `$GH_TOKEN` when it runs. If the command prints it,
+  the block shows `••••` in its place, and no display ever receives it.
+- There's no command that prints a secret back. `board secret list` shows
+  the names, and `board secret remove github` deletes one.
+- Windows isn't supported yet.
 
 ### A display block from a command (no code)
 

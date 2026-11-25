@@ -150,3 +150,12 @@ test("finding the board never runs a project's own git", async () => {
   assert.ok(r[1].result.structuredContent.blocks[0].data.tasks.length >= 0)
   assert.deepEqual(ran(planted), [])
 })
+
+test('your own block reaches every display through board mcp, and runs once per its interval', async () => {
+  const m = machine()
+  fs.writeFileSync(m.env.BOARD_SETTINGS_FILE, JSON.stringify({ blocks: { enabled: ['deploy'], commands: { deploy: { run: `echo deploy >> ${JSON.stringify(m.marker)}; echo live v1`, title: 'Deploy' } } } }))
+  const r = await session(m, [view(1), view(2), view(3)])
+  const block = r[3].result.structuredContent.blocks.find(b => b.id === 'deploy')
+  assert.deepEqual([block.title, block.type, block.data.text], ['Deploy', 'line', 'live v1'])
+  assert.deepEqual(ran(m.marker), ['deploy'])
+})

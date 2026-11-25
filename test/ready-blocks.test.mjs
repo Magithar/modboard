@@ -77,7 +77,7 @@ test('on and off are kept in your own settings, and --all lists every block', ()
   json(root, ['blocks', 'off', 'ci'], { BOARD_SETTINGS_FILE: settings })
   assert.deepEqual(JSON.parse(fs.readFileSync(settings, 'utf8')).blocks.enabled, ['branch'])
   const all = json(root, ['blocks', '--all'], { BOARD_SETTINGS_FILE: settings }).all
-  assert.deepEqual(all.map(b => [b.id, b.enabled]), [['branch', true], ['changes', false], ['ci', false], ['prs', false], ['tests', false]])
+  assert.deepEqual(all.map(b => [b.id, b.enabled]), [['branch', true], ['changes', false], ['ci', false], ['prs', false], ['tests', false], ['clock', false], ['timer', false], ['weather', false]])
   assert.equal(board(root, ['blocks', 'on', 'nope'], { BOARD_SETTINGS_FILE: settings }).code, 4)
 })
 
@@ -223,4 +223,184 @@ test("GIT_* settings in the environment don't reach the blocks' git", () => {
   const env = { GIT_DIR: path.join(other, '.git'), GIT_WORK_TREE: other, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: '/nonexistent' }
   assert.equal(json(root, ['blocks', 'run', 'branch'], env).text, 'mine')
   assert.equal(json(root, ['blocks', 'run', 'changes'], env).text, 'clean')
+})
+
+// Your own blocks: a command you wrote, kept in your settings, shown as a line
+// in every display, run in the project with the project's folders off PATH.
+const withCommands = (commands, enabled = Object.keys(commands)) => {
+  const file = path.join(tmp(), 'settings.json')
+  fs.writeFileSync(file, JSON.stringify({ blocks: { enabled, commands } }))
+  return file
+}
+
+test('your own block shows its first line, runs in the project root, and says how it went', () => {
+  const root = repo()
+  fs.mkdirSync(path.join(root, 'sub'))
+  const settings = withCommands({
+    here: { run: 'echo "${PWD##*/}"' },
+    greet: { run: 'printf "\\n  hello there  \\nsecond\\n"', title: 'Greeting' },
+    quiet: { run: 'true' },
+    broken: { run: 'echo nope >&2; exit 3' },
+    slow: { run: 'sleep 5' },
+  })
+  const lines = json(path.join(root, 'sub'), ['blocks'], { BOARD_SETTINGS_FILE: settings, BOARD_BLOCK_TIMEOUT_MS: '1500', PATH: SYS }).lines
+  const by = Object.fromEntries(lines.map(l => [l.id, l]))
+  assert.equal(by.here.text, path.basename(root))
+  assert.deepEqual([by.greet.state, by.greet.text], ['ok', 'hello there'])
+  assert.deepEqual([by.quiet.state, by.quiet.text], ['empty', 'no output'])
+  assert.deepEqual([by.broken.state, by.broken.text], ['error', 'nope'])
+  assert.equal(by.slow.state, 'timeout')
+  const all = json(root, ['blocks', '--all'], { BOARD_SETTINGS_FILE: settings }).all
+  assert.equal(all.find(b => b.id === 'greet').title, 'Greeting')
+  assert.equal(all.find(b => b.id === 'greet').source, 'yours')
+})
+
+test("a project can't add a block of its own, and a repo's own tools never stand in", () => {
+  const root = repo()
+  const marker = path.join(tmp(), 'ran')
+  // What a cloned repo could carry: its own settings and a planted git.
+  fs.mkdirSync(path.join(root, '.modboard'), { recursive: true })
+  fs.writeFileSync(path.join(root, '.modboard', 'settings.json'), JSON.stringify({ blocks: { enabled: ['evil'], commands: { evil: { run: `echo ran >> ${marker}` } } } }))
+  assert.deepEqual(json(root, ['blocks']).lines, [])
+  fake(path.join(root, 'bin'), 'git', marker)
+  const settings = withCommands({ ver: { run: 'git --version' } })
+  const PATH = [path.join(root, 'bin'), SYS].join(':')
+  const line = json(root, ['blocks'], { BOARD_SETTINGS_FILE: settings, PATH }).lines[0]
+  assert.match(line.text, /^git version/)
+  assert.equal(fs.existsSync(marker), false)
+})
+
+test('a block of your own needs a good name and a command, and is added only at a terminal', async () => {
+  const { addCommandBlock, removeCommandBlock, enabledIds } = await import('../lib/ready-blocks.mjs')
+  const prior = process.env.BOARD_SETTINGS_FILE
+  process.env.BOARD_SETTINGS_FILE = path.join(tmp(), 'settings.json')
+  try {
+    for (const [id, line] of [['Bad', 'x'], ['branch', 'x'], ['a'.repeat(17), 'x'], ['ok', ''], ['ok', 'x'.repeat(501)], [undefined, 'x']])
+      assert.throws(() => addCommandBlock(id, line), { code: 2 }, String(id))
+    addCommandBlock('deploy', 'echo live', { title: 'Deploy' })
+    assert.deepEqual(enabledIds(), ['deploy'])
+    removeCommandBlock('deploy')
+    assert.deepEqual(enabledIds(), [])
+    assert.throws(() => removeCommandBlock('deploy'), { code: 4 })
+  } finally {
+    prior === undefined ? delete process.env.BOARD_SETTINGS_FILE : (process.env.BOARD_SETTINGS_FILE = prior)
+  }
+  const r = board(repo(), ['blocks', 'add', 'x', '--run', 'echo hi'])
+  assert.equal(r.code, 2)
+  assert.match(r.out, /asks a person to confirm, at a terminal/)
+})
+
+// Clock, timer and weather. Weather talks to Open-Meteo only for a place you
+// set; these use a stand-in for it, so nothing leaves the machine.
+test('weather says when no place is set, and reads the forecast for the one that is', async () => {
+  const { runBlock } = await import('../lib/ready-blocks.mjs')
+  const prior = process.env.BOARD_SETTINGS_FILE
+  process.env.BOARD_SETTINGS_FILE = path.join(tmp(), 'settings.json')
+  const urls = []
+  const reply = body => async url => (urls.push(url), body)
+  try {
+    assert.deepEqual(await runBlock('weather', tmp(), { fetchJson: reply({}) }), { id: 'weather', state: 'empty', text: 'no place set: board weather <place>' })
+    assert.deepEqual(urls, [], 'nothing is sent without a place')
+    fs.writeFileSync(process.env.BOARD_SETTINGS_FILE, JSON.stringify({ weather: { name: 'Bengaluru', latitude: 12.97, longitude: 77.59 } }))
+    const ok = await runBlock('weather', tmp(), { fetchJson: reply({ current: { temperature_2m: 24.4, weather_code: 0 }, daily: { temperature_2m_max: [29.6] } }) })
+    assert.deepEqual(ok, { id: 'weather', state: 'ok', text: '☀ 24° clear · H 30° · Bengaluru' })
+    assert.match(urls.at(-1), /^https:\/\/api\.open-meteo\.com\/v1\/forecast\?latitude=12\.97&longitude=77\.59&/)
+    assert.equal((await runBlock('weather', tmp(), { fetchJson: async () => { throw new Error('ENOTFOUND') } })).state, 'offline')
+    assert.equal((await runBlock('weather', tmp(), { fetchJson: async () => { throw Object.assign(new Error('t'), { name: 'TimeoutError' }) } })).state, 'timeout')
+    assert.equal((await runBlock('weather', tmp(), { fetchJson: reply({ nope: 1 }) })).state, 'error')
+  } finally {
+    prior === undefined ? delete process.env.BOARD_SETTINGS_FILE : (process.env.BOARD_SETTINGS_FILE = prior)
+  }
+})
+
+test('a place is coordinates as given, or a name looked up once; board weather turns the block on and off', async () => {
+  const { findPlace } = await import('../lib/ready-blocks.mjs')
+  const never = async () => assert.fail('coordinates are not looked up')
+  assert.deepEqual(await findPlace(' 12.97 , 77.59 ', { get: never }), { name: '12.97 , 77.59', latitude: 12.97, longitude: 77.59 })
+  assert.equal(await findPlace('91,0', { get: never }), null)
+  assert.equal(await findPlace('', { get: never }), null)
+  let asked
+  const found = await findPlace('Bengaluru', { get: async url => ((asked = url), { results: [{ name: 'Bengaluru', latitude: 12.97, longitude: 77.59 }] }) })
+  assert.deepEqual(found, { name: 'Bengaluru', latitude: 12.97, longitude: 77.59 })
+  assert.match(asked, /^https:\/\/geocoding-api\.open-meteo\.com\/v1\/search\?count=1&name=Bengaluru$/)
+  assert.equal(await findPlace('Nowhere', { get: async () => ({}) }), null)
+
+  const settings = path.join(tmp(), 'settings.json')
+  const root = repo()
+  assert.match(board(root, ['weather', '12.97,77.59', '--fahrenheit'], { BOARD_SETTINGS_FILE: settings }).out, /weather for 12\.97,77\.59, in °F; the weather block is on/)
+  const kept = JSON.parse(fs.readFileSync(settings, 'utf8'))
+  assert.deepEqual(kept.weather, { name: '12.97,77.59', latitude: 12.97, longitude: 77.59, fahrenheit: true })
+  assert.deepEqual(kept.blocks.enabled, ['weather'])
+  board(root, ['weather', 'off'], { BOARD_SETTINGS_FILE: settings })
+  const off = JSON.parse(fs.readFileSync(settings, 'utf8'))
+  assert.equal(off.weather, undefined)
+  assert.deepEqual(off.blocks.enabled, [])
+})
+
+test('clock and timer are drawn by the page, and say what they are as text', () => {
+  const settings = withCommands({}, ['clock', 'timer'])
+  const lines = json(repo(), ['blocks'], { BOARD_SETTINGS_FILE: settings }).lines
+  assert.match(lines.find(l => l.id === 'clock').text, /^\d{1,2}:\d{2}/)
+  assert.equal(lines.find(l => l.id === 'timer').text, 'a timer, in the board page')
+  const all = json(repo(), ['blocks', '--all'], { BOARD_SETTINGS_FILE: settings }).all
+  assert.deepEqual(['clock', 'timer', 'weather'].map(id => all.find(b => b.id === id).view), ['clock', 'timer', 'line'])
+})
+
+// Network: a block reaches only the hosts it names, over HTTPS, and nothing
+// while the network is off for blocks.
+test('a block reaches only its own hosts, over HTTPS, on the usual port', async () => {
+  const { guardFetch } = await import('../lib/ready-blocks.mjs')
+  const prior = process.env.BOARD_SETTINGS_FILE
+  process.env.BOARD_SETTINGS_FILE = path.join(tmp(), 'settings.json')
+  const called = []
+  const get = guardFetch({ id: 'weather', hosts: ['api.open-meteo.com'] }, async url => (called.push(url), { ok: 1 }))
+  try {
+    assert.deepEqual(await get('https://api.open-meteo.com/v1/forecast?x=1'), { ok: 1 })
+    for (const bad of [
+      'https://evil.example/steal',
+      'http://api.open-meteo.com/v1/forecast',
+      'https://api.open-meteo.com:8443/v1/forecast',
+      'https://user:pw@api.open-meteo.com/',
+      'https://api.open-meteo.com.evil.example/',
+      'https://geocoding-api.open-meteo.com/v1/search',
+      'file:///etc/passwd',
+      'not a url',
+    ])
+      await assert.rejects(get(bad), { code: 'NOT_ALLOWED' }, bad)
+    assert.deepEqual(called, ['https://api.open-meteo.com/v1/forecast?x=1'])
+  } finally {
+    prior === undefined ? delete process.env.BOARD_SETTINGS_FILE : (process.env.BOARD_SETTINGS_FILE = prior)
+  }
+})
+
+test('with the network off for blocks, nothing is fetched and the block says why', async () => {
+  const { runBlock, setNetwork, networkOff } = await import('../lib/ready-blocks.mjs')
+  const prior = process.env.BOARD_SETTINGS_FILE
+  process.env.BOARD_SETTINGS_FILE = path.join(tmp(), 'settings.json')
+  try {
+    fs.writeFileSync(process.env.BOARD_SETTINGS_FILE, JSON.stringify({ weather: { name: 'Bengaluru', latitude: 12.97, longitude: 77.59 } }))
+    setNetwork(false)
+    assert.equal(networkOff(), true)
+    let fetched = 0
+    const line = await runBlock('weather', tmp(), { fetchJson: async () => (fetched++, {}) })
+    assert.deepEqual(line, { id: 'weather', state: 'offline', text: 'network off for blocks (board blocks network on)' })
+    assert.equal(fetched, 0)
+    setNetwork(true)
+    assert.equal(networkOff(), false)
+    assert.equal(JSON.parse(fs.readFileSync(process.env.BOARD_SETTINGS_FILE, 'utf8')).weather.name, 'Bengaluru', 'the rest of your settings stay')
+  } finally {
+    prior === undefined ? delete process.env.BOARD_SETTINGS_FILE : (process.env.BOARD_SETTINGS_FILE = prior)
+  }
+})
+
+test('board blocks network off and on, and --all says what each block reaches', () => {
+  const root = repo()
+  const settings = path.join(tmp(), 'settings.json')
+  assert.match(board(root, ['blocks', 'network', 'off'], { BOARD_SETTINGS_FILE: settings }).out, /network for blocks: off/)
+  const all = board(root, ['blocks', '--all'], { BOARD_SETTINGS_FILE: settings }).out
+  assert.match(all, /weather .* reaches api\.open-meteo\.com, geocoding-api\.open-meteo\.com/)
+  assert.match(all, /network for blocks is off/)
+  assert.match(board(root, ['weather', 'Bengaluru'], { BOARD_SETTINGS_FILE: settings }).out, /couldn't reach Open-Meteo/)
+  assert.match(board(root, ['blocks', 'network', 'on'], { BOARD_SETTINGS_FILE: settings }).out, /network for blocks: on/)
+  assert.equal(JSON.parse(fs.readFileSync(settings, 'utf8')).blocks.network, undefined)
 })

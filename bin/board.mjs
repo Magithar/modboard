@@ -19,7 +19,8 @@ import { BoardError, createEngine } from '../lib/engine.mjs'
 import { createHolder } from '../lib/holder.mjs'
 import { blockPlan, blocksDir, installBlock, listBlocks, loadStore, removeBlock, storeStatus } from '../lib/load-store.mjs'
 import { readTaskFile } from '../lib/taskfile.mjs'
-import { blockById, findTool, projectRoot, registry, runBlock, setEnabled, enabledIds, viewOf } from '../lib/ready-blocks.mjs'
+import { addCommandBlock, blockById, findPlace, findTool, networkOff, projectRoot, registry, rememberSecret, removeCommandBlock, runBlock, secretNames, setEnabled, setNetwork, setWeather, enabledIds, viewOf, weatherSettings } from '../lib/ready-blocks.mjs'
+import { removeSecret, setSecret } from '../lib/secrets.mjs'
 import { lineBlock, tasksBlock } from '../lib/block-data.mjs'
 import { createBench, listen } from '../lib/serve.mjs'
 import { createMcp, runStdio } from '../lib/mcp.mjs'
@@ -191,6 +192,65 @@ function describe(t) {
   return out.join('\n')
 }
 
+// --secret VAR=name (given once or more) -> { VAR: name }.
+function secretFlags(v) {
+  const out = {}
+  for (const pair of [v ?? []].flat()) {
+    const at = typeof pair === 'string' ? pair.indexOf('=') : -1
+    if (at < 1) throw new BoardError(2, `--secret takes VAR=name, like GH_TOKEN=github${typeof pair === 'string' ? ` (got ${pair})` : ''}`)
+    out[pair.slice(0, at)] = pair.slice(at + 1)
+  }
+  return out
+}
+
+const readAll = stream =>
+  new Promise((resolve, reject) => {
+    let out = ''
+    stream.setEncoding('utf8')
+    stream.on('data', c => (out += c))
+    stream.on('end', () => resolve(out))
+    stream.on('error', reject)
+  })
+
+// A line typed at the terminal, not echoed. Ctrl+C or Ctrl+D gives nothing.
+function askHidden(prompt) {
+  return new Promise(resolve => {
+    const input = process.stdin
+    process.stderr.write(prompt)
+    input.setRawMode(true)
+    input.resume()
+    input.setEncoding('utf8')
+    let value = ''
+    const done = v => {
+      input.setRawMode(false)
+      input.pause()
+      input.off('data', onData)
+      process.stderr.write('\n')
+      resolve(v)
+    }
+    const onData = chunk => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n') return done(value)
+        if (ch === '\u0003' || ch === '\u0004') return done('')
+        if (ch === '\u007f' || ch === '\b') value = value.slice(0, -1)
+        else value += ch
+      }
+    }
+    input.on('data', onData)
+  })
+}
+
+// Open a page in the person's browser: the system's own opener, no shell.
+function openInBrowser(url) {
+  const [cmd, args] =
+    process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['explorer.exe', [url]] : ['xdg-open', [url]]
+  try {
+    spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => console.error(`open ${url} in your browser`)).unref()
+  } catch {
+    console.error(`open ${url} in your browser`)
+  }
+}
+
 // Antigravity's plugins folder (BOARD_ANTIGRAVITY_PLUGINS for tests).
 const antigravityPlugins = () => process.env.BOARD_ANTIGRAVITY_PLUGINS ?? path.join(os.homedir(), '.gemini', 'config', 'plugins')
 
@@ -246,6 +306,8 @@ const ids = list => (list.length ? list.join(', ') : 'nothing')
 // What each command says to a person. --json prints the data instead, and
 // view and events (for programs) always do.
 const SAY = {
+  secret: r => (r.secrets ? (r.secrets.length ? r.secrets.join('\n') : 'no secrets set; board secret set <name>') : r.set ? `kept ${r.secret} in the keychain` : `removed ${r.secret}`),
+  weather: r => (r.weather ? `weather for ${r.weather}${r.fahrenheit ? ', in °F' : ''}; the weather block is on` : 'no weather place set; board weather <place> sets one'),
   antigravity: r =>
     [
       `${r.updated ? 'updated' : 'installed'} the modBOARD panel in ${r.dir}`,
@@ -275,8 +337,15 @@ const SAY = {
   done: t => `done ${line(t)}\n${t.notes.at(-1).text}${t.review ? `\nadded ${t.review} to review it` : ''}`,
   'release-all': r => `released ${ids(r.released)}`,
   blocks: r => {
-    if (r.all) return r.all.map(b => `${b.enabled ? '[x]' : '[ ]'} ${b.id.padEnd(8)} ${b.about}${b.needs.length ? `  (needs ${b.needs.join(', ')})` : ''}`).join('\n')
+    if (r.network) return `network for blocks: ${r.network}${r.network === 'off' ? ' (board blocks network on turns it back on)' : ''}`
+    if (r.all)
+      return [
+        ...r.all.map(b => `${b.enabled ? '[x]' : '[ ]'} ${b.id.padEnd(8)} ${b.about}${b.needs.length ? `  (needs ${b.needs.join(', ')})` : ''}${b.hosts?.length ? `  reaches ${b.hosts.join(', ')}` : ''}`),
+        ...(r.networkOff ? ['network for blocks is off: board blocks network on'] : []),
+      ].join('\n')
     if (r.lines) return r.lines.length ? r.lines.map(l => `${l.id.padEnd(8)} ${l.text}`).join('\n') : 'no blocks on; board blocks --all lists them, board blocks on <id> turns one on'
+    if (r.added) return `added ${r.id}, and turned it on; every display shows it`
+    if (r.removed) return `removed ${r.id}`
     if (r.text !== undefined) return `${r.id.padEnd(8)} ${r.text}`
     return `${r.id} is ${r.enabled ? 'on' : 'off'}`
   },
@@ -545,9 +614,56 @@ const commands = {
   //   board blocks --all           every block, on or off (nothing runs)
   //   board blocks on <id>         turn one on (off: off), in your own settings
   //   board blocks run <id>        one block's line, for a display that polls
-  // Which are on is yours (~/.config/modboard/settings.json); a project can't
-  // turn one on. Each runs in this checkout, so it is about this project.
+  //   board blocks add <name> --run "<command>" [--title T] [--every 30s]
+  //                                one of your own: a command's first line, in
+  //                                every display; asks you at a terminal first
+  //   board blocks remove <name>
+  // Which are on, and your own, are yours (~/.config/modboard/settings.json);
+  // a project can't add or turn one on. Each runs in this checkout, so it is
+  // about this project.
   async blocks(_, [sub, id], flags) {
+    if (sub === 'add') {
+      const line = text(flags.run)
+      if (!id || !line) throw new BoardError(2, 'usage: board blocks add <name> --run "<command>" [--title <title>] [--every 30s]')
+      const every = duration(flags.every, 'every')
+      const secrets = secretFlags(flags.secret)
+      if (!process.stdin.isTTY || !process.stderr.isTTY)
+        throw new BoardError(2, `board blocks add asks a person to confirm, at a terminal: run it yourself to add "${id}"`)
+      console.error(
+        [
+          `Add your own block "${id}", which runs:`,
+          `  ${line}`,
+          `every ${Math.round((every ?? 30_000) / 1000)}s while a display shows the board, in whichever project it shows,`,
+          'with your access: your files, environment and network. It shows the first line it prints.',
+          ...(Object.keys(secrets).length ? [`It gets ${Object.entries(secrets).map(([k, v]) => `$${k} from secret ${v}`).join(', ')}.`] : []),
+        ].join('\n'),
+      )
+      const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
+      const answer = await rl
+        .question('Add it? Type yes: ')
+        .catch(() => '')
+        .finally(() => rl.close())
+      if (answer.trim().toLowerCase() !== 'yes') throw new BoardError(2, 'not added; nothing changed')
+      try {
+        return addCommandBlock(id, line, { title: text(flags.title), every, secrets })
+      } catch (err) {
+        throw new BoardError(err.code ?? 2, err.message)
+      }
+    }
+    // board blocks network off|on: every block's network, at once (yours,
+    // which are shell commands, aren't limited by this).
+    if (sub === 'network') {
+      if (id !== 'on' && id !== 'off') return { network: networkOff() ? 'off' : 'on' }
+      return setNetwork(id === 'on')
+    }
+    if (sub === 'remove') {
+      if (!id) throw new BoardError(2, 'usage: board blocks remove <name>')
+      try {
+        return removeCommandBlock(id)
+      } catch (err) {
+        throw new BoardError(err.code ?? 2, err.message)
+      }
+    }
     if (sub === 'on' || sub === 'off') {
       if (!id) throw new BoardError(2, `usage: board blocks ${sub} <id>`)
       try {
@@ -561,10 +677,55 @@ const commands = {
       if (!id || !blockById(id)) throw new BoardError(id ? 4 : 2, id ? `no block "${id}"; board blocks --all lists them` : 'usage: board blocks run <id>')
       return runBlock(id, process.cwd(), opts)
     }
-    if (sub) throw new BoardError(2, 'usage: board blocks [--all] | board blocks on|off|run <id>')
-    if (flags.all) return { all: registry() }
+    if (sub) throw new BoardError(2, 'usage: board blocks [--all] | board blocks on|off|run <id> | board blocks add <name> --run "<command>" | board blocks remove <name> | board blocks network on|off')
+    if (flags.all) return { all: registry(), ...(networkOff() ? { networkOff: true } : {}) }
     // Every block that's on, at once: one that is slow or fails holds up none of the others.
     return { lines: await Promise.all(enabledIds().map(b => runBlock(b, process.cwd(), opts))) }
+  },
+  // board secret set <name> [--stdin] | board secret remove <name> | board secret list
+  // A secret for your blocks (an API token), kept in the OS keychain. Set
+  // asks for it at a terminal, not shown as you type (--stdin reads it from a
+  // pipe instead); it never goes in an argument, a file or your history.
+  // There is no command that prints one back.
+  async secret(_, [sub, name], flags) {
+    const ok = f => {
+      try {
+        return f()
+      } catch (err) {
+        throw new BoardError(typeof err.code === 'number' ? err.code : 3, err.message)
+      }
+    }
+    if (sub === 'list') return { secrets: secretNames() }
+    if (sub === 'remove') {
+      if (!name) throw new BoardError(2, 'usage: board secret remove <name>')
+      const r = ok(() => removeSecret(name))
+      rememberSecret(name, false)
+      return r
+    }
+    if (sub !== 'set' || !name) throw new BoardError(2, 'usage: board secret set <name> [--stdin] | board secret remove <name> | board secret list')
+    let value
+    if (flags.stdin) value = (await readAll(process.stdin)).replace(/\r?\n$/, '')
+    else if (process.stdin.isTTY && process.stderr.isTTY) value = await askHidden(`Secret ${name} (not shown): `)
+    else throw new BoardError(2, 'board secret set asks at a terminal; to pipe the value in, add --stdin')
+    const r = ok(() => setSecret(name, value))
+    rememberSecret(name, true)
+    return r
+  },
+  // board weather <place> [--fahrenheit] | board weather off | board weather
+  // The place for the weather block, in your settings, and turns it on. A
+  // name is looked up once at Open-Meteo; "12.97,77.59" is used as it is.
+  async weather(_, words, flags) {
+    const said = words.join(' ').trim()
+    if (!said) return { weather: weatherSettings()?.name ?? null, fahrenheit: weatherSettings()?.fahrenheit ?? false }
+    if (said === 'off') return setWeather(null)
+    let place
+    try {
+      place = await findPlace(said)
+    } catch (err) {
+      throw new BoardError(3, `couldn't reach Open-Meteo to find "${said}" (${err.message}); try latitude,longitude`)
+    }
+    if (!place) throw new BoardError(4, `no place called "${said}"; try a city, or latitude,longitude`)
+    return setWeather(place, { fahrenheit: !!flags.fahrenheit })
   },
   // The project's own task.md, for display; it never touches the board.
   taskfile: () => readTaskFile(process.env.BOARD_TASKFILE_DIR ?? projectDir()),
@@ -575,18 +736,23 @@ const commands = {
   // Copies integrations/antigravity/modboard into its plugins folder and names
   // this install in the panel's settings, so updating modboard updates it.
   antigravity: (_, __, flags) => installAntigravity(flags),
-  // board serve [--port 4477] [--dir <project>]: the board as a local web page, read-only, in
-  // the shared block shape (lib/block-data.mjs). Runs until stopped.
+  // board serve [--port 4477] [--dir <project>] [--open] [--read-only]: the
+  // board as a dashboard in your own browser, this machine only, the same page
+  // the apps draw. Its buttons act for you (BOARD_AGENT, else "human"), as
+  // board mcp's do; --read-only turns them off. Runs until stopped.
   async serve(board, _, flags) {
     const port = flags.port === undefined ? 4477 : typeof flags.port === 'string' && /^\d+$/.test(flags.port) ? Number(flags.port) : NaN
-    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new BoardError(2, 'usage: board serve [--port 4477]')
+    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new BoardError(2, 'usage: board serve [--port 4477] [--dir <project>] [--open] [--read-only]')
+    const me = process.env.BOARD_AGENT || 'human'
+    const act = flags['read-only'] ? undefined : boardActions(board, me)
     let url
     try {
-      url = await listen(createBench(boardBlocks(board)), port)
+      url = await listen(createBench(boardBlocks(board, act ? me : undefined), { act }), port)
     } catch (err) {
       throw new BoardError(2, err.code === 'EADDRINUSE' ? `port ${port} is in use; try board serve --port <another>` : err.message)
     }
-    console.log(`modBOARD at ${url}  (this machine only, read-only; Ctrl-C stops it)`)
+    console.log(`modBOARD at ${url}  (this machine only; ${act ? `its buttons act as ${me}` : 'read-only'}; Ctrl-C stops it)`)
+    if (flags.open) openInBrowser(url)
     return new Promise(() => {})
   },
   // board mcp [--dir <project>]: the board as a local MCP server on stdio, drawn as an MCP App
@@ -615,10 +781,12 @@ const FLAGS = {
   check: ['passed'],
   run: [],
   block: ['name'],
-  blocks: ['all'],
-  serve: ['port', 'dir'],
+  blocks: ['all', 'run', 'title', 'every', 'secret'],
+  secret: ['stdin'],
+  serve: ['port', 'dir', 'open', 'read-only'],
   mcp: ['dir'],
   antigravity: ['dir'],
+  weather: ['fahrenheit'],
   done: ['note', 'review'],
   'release-all': ['handoff', 'session'],
   register: ['session'],
@@ -636,7 +804,7 @@ function checkFlags(cmd, flags) {
 }
 
 // Commands that read no board, so no storage block is loaded for them.
-const BOARDLESS = new Set(['where', 'taskfile', 'block', 'blocks', 'antigravity'])
+const BOARDLESS = new Set(['where', 'taskfile', 'block', 'blocks', 'antigravity', 'weather', 'secret'])
 // Displays act for a person, who has no process to watch: their claims end by
 // lease alone, not when the app showing the board quits (lib/holder.mjs).
 const DISPLAYS = new Set(['serve', 'mcp'])

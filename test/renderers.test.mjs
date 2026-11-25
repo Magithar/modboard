@@ -26,6 +26,8 @@ const pageViews = () => {
 const SAMPLES = {
   tasks: tasksBlock([{ id: 'T-001', title: 'Fix login', status: 'claimed', claim: { owner: 'codex 1', since: 'x' }, notes: [] }], { me: 'human' }),
   line: lineBlock({ id: 'branch', state: 'ok', text: 'main' }, { title: 'Branch' }),
+  clock: lineBlock({ id: 'clock', state: 'ok', text: '14:05' }, { title: 'Clock', type: 'clock' }),
+  timer: lineBlock({ id: 'timer', state: 'ok', text: 'a timer, in the board page' }, { title: 'Timer', type: 'timer' }),
 }
 
 test('every view has a sample here, and every sample keeps the contract', () => {

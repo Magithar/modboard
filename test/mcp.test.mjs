@@ -96,7 +96,7 @@ test('stdio: one message per line, and every answer is written before it exits',
 })
 
 test('blocksText draws an unknown block type as its data', () => {
-  assert.equal(blocksText([{ type: 'clock', title: 'Clock', status: 'ready', data: { time: '20:15' } }]), 'Clock: {"time":"20:15"}')
+  assert.equal(blocksText([{ type: 'chart', title: 'Chart', status: 'ready', data: { n: 3 } }]), 'Chart: {"n":3}')
 })
 
 test('stdio: a host that hangs up mid-reply ends the session, not the process', async () => {

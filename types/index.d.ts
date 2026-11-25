@@ -53,7 +53,7 @@ export type Weather = { temp: number; high: number; code: number; place: string;
 // A ready-made block as the registry reports it (board blocks --all), and
 // its last line. state: ok · empty · missing · auth · offline · unsafe ·
 // timeout · error.
-export type ReadyBlock = { id: string; title: string; about: string; needs: string[]; every: number; timeout: number; source: string; enabled: boolean }
+export type ReadyBlock = { id: string; title: string; about: string; needs: string[]; every: number; timeout: number; source: string; enabled: boolean; view?: string; hosts?: string[] }
 export type ReadyValue = { id: string; state: string; text: string; at: number }
 
 export type Reminder = { at: string; note: string; due?: number }
